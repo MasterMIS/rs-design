@@ -1,0 +1,469 @@
+.usersContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.headerActions {
+  display: flex;
+  gap: 12px;
+}
+
+.titleSection h2 {
+  font-size: 1.75rem;
+  margin-bottom: 4px;
+  color: var(--text-heading);
+}
+
+.titleSection p {
+  font-size: 0.95rem;
+  color: var(--text-light);
+}
+
+.addButton, .filterBtn {
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.addButton {
+  background-color: var(--primary);
+  color: white;
+  box-shadow: 0 4px 15px rgba(59, 175, 218, 0.3);
+}
+
+.addButton:hover {
+  background-color: #3295b9;
+  transform: translateY(-1px);
+}
+
+.filterBtn {
+  background-color: white;
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+}
+
+.filterBtn:hover, .activeFilter {
+  border-color: var(--primary);
+  color: var(--primary);
+  background-color: rgba(59, 175, 218, 0.05);
+}
+
+/* Content Layout with Vertical Filter */
+.contentLayout {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.verticalFilter {
+  width: 280px;
+  background-color: var(--bg-card);
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 24px;
+  animation: slideInLeft 0.3s ease-out;
+  border: 1px solid var(--border-color);
+}
+
+.filterHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 12px;
+}
+
+.filterHeader h3 {
+  font-size: 1.1rem;
+  color: var(--text-heading);
+}
+
+.filterHeader button {
+  background: none;
+  border: none;
+  color: var(--text-light);
+  cursor: pointer;
+}
+
+.filterGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.filterGroup label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-light);
+}
+
+.searchBox {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.searchBox svg {
+  position: absolute;
+  left: 12px;
+  color: var(--text-light);
+}
+
+.searchBox input {
+  width: 100%;
+  padding: 10px 10px 10px 38px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background-color: var(--bg-main);
+  color: var(--text-main);
+}
+
+.filterGroup select {
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background-color: var(--bg-main);
+  color: var(--text-main);
+  cursor: pointer;
+}
+
+.clearBtn {
+  background: none;
+  border: 1px solid var(--border-color);
+  padding: 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--text-light);
+}
+
+.mainGridArea {
+  flex: 1;
+}
+
+/* Reverting to Simple User Grid & Cards */
+.userGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 24px;
+}
+
+.userCard {
+  background-color: var(--bg-card);
+  border-radius: 16px;
+  padding: 24px;
+  position: relative;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02);
+  border: 1px solid var(--border-color);
+}
+
+.userCard:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
+}
+
+.cardActions {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  gap: 8px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.userCard:hover .cardActions {
+  opacity: 1;
+}
+
+.iconBtn {
+  background-color: var(--bg-main);
+  border: 1px solid var(--border-color);
+  color: var(--text-light);
+  padding: 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.iconBtn:hover {
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
+.deleteBtn:hover {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.cardHeader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.avatarWrapper {
+  position: relative;
+  margin-bottom: 16px;
+}
+
+.cardAvatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 24px;
+  object-fit: cover;
+  border: 3px solid white;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+}
+
+.avatarPlaceholder {
+  width: 80px;
+  height: 80px;
+  border-radius: 24px;
+  background-color: var(--bg-main);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-light);
+  border: 1px dashed var(--border-color);
+}
+
+.statusDot {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 3px solid white;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+.active { background-color: var(--success); }
+.inactive { background-color: var(--danger); }
+
+.cardName {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+  color: var(--text-heading);
+}
+
+.cardRole {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--primary);
+  background-color: var(--primary-light);
+  padding: 4px 12px;
+  border-radius: 20px;
+}
+
+.cardBody {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 0;
+  border-top: 1px solid var(--border-color);
+}
+
+.infoItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--text-main);
+  font-size: 0.85rem;
+}
+
+.infoItem svg {
+  color: var(--primary);
+}
+
+.statusLabel {
+  font-weight: 600;
+}
+
+/* Form Styles */
+.userForm { display: flex; flex-direction: column; gap: 20px; }
+.imageUploadSection { display: flex; justify-content: center; margin-bottom: 8px; }
+.imagePreview { width: 100px; height: 100px; border-radius: 30px; border: 2px dashed var(--border-color); display: flex; align-items: center; justify-content: center; cursor: pointer; overflow: hidden; background-color: var(--bg-main); }
+.imagePreview img { width: 100%; height: 100%; object-fit: cover; }
+
+.formGroup { display: flex; flex-direction: column; gap: 8px; }
+.formGroup label { 
+  font-size: 0.85rem; 
+  font-weight: 600; 
+  color: var(--text-heading);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.labelIcon {
+  color: var(--primary);
+}
+
+.formGroup input, .formGroup select { 
+  padding: 12px; 
+  border: 1px solid var(--border-color); 
+  border-radius: 10px; 
+  background-color: var(--primary-light);
+  color: var(--text-heading);
+  transition: all 0.2s;
+}
+
+.formGroup input:focus, .formGroup select:focus {
+  background-color: var(--bg-card);
+  border-color: var(--primary);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(59, 175, 218, 0.1);
+}
+
+.toggleGroup {
+  display: flex;
+  gap: 8px;
+  background-color: var(--bg-main);
+  padding: 4px;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+}
+
+.toggleBtn {
+  flex: 1;
+  padding: 10px;
+  border: none;
+  background: none;
+  color: var(--text-light);
+  font-weight: 600;
+  font-size: 0.85rem;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.2s;
+}
+
+.activeToggle {
+  background-color: var(--primary);
+  color: white !important;
+  box-shadow: 0 4px 10px rgba(59, 175, 218, 0.3);
+}
+
+.inactiveToggle.activeToggle {
+  background-color: var(--danger);
+  box-shadow: 0 4px 10px rgba(241, 85, 108, 0.3);
+}
+
+.inputWithIcon {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.eyeBtn {
+  position: absolute;
+  right: 12px;
+  background: none;
+  border: none;
+  color: var(--text-light);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+}
+
+.eyeBtn:hover {
+  color: var(--primary);
+}
+
+.passwordInput {
+  width: 100%;
+  padding-right: 40px !important;
+}
+
+.selectWithAdd {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+}
+
+.miniAddBtn {
+  background-color: var(--primary);
+  color: white;
+  border: none;
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform 0.2s;
+}
+
+.miniAddBtn:hover {
+  transform: scale(1.05);
+  background-color: #3295b9;
+}
+
+.newItemForm {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.newItemForm input {
+  padding: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background-color: var(--bg-main);
+  width: 100%;
+  color: var(--text-main);
+}
+
+.formRow { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.formActions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 10px; }
+.submitButton { background-color: var(--primary); color: white; border: none; padding: 12px 30px; border-radius: 10px; cursor: pointer; font-weight: 700; transition: all 0.2s; }
+.submitButton:hover { background-color: #3295b9; transform: translateY(-1px); }
+.cancelButton { background: none; border: 1px solid var(--border-color); padding: 12px 30px; border-radius: 10px; cursor: pointer; font-weight: 600; color: var(--text-main); }
+
+.errorBanner { background-color: rgba(241, 85, 108, 0.1); color: var(--danger); padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; }
+.loadingState { display: flex; flex-direction: column; align-items: center; padding: 100px; gap: 16px; }
+
+.emptyStateContainer { width: 100%; display: flex; justify-content: center; padding: 100px 0; }
+.emptyState { color: var(--text-light); font-size: 1.1rem; }
+
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideInLeft { from { transform: translateX(-20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }

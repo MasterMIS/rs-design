@@ -1,0 +1,99 @@
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+  animation: fadeIn 0.2s ease-out;
+}
+
+.modal {
+  background-color: var(--bg-card);
+  width: 100%;
+  max-width: 650px;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
+  animation: slideUp 0.3s ease-out;
+}
+
+.header {
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: var(--primary-light);
+  border-radius: 12px 12px 0 0;
+}
+
+.header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.headerTitle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dangerHeader {
+  background-color: #fff5f5;
+  border-bottom: 1px solid #feb2b2;
+}
+
+.dangerHeader h3 {
+  color: var(--danger);
+}
+
+.dangerIcon {
+  color: var(--danger);
+}
+
+.dangerModal {
+  border: 1px solid #feb2b2;
+}
+
+.closeButton {
+  background: none;
+  border: none;
+  color: var(--text-light);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.closeButton:hover {
+  background-color: var(--bg-main);
+  color: var(--text-heading);
+}
+
+.content {
+  padding: 24px;
+  overflow-y: auto;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}

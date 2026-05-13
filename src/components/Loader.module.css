@@ -1,0 +1,24 @@
+.loaderWrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.spinner {
+  color: var(--primary);
+  animation: spin 1s linear infinite;
+}
+
+.loaderText {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-heading);
+  letter-spacing: 0.5px;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
