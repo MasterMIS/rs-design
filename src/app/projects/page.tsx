@@ -8,7 +8,8 @@ import {
   User, Trash2, ArrowRight, ChevronRight, Globe,
   Home, Phone, Mail, FileText, Info, Edit2, ArrowLeft,
   ExternalLink, Layers, ShieldCheck, Activity, Tag,
-  Layers3, Landmark, Contact, Map, Settings, BriefcaseBusiness
+  Layers3, Landmark, Contact, Map, Settings, BriefcaseBusiness,
+  LayoutGrid, List, Eye
 } from 'lucide-react';
 import styles from './projects.module.css';
 import Modal from '@/components/Modal';
@@ -35,6 +36,7 @@ export default function ProjectsPage() {
   const [activeTab, setActiveTab] = useState('basic');
   const [viewingProject, setViewingProject] = useState<Project | null>(null);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
   
   // Dropdowns
   const projectTypes = ['Residential', 'Corporate Office', 'Retail Store', 'Villa', 'Apartment', 'Showroom', 'Factory', 'Warehouse'];
@@ -57,7 +59,18 @@ export default function ProjectsPage() {
 
   useEffect(() => {
     fetchProjects();
+    const saved = localStorage.getItem('projects_view_mode') as 'card' | 'table';
+    if (saved === 'card' || saved === 'table') {
+      setTimeout(() => {
+        setViewMode(saved);
+      }, 0);
+    }
   }, []);
+
+  const handleViewModeChange = (mode: 'card' | 'table') => {
+    setViewMode(mode);
+    localStorage.setItem('projects_view_mode', mode);
+  };
 
   async function fetchProjects() {
     try {
@@ -443,6 +456,24 @@ export default function ProjectsPage() {
           <p>Track and manage your architectural and design projects.</p>
         </div>
         <div className={styles.headerActions}>
+          <div className={styles.viewToggleGroup}>
+            <button 
+              type="button"
+              className={`${styles.viewToggleBtn} ${viewMode === 'card' ? styles.activeView : ''}`}
+              onClick={() => handleViewModeChange('card')}
+              title="Card View"
+            >
+              <LayoutGrid size={18} />
+            </button>
+            <button 
+              type="button"
+              className={`${styles.viewToggleBtn} ${viewMode === 'table' ? styles.activeView : ''}`}
+              onClick={() => handleViewModeChange('table')}
+              title="Table View"
+            >
+              <List size={18} />
+            </button>
+          </div>
           <button className={styles.addButton} onClick={handleCreateNew}>
             <Plus size={18} />
             <span>Create Project</span>
@@ -474,57 +505,152 @@ export default function ProjectsPage() {
         </div>
       </div>
 
-      <div className={styles.projectGrid}>
-        {loading ? (
+      {loading ? (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '100px 0', color: 'var(--text-light)' }}>
           <p>Loading projects...</p>
-        ) : projects.map((project) => (
-          <div key={project.id} className={styles.projectCard}>
-            <div className={styles.cardTop}>
-              <div className={styles.cardHeader}>
-                <span className={styles.projectBadge}>{project.basicInfo.type}</span>
-                <span className={styles.projectCode}>{project.basicInfo.code || project.id}</span>
-              </div>
-              <h3>{project.basicInfo.name}</h3>
-              
-              <div className={styles.progressWrapper}>
-                <div className={styles.progressHeader}>
-                  <span>Progress</span>
-                  <span>{project.metadata?.completion || 0}%</span>
+        </div>
+      ) : projects.length === 0 ? (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '100px 0', color: 'var(--text-light)' }}>
+          <p>No projects found.</p>
+        </div>
+      ) : viewMode === 'card' ? (
+        <div className={styles.projectGrid}>
+          {projects.map((project) => (
+            <div key={project.id} className={styles.projectCard}>
+              <div className={styles.cardTop}>
+                <div className={styles.cardHeader}>
+                  <span className={styles.projectBadge}>{project.basicInfo.type}</span>
+                  <span className={styles.projectCode}>{project.basicInfo.code || project.id}</span>
                 </div>
-                <div className={styles.progressBar}>
-                  <div 
-                    className={styles.progressFill} 
-                    style={{ width: `${project.metadata?.completion || 0}%` }} 
-                  />
+                <h3>{project.basicInfo.name}</h3>
+                
+                <div className={styles.progressWrapper}>
+                  <div className={styles.progressHeader}>
+                    <span>Progress</span>
+                    <span>{project.metadata?.completion || 0}%</span>
+                  </div>
+                  <div className={styles.progressBar}>
+                    <div 
+                      className={styles.progressFill} 
+                      style={{ width: `${project.metadata?.completion || 0}%` }} 
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className={styles.cardDetails}>
-              <div className={styles.detailItem}>
-                <User size={14} />
-                <span>{project.clients[0]?.name || 'N/A'}</span>
+              <div className={styles.cardDetails}>
+                <div className={styles.detailItem}>
+                  <User size={14} />
+                  <span>{project.clients[0]?.name || 'N/A'}</span>
+                </div>
+                <div className={styles.detailItem}>
+                  <MapPin size={14} />
+                  <span>{project.sites[0]?.city || 'No Location'}</span>
+                </div>
+                <div className={styles.detailItem}>
+                  <DollarSign size={14} />
+                  <span>Budget: ₹{project.basicInfo.estimatedBudget || '0'}</span>
+                </div>
               </div>
-              <div className={styles.detailItem}>
-                <MapPin size={14} />
-                <span>{project.sites[0]?.city || 'No Location'}</span>
-              </div>
-              <div className={styles.detailItem}>
-                <DollarSign size={14} />
-                <span>Budget: ₹{project.basicInfo.estimatedBudget || '0'}</span>
-              </div>
-            </div>
 
-            <div className={styles.cardFooter}>
-              <div className={styles.teamAvatars}>
-                <Users size={16} color="#94a3b8" />
-                <span className={styles.teamCount}>{project.team.length} Members</span>
+              <div className={styles.cardFooter}>
+                <div className={styles.teamAvatars}>
+                  <Users size={16} color="#94a3b8" />
+                  <span className={styles.teamCount}>{project.team.length} Members</span>
+                </div>
+                <button className={styles.viewBtn} onClick={() => setViewingProject(project)}>Manage Project</button>
               </div>
-              <button className={styles.viewBtn} onClick={() => setViewingProject(project)}>Manage Project</button>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      ) : (
+        <div className={styles.tableContainer}>
+          <table className={styles.projectTable}>
+            <thead>
+              <tr>
+                <th>Actions</th>
+                <th>Project</th>
+                <th>Type</th>
+                <th>Progress</th>
+                <th>Client</th>
+                <th>Location</th>
+                <th>Budget</th>
+                <th>Team</th>
+              </tr>
+            </thead>
+            <tbody>
+              {projects.map((project) => (
+                <tr key={project.id}>
+                  <td>
+                    <div className={styles.tableActions}>
+                      <button 
+                        className={styles.tableActionBtn} 
+                        onClick={() => setViewingProject(project)} 
+                        title="Manage Project"
+                      >
+                        <Eye size={16} />
+                      </button>
+                      <button 
+                        className={styles.tableActionBtn} 
+                        onClick={() => handleEdit(project)} 
+                        title="Edit Project"
+                      >
+                        <Edit2 size={16} />
+                      </button>
+                      <button 
+                        className={`${styles.tableActionBtn} ${styles.deleteBtn}`} 
+                        onClick={() => confirmDelete(project)} 
+                        title="Delete Project"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </td>
+                  <td>
+                    <span className={styles.tableProjectName}>{project.basicInfo.name}</span>
+                    <span className={styles.tableProjectCode}>{project.basicInfo.code || project.id}</span>
+                  </td>
+                  <td>
+                    <span className={styles.tableBadge}>{project.basicInfo.type}</span>
+                  </td>
+                  <td>
+                    <div className={styles.tableProgressWrapper}>
+                      <div className={styles.tableProgressHeader}>
+                        <span>{project.metadata?.completion || 0}%</span>
+                      </div>
+                      <div className={styles.tableProgressBar}>
+                        <div 
+                          className={styles.tableProgressFill} 
+                          style={{ width: `${project.metadata?.completion || 0}%` }} 
+                        />
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <div className={styles.tableMetaCell}>
+                      <User size={14} />
+                      <span>{project.clients[0]?.name || 'N/A'}</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div className={styles.tableMetaCell}>
+                      <MapPin size={14} />
+                      <span>{project.sites[0]?.city || 'No Location'}</span>
+                    </div>
+                  </td>
+                  <td>₹{project.basicInfo.estimatedBudget || '0'}</td>
+                  <td>
+                    <div className={styles.tableMetaCell}>
+                      <Users size={14} />
+                      <span>{project.team.length} Members</span>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* Main Creation Modal */}
       <Modal 

@@ -7,7 +7,11 @@ import {
   LayoutDashboard, 
   Users,
   Briefcase,
-  X
+  X,
+  AlertTriangle,
+  Contact,
+  ClipboardList,
+  Files
 } from 'lucide-react';
 import styles from './Sidebar.module.css';
 import Logo from './Logo';
@@ -57,4 +61,8 @@ const navItems = [
   { name: 'Dashboard', icon: LayoutDashboard, path: '/' },
   { name: 'Projects', icon: Briefcase, path: '/projects' },
   { name: 'Users', icon: Users, path: '/users' },
+  { name: 'Deficiencies', icon: AlertTriangle, path: '/deficiencies' },
+  { name: 'Directory', icon: Contact, path: '/directory' },
+  { name: 'MOM', icon: ClipboardList, path: '/mom' },
+  { name: 'Documents', icon: Files, path: '/documents' },
 ];

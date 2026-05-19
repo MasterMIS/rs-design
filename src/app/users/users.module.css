@@ -1,7 +1,7 @@
 .usersContainer {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 16px;
   animation: fadeIn 0.3s ease-out;
 }
 
@@ -9,34 +9,36 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  margin-top: -6px;
 }
 
 .headerActions {
   display: flex;
-  gap: 12px;
+  gap: 8px;
 }
 
 .titleSection h2 {
-  font-size: 1.75rem;
-  margin-bottom: 4px;
+  font-size: 1.6rem;
+  margin-bottom: 2px;
   color: var(--text-heading);
 }
 
 .titleSection p {
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   color: var(--text-light);
 }
 
 .addButton, .filterBtn {
   border: none;
-  padding: 12px 24px;
+  padding: 8px 16px;
   border-radius: 8px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
+  font-size: 0.85rem;
 }
 
 .addButton {
@@ -65,22 +67,22 @@
 /* Content Layout with Vertical Filter */
 .contentLayout {
   display: flex;
-  gap: 24px;
+  gap: 16px;
   align-items: flex-start;
 }
 
 .verticalFilter {
-  width: 280px;
+  width: 250px;
   background-color: var(--bg-card);
   border-radius: 12px;
-  padding: 24px;
+  padding: 16px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 12px;
   flex-shrink: 0;
   position: sticky;
-  top: 24px;
+  top: 16px;
   animation: slideInLeft 0.3s ease-out;
   border: 1px solid var(--border-color);
 }
@@ -90,11 +92,11 @@
   justify-content: space-between;
   align-items: center;
   border-bottom: 1px solid var(--border-color);
-  padding-bottom: 12px;
+  padding-bottom: 8px;
 }
 
 .filterHeader h3 {
-  font-size: 1.1rem;
+  font-size: 0.95rem;
   color: var(--text-heading);
 }
 
@@ -103,16 +105,17 @@
   border: none;
   color: var(--text-light);
   cursor: pointer;
+  font-size: 0.8rem;
 }
 
 .filterGroup {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .filterGroup label {
-  font-size: 0.8rem;
+  font-size: 0.7rem;
   font-weight: 700;
   text-transform: uppercase;
   color: var(--text-light);
@@ -126,26 +129,28 @@
 
 .searchBox svg {
   position: absolute;
-  left: 12px;
+  left: 10px;
   color: var(--text-light);
 }
 
 .searchBox input {
   width: 100%;
-  padding: 10px 10px 10px 38px;
+  padding: 8px 8px 8px 32px;
   border: 1px solid var(--border-color);
   border-radius: 8px;
   background-color: var(--bg-main);
   color: var(--text-main);
+  font-size: 0.85rem;
 }
 
 .filterGroup select {
-  padding: 10px;
+  padding: 8px;
   border: 1px solid var(--border-color);
   border-radius: 8px;
   background-color: var(--bg-main);
   color: var(--text-main);
   cursor: pointer;
+  font-size: 0.85rem;
 }
 
 .clearBtn {
@@ -165,31 +170,31 @@
 /* Reverting to Simple User Grid & Cards */
 .userGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 24px;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
 }
 
 .userCard {
   background-color: var(--bg-card);
-  border-radius: 16px;
-  padding: 24px;
+  border-radius: 12px;
+  padding: 16px;
   position: relative;
   transition: all 0.3s ease;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
   border: 1px solid var(--border-color);
 }
 
 .userCard:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.05);
 }
 
 .cardActions {
   position: absolute;
-  top: 16px;
-  right: 16px;
+  top: 12px;
+  right: 12px;
   display: flex;
-  gap: 8px;
+  gap: 6px;
   opacity: 0;
   transition: opacity 0.2s;
 }
@@ -202,8 +207,8 @@
   background-color: var(--bg-main);
   border: 1px solid var(--border-color);
   color: var(--text-light);
-  padding: 8px;
-  border-radius: 8px;
+  padding: 6px;
+  border-radius: 6px;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -225,27 +230,27 @@
   flex-direction: column;
   align-items: center;
   text-align: center;
-  margin-bottom: 20px;
+  margin-bottom: 12px;
 }
 
 .avatarWrapper {
   position: relative;
-  margin-bottom: 16px;
+  margin-bottom: 10px;
 }
 
 .cardAvatar {
-  width: 80px;
-  height: 80px;
-  border-radius: 24px;
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
   object-fit: cover;
-  border: 3px solid white;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+  border: 2px solid white;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
 }
 
 .avatarPlaceholder {
-  width: 80px;
-  height: 80px;
-  border-radius: 24px;
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
   background-color: var(--bg-main);
   display: flex;
   align-items: center;
@@ -258,37 +263,37 @@
   position: absolute;
   bottom: 0;
   right: 0;
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
-  border: 3px solid white;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+  border: 2px solid white;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
 }
 
 .active { background-color: var(--success); }
 .inactive { background-color: var(--danger); }
 
 .cardName {
-  font-size: 1.1rem;
+  font-size: 1rem;
   font-weight: 700;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
   color: var(--text-heading);
 }
 
 .cardRole {
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   font-weight: 600;
   color: var(--primary);
   background-color: var(--primary-light);
-  padding: 4px 12px;
+  padding: 2px 10px;
   border-radius: 20px;
 }
 
 .cardBody {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 16px 0;
+  gap: 8px;
+  padding: 10px 0;
   border-top: 1px solid var(--border-color);
 }
 
@@ -332,7 +337,7 @@
   padding: 12px; 
   border: 1px solid var(--border-color); 
   border-radius: 10px; 
-  background-color: var(--primary-light);
+  background-color: var(--bg-main);
   color: var(--text-heading);
   transition: all 0.2s;
 }
@@ -467,3 +472,202 @@
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes slideInLeft { from { transform: translateX(-20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+/* ==========================================
+   View Mode Switching & Table Views
+   ========================================== */
+
+.viewToggleGroup {
+  display: flex;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  padding: 4px;
+  border-radius: 10px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.02);
+  align-items: center;
+}
+
+.viewToggleBtn {
+  background: none;
+  border: none;
+  color: var(--text-light);
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.viewToggleBtn:hover {
+  color: var(--primary);
+  background-color: rgba(59, 175, 218, 0.03);
+}
+
+.activeView {
+  background-color: var(--primary-light);
+  color: var(--primary) !important;
+}
+
+/* Table container styling */
+.tableContainer {
+  width: 100%;
+  overflow-x: auto;
+  background-color: var(--bg-card);
+  border-radius: 16px;
+  border: 1px solid var(--border-color);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02);
+  animation: fadeIn 0.3s ease-out;
+}
+
+.userTable {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  min-width: 900px;
+}
+
+.userTable th {
+  padding: 16px 20px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  color: var(--text-light);
+  border-bottom: 2px solid var(--border-color);
+  background-color: rgba(214, 226, 243, 0.2); /* Soft cool tint */
+}
+
+[data-theme='dark'] .userTable th {
+  background-color: rgba(49, 57, 68, 0.35);
+}
+
+.userTable td {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-main);
+  font-size: 0.9rem;
+  vertical-align: middle;
+  transition: background-color 0.2s ease;
+}
+
+.userTable tr:last-child td {
+  border-bottom: none;
+}
+
+.userTable tr:hover td {
+  background-color: rgba(59, 175, 218, 0.02);
+}
+
+/* User identity inside table */
+.tableUserCell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.tableAvatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  object-fit: cover;
+  border: 2px solid white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme='dark'] .tableAvatar {
+  border-color: var(--bg-card);
+}
+
+.tableAvatarPlaceholder {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background-color: var(--bg-main);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-light);
+  border: 1px dashed var(--border-color);
+}
+
+.tableUserName {
+  font-weight: 700;
+  color: var(--text-heading);
+}
+
+.tableRoleTag {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--primary);
+  background-color: var(--primary-light);
+  padding: 4px 10px;
+  border-radius: 20px;
+  display: inline-block;
+}
+
+/* Custom table action buttons */
+.tableActions {
+  display: flex;
+  gap: 8px;
+}
+
+.tableActionBtn {
+  background-color: var(--bg-main);
+  border: 1px solid var(--border-color);
+  color: var(--text-light);
+  padding: 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.tableActionBtn:hover {
+  color: var(--primary);
+  border-color: var(--primary);
+  background-color: var(--primary-light);
+}
+
+.tableActionBtn.deleteBtn:hover {
+  color: var(--danger);
+  border-color: var(--danger);
+  background-color: rgba(241, 85, 108, 0.1);
+}
+
+/* Custom table status badge */
+.tableStatusBadge {
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tableStatusBadge::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.tableStatusBadge.active {
+  background-color: rgba(39, 206, 138, 0.1);
+  color: var(--success);
+}
+.tableStatusBadge.active::before {
+  background-color: var(--success);
+}
+
+.tableStatusBadge.inactive {
+  background-color: rgba(241, 85, 108, 0.1);
+  color: var(--danger);
+}
+.tableStatusBadge.inactive::before {
+  background-color: var(--danger);
+}

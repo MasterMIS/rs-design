@@ -5,7 +5,8 @@ import {
   Search, Plus, MoreHorizontal, Mail, Phone, MapPin, 
   Loader2, Camera, Lock, User as UserIcon, 
   Edit2, Trash2, Shield, PhoneCall, Filter, X,
-  Eye, EyeOff, Briefcase, Building, UserCheck, Smartphone, Check
+  Eye, EyeOff, Briefcase, Building, UserCheck, Smartphone, Check,
+  LayoutGrid, List
 } from 'lucide-react';
 import styles from './users.module.css';
 import Modal from '@/components/Modal';
@@ -54,6 +55,7 @@ export default function UsersPage() {
   
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [deletingUser, setDeletingUser] = useState<User | null>(null);
+  const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -77,7 +79,18 @@ export default function UsersPage() {
   useEffect(() => {
     fetchUsers();
     fetchDropdowns();
+    const saved = localStorage.getItem('users_view_mode') as 'card' | 'table';
+    if (saved === 'card' || saved === 'table') {
+      setTimeout(() => {
+        setViewMode(saved);
+      }, 0);
+    }
   }, []);
+
+  const handleViewModeChange = (mode: 'card' | 'table') => {
+    setViewMode(mode);
+    localStorage.setItem('users_view_mode', mode);
+  };
 
   async function fetchUsers() {
     try {
@@ -255,6 +268,24 @@ export default function UsersPage() {
           <p>Manage your team members and their account permissions.</p>
         </div>
         <div className={styles.headerActions}>
+          <div className={styles.viewToggleGroup}>
+            <button 
+              type="button"
+              className={`${styles.viewToggleBtn} ${viewMode === 'card' ? styles.activeView : ''}`}
+              onClick={() => handleViewModeChange('card')}
+              title="Card View"
+            >
+              <LayoutGrid size={18} />
+            </button>
+            <button 
+              type="button"
+              className={`${styles.viewToggleBtn} ${viewMode === 'table' ? styles.activeView : ''}`}
+              onClick={() => handleViewModeChange('table')}
+              title="Table View"
+            >
+              <List size={18} />
+            </button>
+          </div>
           <button 
             className={`${styles.filterBtn} ${isFilterVisible ? styles.activeFilter : ''}`}
             onClick={() => setIsFilterVisible(!isFilterVisible)}
@@ -318,69 +349,129 @@ export default function UsersPage() {
             <div className={styles.loadingState}>
               <Loader size={40} text="Loading users..." />
             </div>
-          ) : (
+          ) : filteredUsers.length === 0 ? (
+            <div className={styles.emptyStateContainer}>
+              <p className={styles.emptyState}>No users found.</p>
+            </div>
+          ) : viewMode === 'card' ? (
             <div className={styles.userGrid}>
-              {filteredUsers.length > 0 ? (
-                filteredUsers.map((user) => (
-                  <div key={user.id} className={styles.userCard}>
-                    <div className={styles.cardActions}>
-                      <button className={styles.iconBtn} onClick={() => handleEdit(user)}>
-                        <Edit2 size={16} />
-                      </button>
-                      <button className={`${styles.iconBtn} ${styles.deleteBtn}`} onClick={() => handleDeleteClick(user)}>
-                        <Trash2 size={16} />
-                      </button>
+              {filteredUsers.map((user) => (
+                <div key={user.id} className={styles.userCard}>
+                  <div className={styles.cardActions}>
+                    <button className={styles.iconBtn} onClick={() => handleEdit(user)}>
+                      <Edit2 size={16} />
+                    </button>
+                    <button className={`${styles.iconBtn} ${styles.deleteBtn}`} onClick={() => handleDeleteClick(user)}>
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                  
+                  <div className={styles.cardHeader}>
+                    <div className={styles.avatarWrapper}>
+                      {user.avatar ? (
+                        <img 
+                          src={user.avatar} 
+                          alt={user.name} 
+                          className={styles.cardAvatar} 
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : (
+                        <div className={styles.avatarPlaceholder}>
+                          <UserIcon size={32} />
+                        </div>
+                      )}
+                      <span className={`${styles.statusDot} ${styles[user.status.replace(' ', '').toLowerCase()] || styles.active}`} />
                     </div>
-                    
-                    <div className={styles.cardHeader}>
-                      <div className={styles.avatarWrapper}>
-                        {user.avatar ? (
-                          <img 
-                            src={user.avatar} 
-                            alt={user.name} 
-                            className={styles.cardAvatar} 
-                            referrerPolicy="no-referrer"
-                          />
-                        ) : (
-                          <div className={styles.avatarPlaceholder}>
-                            <UserIcon size={32} />
-                          </div>
-                        )}
-                        <span className={`${styles.statusDot} ${styles[user.status.replace(' ', '').toLowerCase()] || styles.active}`} />
-                      </div>
-                      <h3 className={styles.cardName}>{user.name}</h3>
-                      <span className={styles.cardRole}>{user.role}</span>
-                    </div>
+                    <h3 className={styles.cardName}>{user.name}</h3>
+                    <span className={styles.cardRole}>{user.role}</span>
+                  </div>
 
-                    <div className={styles.cardBody}>
-                      <div className={styles.infoItem}>
-                        <Mail size={14} />
-                        <span>{user.email}</span>
-                      </div>
-                      <div className={styles.infoItem}>
-                        <PhoneCall size={14} />
-                        <span>{user.mobile || 'N/A'}</span>
-                      </div>
-                      <div className={styles.infoItem}>
-                        <Building size={14} />
-                        <span>{user.department || 'No Dept'}</span>
-                      </div>
-                      <div className={styles.infoItem}>
-                        <Briefcase size={14} />
-                        <span>{user.designation || 'No Desig'}</span>
-                      </div>
-                      <div className={styles.infoItem}>
-                        <Shield size={14} />
-                        <span className={styles.statusLabel}>{user.status}</span>
-                      </div>
+                  <div className={styles.cardBody}>
+                    <div className={styles.infoItem}>
+                      <Mail size={14} />
+                      <span>{user.email}</span>
+                    </div>
+                    <div className={styles.infoItem}>
+                      <PhoneCall size={14} />
+                      <span>{user.mobile || 'N/A'}</span>
+                    </div>
+                    <div className={styles.infoItem}>
+                      <Building size={14} />
+                      <span>{user.department || 'No Dept'}</span>
+                    </div>
+                    <div className={styles.infoItem}>
+                      <Briefcase size={14} />
+                      <span>{user.designation || 'No Desig'}</span>
+                    </div>
+                    <div className={styles.infoItem}>
+                      <Shield size={14} />
+                      <span className={styles.statusLabel}>{user.status}</span>
                     </div>
                   </div>
-                ))
-              ) : (
-                <div className={styles.emptyStateContainer}>
-                  <p className={styles.emptyState}>No users found.</p>
                 </div>
-              )}
+              ))}
+            </div>
+          ) : (
+            <div className={styles.tableContainer}>
+              <table className={styles.userTable}>
+                <thead>
+                  <tr>
+                    <th>Actions</th>
+                    <th>User</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Mobile</th>
+                    <th>Department</th>
+                    <th>Designation</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredUsers.map((user) => (
+                    <tr key={user.id}>
+                      <td>
+                        <div className={styles.tableActions}>
+                          <button className={styles.tableActionBtn} onClick={() => handleEdit(user)} title="Edit User">
+                            <Edit2 size={16} />
+                          </button>
+                          <button className={`${styles.tableActionBtn} ${styles.deleteBtn}`} onClick={() => handleDeleteClick(user)} title="Delete User">
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </td>
+                      <td>
+                        <div className={styles.tableUserCell}>
+                          {user.avatar ? (
+                            <img 
+                              src={user.avatar} 
+                              alt={user.name} 
+                              className={styles.tableAvatar} 
+                              referrerPolicy="no-referrer"
+                            />
+                          ) : (
+                            <div className={styles.tableAvatarPlaceholder}>
+                              <UserIcon size={16} />
+                            </div>
+                          )}
+                          <span className={styles.tableUserName}>{user.name}</span>
+                        </div>
+                      </td>
+                      <td>{user.email}</td>
+                      <td>
+                        <span className={styles.tableRoleTag}>{user.role}</span>
+                      </td>
+                      <td>{user.mobile || 'N/A'}</td>
+                      <td>{user.department || 'No Dept'}</td>
+                      <td>{user.designation || 'No Desig'}</td>
+                      <td>
+                        <span className={`${styles.tableStatusBadge} ${user.status.toLowerCase() === 'active' ? styles.active : styles.inactive}`}>
+                          {user.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>

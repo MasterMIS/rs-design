@@ -7,13 +7,14 @@
   --info: #3bafda;
   --warning: #f1b44c;
   --danger: #f1556c;
-  --bg-main: #f5f7fb;
-  --bg-card: #ffffff;
-  --bg-sidebar: #ffffff;
-  --text-main: #6e768e;
-  --text-heading: #343a40;
-  --text-light: #98a6ad;
-  --border-color: #e3e6ef;
+  --bg-main: #e8eff9; /* Premium soft ice-blue background (was #f5f7fb) */
+  --bg-card: #ffffff; /* Clean white cards for clean layers */
+  --bg-sidebar: #ffffff; /* Clean white sidebar */
+  --text-main: #566583; /* Rich slate-blue body text (was #6e768e) */
+  --text-heading: #1e293b; /* Deep slate-navy for strong headings (was #343a40) */
+  --text-light: #8ea2bc; /* Soft cool-blue gray for secondary text (was #98a6ad) */
+  --border-color: #d6e2f3; /* Premium cool-blue borders (was #e3e6ef) */
+  --chart-grid: #e2ecf7; /* Matching soft blue-gray grid lines for charts */
   --header-height: 70px;
   --sidebar-width: 220px; /* Reduced from 250px */
 }
@@ -26,6 +27,7 @@
   --text-heading: #e9ecef;
   --text-light: #7a828a;
   --border-color: #313944;
+  --chart-grid: #2c3540;
   --primary-light: rgba(59, 175, 218, 0.1);
 }
 

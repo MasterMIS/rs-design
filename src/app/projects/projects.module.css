@@ -1,7 +1,7 @@
 .projectsContainer {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 16px;
   animation: fadeIn 0.3s ease-out;
 }
 
@@ -9,37 +9,39 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  margin-top: -6px;
 }
 
 .titleSection h2 {
-  font-size: 1.75rem;
-  margin-bottom: 4px;
+  font-size: 1.6rem;
+  margin-bottom: 2px;
   color: var(--text-heading);
 }
 
 .titleSection p {
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   color: var(--text-light);
 }
 
 .headerActions {
   display: flex;
-  gap: 12px;
+  gap: 8px;
 }
 
 .addButton {
   background-color: var(--primary);
   color: white;
   border: none;
-  padding: 12px 24px;
-  border-radius: 10px;
+  padding: 8px 16px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   font-weight: 700;
   cursor: pointer;
   transition: all 0.2s;
   box-shadow: 0 4px 15px rgba(59, 175, 218, 0.3);
+  font-size: 0.85rem;
 }
 
 .addButton:hover {
@@ -50,14 +52,14 @@
 /* Stats Overview */
 .statsRow {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 16px;
-  margin-bottom: 24px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
 }
 
 .statCard {
   background-color: var(--bg-card);
-  padding: 16px;
+  padding: 10px 16px;
   border-radius: 12px;
   border: 1px solid var(--border-color);
   display: flex;
@@ -66,22 +68,22 @@
 }
 
 .statIcon {
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .statInfo h3 {
-  font-size: 1.5rem;
+  font-size: 1.35rem;
   font-weight: 800;
   color: var(--text-heading);
 }
 
 .statInfo p {
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   font-weight: 600;
   color: var(--text-light);
   text-transform: uppercase;
@@ -91,12 +93,12 @@
 .projectGrid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 24px;
+  gap: 16px;
 }
 
 .projectCard {
   background-color: var(--bg-card);
-  border-radius: 20px;
+  border-radius: 14px;
   border: 1px solid var(--border-color);
   overflow: hidden;
   display: flex;
@@ -105,16 +107,16 @@
 }
 
 .projectCard:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.05);
 }
 
 .cardTop {
-  padding: 16px 20px;
+  padding: 12px 16px;
   border-bottom: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .cardHeader {
@@ -126,21 +128,21 @@
 .projectBadge {
   background-color: var(--primary-light);
   color: var(--primary);
-  padding: 4px 10px;
+  padding: 2px 8px;
   border-radius: 6px;
-  font-size: 0.7rem;
+  font-size: 0.65rem;
   font-weight: 700;
 }
 
 .cardHeader h3 {
-  font-size: 1.15rem;
+  font-size: 1.05rem;
   font-weight: 700;
   color: var(--text-heading);
-  margin-top: 4px;
+  margin-top: 2px;
 }
 
 .projectCode {
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   font-weight: 600;
   color: var(--text-light);
 }
@@ -149,25 +151,25 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 10px;
+  margin-top: 6px;
 }
 
 .progressWrapper {
   flex: 1;
-  margin-right: 20px;
+  margin-right: 12px;
 }
 
 .progressHeader {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 6px;
-  font-size: 0.75rem;
+  margin-bottom: 4px;
+  font-size: 0.7rem;
   font-weight: 600;
   color: var(--text-main);
 }
 
 .progressBar {
-  height: 6px;
+  height: 5px;
   background-color: var(--bg-main);
   border-radius: 3px;
   overflow: hidden;
@@ -180,17 +182,17 @@
 }
 
 .cardDetails {
-  padding: 16px 20px;
+  padding: 10px 16px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .detailItem {
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-size: 0.85rem;
+  gap: 8px;
+  font-size: 0.8rem;
   color: var(--text-main);
 }
 
@@ -199,7 +201,7 @@
 }
 
 .cardFooter {
-  padding: 16px 24px;
+  padding: 10px 16px;
   background-color: var(--bg-main);
   border-top: 1px solid var(--border-color);
   display: flex;
@@ -213,18 +215,18 @@
 }
 
 .teamCount {
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   font-weight: 600;
   color: var(--text-light);
-  margin-left: 8px;
+  margin-left: 6px;
 }
 
 .viewBtn {
   background: none;
   border: 1px solid var(--border-color);
-  padding: 6px 12px;
-  border-radius: 8px;
-  font-size: 0.8rem;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.75rem;
   font-weight: 600;
   color: var(--text-main);
   cursor: pointer;
@@ -290,17 +292,26 @@
   grid-column: span 2;
 }
 
-.formGroup label {
+.formGroup > label {
   font-size: 0.85rem;
   font-weight: 700;
   color: var(--text-heading);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.formGroup > label svg, .labelIcon {
+  color: var(--primary);
+  opacity: 0.85;
+  flex-shrink: 0;
 }
 
 .formGroup input, .formGroup select, .formGroup textarea {
   padding: 12px;
   border: 1px solid var(--border-color);
   border-radius: 10px;
-  background-color: var(--primary-light);
+  background-color: var(--bg-main);
   color: var(--text-heading);
   font-size: 0.9rem;
 }
@@ -826,4 +837,187 @@
 
 .confirmDeleteBtn:hover {
   background-color: #d43f3a;
+}
+
+/* ==========================================
+   View Mode Switching & Table Views
+   ========================================== */
+
+.viewToggleGroup {
+  display: flex;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  padding: 4px;
+  border-radius: 10px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.02);
+  align-items: center;
+}
+
+.viewToggleBtn {
+  background: none;
+  border: none;
+  color: var(--text-light);
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.viewToggleBtn:hover {
+  color: var(--primary);
+  background-color: rgba(59, 175, 218, 0.03);
+}
+
+.activeView {
+  background-color: var(--primary-light);
+  color: var(--primary) !important;
+}
+
+/* Table container styling */
+.tableContainer {
+  width: 100%;
+  overflow-x: auto;
+  background-color: var(--bg-card);
+  border-radius: 16px;
+  border: 1px solid var(--border-color);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02);
+  animation: fadeIn 0.3s ease-out;
+  margin-top: 24px;
+}
+
+.projectTable {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  min-width: 1000px;
+}
+
+.projectTable th {
+  padding: 16px 20px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  color: var(--text-light);
+  border-bottom: 2px solid var(--border-color);
+  background-color: rgba(214, 226, 243, 0.2); /* Soft cool tint */
+}
+
+[data-theme='dark'] .projectTable th {
+  background-color: rgba(49, 57, 68, 0.35);
+}
+
+.projectTable td {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-main);
+  font-size: 0.9rem;
+  vertical-align: middle;
+  transition: background-color 0.2s ease;
+}
+
+.projectTable tr:last-child td {
+  border-bottom: none;
+}
+
+.projectTable tr:hover td {
+  background-color: rgba(59, 175, 218, 0.02);
+}
+
+/* Table elements */
+.tableProjectName {
+  font-weight: 700;
+  color: var(--text-heading);
+  display: block;
+}
+
+.tableProjectCode {
+  font-size: 0.75rem;
+  color: var(--text-light);
+  font-weight: 600;
+  display: block;
+  margin-top: 2px;
+}
+
+.tableBadge {
+  background: #bae6fd;
+  color: #0369a1;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  display: inline-block;
+}
+
+/* Progress bar inside table */
+.tableProgressWrapper {
+  width: 140px;
+}
+
+.tableProgressHeader {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: var(--text-main);
+}
+
+.tableProgressBar {
+  width: 100%;
+  height: 6px;
+  background-color: var(--bg-main);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.tableProgressFill {
+  height: 100%;
+  background-color: var(--primary);
+  border-radius: 3px;
+}
+
+/* Custom table actions column */
+.tableActions {
+  display: flex;
+  gap: 8px;
+}
+
+.tableActionBtn {
+  background-color: var(--bg-main);
+  border: 1px solid var(--border-color);
+  color: var(--text-light);
+  padding: 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.tableActionBtn:hover {
+  color: var(--primary);
+  border-color: var(--primary);
+  background-color: var(--primary-light);
+}
+
+.tableActionBtn.deleteBtn:hover {
+  color: var(--danger);
+  border-color: var(--danger);
+  background-color: rgba(241, 85, 108, 0.1);
+}
+
+/* Table columns icon descriptions */
+.tableMetaCell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tableMetaCell svg {
+  color: var(--text-light);
 }
