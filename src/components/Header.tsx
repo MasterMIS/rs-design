@@ -13,7 +13,8 @@ import {
   Menu,
   LogOut,
   User as UserIcon,
-  Settings
+  Settings,
+  Globe
 } from 'lucide-react';
 import styles from './Header.module.css';
 import { useAuth } from '@/context/AuthContext';
@@ -127,6 +128,18 @@ export default function Header({ toggleSidebar }: HeaderProps) {
       </div>
 
       <div className={styles.right}>
+        {user?.role !== 'Client' && (
+          <button 
+            type="button"
+            onClick={() => router.push('/website')} 
+            className={styles.viewWebsiteBtn}
+            title="Preview Client Website"
+          >
+            <Globe size={16} />
+            <span className={styles.hideMobile}>Client Website</span>
+          </button>
+        )}
+        
         <div className={`${styles.iconButton} ${styles.hideMobile}`} onClick={toggleFullScreen}>
           <Maximize size={20} />
         </div>

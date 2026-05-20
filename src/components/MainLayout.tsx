@@ -13,6 +13,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   const { user, isLoading } = useAuth();
   
   const isLoginPage = pathname === '/login';
+  const isWebsitePage = pathname === '/website';
 
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
   const closeSidebar = () => setIsSidebarOpen(false);
@@ -25,9 +26,9 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
     );
   }
 
-  // If login page, don't show sidebar/header
-  if (isLoginPage) {
-    return <div className="login-layout">{children}</div>;
+  // If login page or client website page, bypass standard admin frame
+  if (isLoginPage || isWebsitePage) {
+    return <div className="no-layout">{children}</div>;
   }
 
   // If not logged in and not on login page, the AuthContext will handle redirect.

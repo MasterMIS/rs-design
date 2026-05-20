@@ -9,6 +9,9 @@ interface User {
   email: string;
   role: string;
   avatar: string;
+  projectName?: string;
+  projectId?: string;
+  projectCode?: string;
 }
 
 interface AuthContextType {
@@ -41,7 +44,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!user && pathname !== '/login') {
         router.push('/login');
       } else if (user && pathname === '/login') {
-        router.push('/');
+        if (user.role === 'Client') {
+          router.push('/website');
+        } else {
+          router.push('/');
+        }
+      } else if (user && user.role === 'Client' && pathname !== '/website') {
+        // Restrict client strictly to the client website
+        router.push('/website');
       }
     }
   }, [user, pathname, isLoading, router]);
@@ -49,7 +59,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = (userData: User) => {
     setUser(userData);
     localStorage.setItem('rs_user', JSON.stringify(userData));
-    router.push('/');
+    if (userData.role === 'Client') {
+      router.push('/website');
+    } else {
+      router.push('/');
+    }
   };
 
   const logout = () => {
