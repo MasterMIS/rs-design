@@ -671,3 +671,26 @@
 .tableStatusBadge.inactive::before {
   background-color: var(--danger);
 }
+
+@media (max-width: 600px) {
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .headerActions {
+    width: 100%;
+    display: flex;
+    justify-content: flex-start;
+    gap: 12px;
+  }
+  .titleSection h2 {
+    font-size: 1.3rem;
+  }
+}
+
+@media (max-width: 600px) {
+  .gridForm, .formRow {
+    grid-template-columns: 1fr !important;
+  }
+}

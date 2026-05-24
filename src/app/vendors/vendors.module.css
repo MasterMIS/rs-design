@@ -1,26 +1,35 @@
 .container {
+  padding: 0;
+  animation: fadeIn 0.3s ease-out;
   display: flex;
   flex-direction: column;
   gap: 16px;
-  animation: fadeIn 0.3s ease-out;
 }
 
 .header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 16px;
   margin-top: -6px;
 }
 
 .titleSection h2 {
   font-size: 1.6rem;
-  margin-bottom: 2px;
+  font-weight: 800;
   color: var(--text-heading);
+  margin-bottom: 2px;
 }
 
 .titleSection p {
-  font-size: 0.9rem;
   color: var(--text-light);
+  font-size: 0.9rem;
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .addButton {
@@ -29,13 +38,13 @@
   border: none;
   padding: 8px 16px;
   border-radius: 8px;
+  font-weight: 600;
   display: flex;
   align-items: center;
   gap: 6px;
-  font-weight: 700;
   cursor: pointer;
+  box-shadow: 0 4px 10px rgba(59, 175, 218, 0.2);
   transition: all 0.2s;
-  box-shadow: 0 4px 15px rgba(59, 175, 218, 0.3);
   font-size: 0.85rem;
 }
 
@@ -44,7 +53,7 @@
   transform: translateY(-1px);
 }
 
-/* Stats Row */
+/* Stats Cards */
 .statsGrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -72,9 +81,9 @@
 }
 
 .statCard.total .statIcon { background-color: var(--primary-light); color: var(--primary); }
-.statCard.draft .statIcon { background-color: rgba(155, 89, 182, 0.1); color: #9b59b6; }
-.statCard.distributed .statIcon { background-color: rgba(39, 206, 138, 0.1); color: var(--success); }
-.statCard.pending .statIcon { background-color: rgba(243, 156, 18, 0.1); color: #f39c12; }
+.statCard.appointed .statIcon { background-color: rgba(39, 206, 138, 0.1); color: var(--success); }
+.statCard.discussion .statIcon { background-color: rgba(243, 156, 18, 0.1); color: #f39c12; }
+.statCard.teams .statIcon { background-color: rgba(155, 89, 182, 0.1); color: #9b59b6; }
 
 .statInfo h3 {
   font-size: 1.35rem;
@@ -148,7 +157,7 @@
   font-size: 0.8rem;
   font-weight: 600;
   cursor: pointer;
-  min-width: 120px;
+  min-width: 110px;
   transition: all 0.2s;
 }
 
@@ -188,7 +197,7 @@
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
 }
 
-/* Projects Accordions / Grouping */
+/* Directory Content Groupings */
 .projectGroupSection {
   display: flex;
   flex-direction: column;
@@ -210,148 +219,222 @@
   letter-spacing: 0.5px;
 }
 
-.momGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 16px;
+/* Accordion Design for Teams */
+.teamAccordion {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.01);
+  transition: all 0.2s ease;
 }
 
-.momCard {
-  background-color: var(--bg-card);
-  border-radius: 14px;
-  border: 1px solid var(--border-color);
+.teamAccordionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px;
+  background-color: rgba(214, 226, 243, 0.15);
+  cursor: pointer;
+  user-select: none;
+  border-left: 4px solid var(--primary);
+  transition: background-color 0.2s;
+}
+
+[data-theme='dark'] .teamAccordionHeader {
+  background-color: rgba(49, 57, 68, 0.2);
+}
+
+.teamAccordionHeader:hover {
+  background-color: rgba(214, 226, 243, 0.3);
+}
+
+.teamAccordionTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--text-heading);
+}
+
+.teamMemberCount {
+  background-color: var(--primary-light);
+  color: var(--primary);
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.teamAccordionBody {
   padding: 16px;
-  position: relative;
-  transition: all 0.3s ease;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.01);
   display: flex;
   flex-direction: column;
+  gap: 16px;
+  border-top: 1px solid var(--border-color);
+  animation: slideDown 0.2s ease-out;
+}
+
+/* Member Cards Layout */
+.memberGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
   gap: 12px;
 }
 
-.momCard:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.05);
-  border-color: var(--primary);
+.memberCard {
+  background-color: var(--bg-card);
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: relative;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.01);
+  background-image: linear-gradient(to bottom, var(--bg-card), rgba(214, 226, 243, 0.05));
 }
 
-.cardHeader {
+.memberCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+}
+
+.memberTop {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   gap: 8px;
 }
 
-.cardPurpose {
-  font-size: 1.05rem;
+.memberPrimary {
+  display: flex;
+  flex-direction: column;
+}
+
+.memberName {
+  font-size: 0.95rem;
   font-weight: 700;
   color: var(--text-heading);
-  line-height: 1.3;
 }
 
-.statusBadge {
-  font-size: 0.7rem;
-  font-weight: 700;
-  padding: 3px 8px;
-  border-radius: 6px;
-  text-transform: uppercase;
-}
-
-.statusBadge.draft { background-color: rgba(155, 89, 182, 0.1); color: #9b59b6; }
-.statusBadge.approved { background-color: rgba(39, 206, 138, 0.1); color: var(--success); }
-.statusBadge.distributed { background-color: rgba(59, 175, 218, 0.1); color: var(--primary); }
-.statusBadge.closed { background-color: rgba(241, 85, 108, 0.1); color: var(--danger); }
-
-.cardMeta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
+.memberDesignation {
   font-size: 0.75rem;
-  color: var(--text-light);
+  color: var(--primary);
   font-weight: 600;
-  border-bottom: 1px dashed var(--border-color);
-  padding-bottom: 8px;
+  margin-top: 1px;
 }
 
-.metaItem {
+.badgesTray {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+/* Escalation Badges */
+.escalationBadge {
+  font-size: 0.65rem;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.escalationBadge.L1 { background-color: rgba(39, 206, 138, 0.1); color: var(--success); }
+.escalationBadge.L2 { background-color: rgba(243, 156, 18, 0.1); color: #f39c12; }
+.escalationBadge.L3 { background-color: rgba(241, 85, 108, 0.1); color: var(--danger); }
+
+/* Status Badges */
+.statusBadge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.statusBadge.Appointed { background-color: rgba(39, 206, 138, 0.1); color: var(--success); }
+.statusBadge.Shortlisted { background-color: rgba(59, 175, 218, 0.1); color: var(--primary); }
+.statusBadge.Terminated { background-color: rgba(241, 85, 108, 0.1); color: var(--danger); }
+.statusBadge.Under_Discussion { background-color: rgba(243, 156, 18, 0.1); color: #f39c12; }
+
+.memberDetails {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: var(--text-main);
+  padding: 8px 0;
+  border-top: 1px dashed var(--border-color);
+  border-bottom: 1px dashed var(--border-color);
+}
+
+.detailRow {
   display: flex;
   align-items: center;
-  gap: 4px;
-}
-
-.metaItem svg {
-  color: var(--text-light);
-}
-
-.cardBody {
-  display: flex;
-  flex-direction: column;
   gap: 8px;
-  font-size: 0.8rem;
-  color: var(--text-main);
-  flex-grow: 1;
 }
 
-.sectionBlock {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 6px 10px;
-  background-color: var(--bg-main);
-  border-radius: 8px;
-}
-
-.sectionBlock strong {
-  font-size: 0.7rem;
-  text-transform: uppercase;
+.detailRow svg {
   color: var(--text-light);
-  letter-spacing: 0.5px;
+  flex-shrink: 0;
 }
 
-.sectionBlock p {
-  line-height: 1.4;
-  white-space: pre-line;
+.detailValue {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.cardActions {
+.memberActions {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding-top: 8px;
-  border-top: 1px solid var(--border-color);
+  margin-top: 2px;
 }
 
-.actionLeft {
+.communicationTray {
   display: flex;
   gap: 6px;
 }
 
-.docLink {
+.trayBtn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
   display: flex;
   align-items: center;
-  gap: 4px;
-  background-color: var(--primary-light);
-  color: var(--primary);
-  padding: 4px 8px;
-  border-radius: 6px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-decoration: none;
-  transition: all 0.2s;
-}
-
-.docLink:hover {
-  background-color: var(--primary);
-  color: white;
-}
-
-.noDocText {
-  font-size: 0.75rem;
+  justify-content: center;
+  background-color: var(--bg-main);
+  border: 1px solid var(--border-color);
   color: var(--text-light);
-  font-style: italic;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
-.actionRight {
+.trayBtn:hover {
+  transform: scale(1.08);
+}
+
+.trayBtn.phone:hover {
+  background-color: rgba(59, 175, 218, 0.1);
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
+.trayBtn.email:hover {
+  background-color: rgba(155, 89, 182, 0.1);
+  color: #9b59b6;
+  border-color: #9b59b6;
+}
+
+.trayBtn.whatsapp:hover {
+  background-color: rgba(39, 206, 138, 0.1);
+  color: var(--success);
+  border-color: var(--success);
+}
+
+.recordControls {
   display: flex;
   gap: 6px;
 }
@@ -360,7 +443,7 @@
   background-color: var(--bg-main);
   border: 1px solid var(--border-color);
   color: var(--text-light);
-  padding: 6px;
+  padding: 4px;
   border-radius: 6px;
   cursor: pointer;
   display: flex;
@@ -380,7 +463,7 @@
   background-color: rgba(241, 85, 108, 0.05);
 }
 
-/* Tabular view styling */
+/* Compact Table Layout styling */
 .tableContainer {
   width: 100%;
   overflow-x: auto;
@@ -392,14 +475,14 @@
   animation: fadeIn 0.3s ease-out;
 }
 
-.momTable {
+.directoryTable {
   width: 100%;
   border-collapse: collapse;
   text-align: left;
   min-width: 1100px;
 }
 
-.momTable th {
+.directoryTable th {
   padding: 10px 14px;
   font-weight: 700;
   font-size: 0.8rem;
@@ -409,11 +492,11 @@
   background-color: rgba(214, 226, 243, 0.2);
 }
 
-[data-theme='dark'] .momTable th {
+[data-theme='dark'] .directoryTable th {
   background-color: rgba(49, 57, 68, 0.35);
 }
 
-.momTable td {
+.directoryTable td {
   padding: 8px 14px;
   border-bottom: 1px solid var(--border-color);
   color: var(--text-main);
@@ -422,11 +505,11 @@
   transition: background-color 0.2s ease;
 }
 
-.momTable tr:last-child td {
+.directoryTable tr:last-child td {
   border-bottom: none;
 }
 
-.momTable tr:hover td {
+.directoryTable tr:hover td {
   background-color: rgba(59, 175, 218, 0.01);
 }
 
@@ -452,7 +535,7 @@
   gap: 6px;
 }
 
-/* Modals & Forms */
+/* Modals Form Layout */
 .formGrid {
   display: flex;
   flex-direction: column;
@@ -504,75 +587,8 @@
 }
 
 .formTextarea {
-  min-height: 70px;
+  min-height: 60px;
   resize: vertical;
-}
-
-/* File Upload drag-and-drop */
-.uploadBox {
-  border: 2px dashed var(--border-color);
-  border-radius: 12px;
-  padding: 16px;
-  text-align: center;
-  cursor: pointer;
-  background-color: var(--bg-main);
-  transition: all 0.2s;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  position: relative;
-}
-
-.uploadBox:hover {
-  border-color: var(--primary);
-  background-color: var(--primary-light);
-}
-
-.uploadBox label {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-  font-size: 0.8rem;
-  color: var(--text-light);
-  font-weight: 600;
-  width: 100%;
-  height: 100%;
-}
-
-.uploadBox input[type='file'] {
-  display: none;
-}
-
-.previewWrapper {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-}
-
-.fileMeta {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background-color: var(--primary-light);
-  color: var(--primary);
-  padding: 6px 12px;
-  border-radius: 8px;
-  font-size: 0.8rem;
-  font-weight: 700;
-}
-
-.removeFileBtn {
-  font-size: 0.75rem;
-  color: var(--danger);
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-weight: 700;
 }
 
 .formActions {
@@ -611,7 +627,7 @@
   background-color: var(--bg-main);
 }
 
-/* Delete modal styling */
+/* Delete modal */
 .deleteConfirmBody {
   text-align: center;
   padding: 10px 0;
@@ -655,6 +671,11 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes slideDown {
+  from { height: 0; opacity: 0; }
+  to { height: auto; opacity: 1; }
+}
+
 @media (max-width: 600px) {
   .header {
     flex-direction: column;
@@ -676,4 +697,124 @@
   .gridForm, .formRow {
     grid-template-columns: 1fr !important;
   }
+}
+
+.uploadBox {
+  border: 2px dashed var(--border-color);
+  border-radius: 12px;
+  padding: 16px;
+  text-align: center;
+  cursor: pointer;
+  background-color: var(--bg-main);
+  transition: all 0.2s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+}
+
+.uploadBox:hover {
+  border-color: var(--primary);
+  background-color: var(--primary-light);
+}
+
+.uploadBox label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  color: var(--text-light);
+  font-weight: 600;
+  width: 100%;
+  height: 100%;
+}
+
+.uploadBox input[type='file'] {
+  display: none;
+}
+
+.uploadedStagedList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+  width: 100%;
+}
+
+.uploadedStagedList strong {
+  font-size: 0.75rem;
+  color: var(--text-heading);
+  align-self: flex-start;
+}
+
+.stagingGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.stagedFileItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: var(--bg-main);
+  border: 1px solid var(--border-color);
+  padding: 8px 12px;
+  border-radius: 8px;
+  gap: 12px;
+}
+
+.stagedFileLeft {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 40%;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.stagedFileName {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stagedTitleInput {
+  flex: 1;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-card);
+  color: var(--text-main);
+  font-size: 0.75rem;
+  transition: all 0.2s;
+}
+
+.stagedTitleInput:focus {
+  border-color: var(--primary);
+  outline: none;
+}
+
+.removeStagedBtn {
+  background: none;
+  border: none;
+  color: var(--danger);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.removeStagedBtn:hover {
+  transform: scale(1.15);
 }

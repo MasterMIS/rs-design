@@ -281,3 +281,9 @@
     padding: 32px 24px;
   }
 }
+
+@media (max-width: 600px) {
+  .gridForm, .formRow {
+    grid-template-columns: 1fr !important;
+  }
+}

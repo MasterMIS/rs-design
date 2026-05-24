@@ -11,7 +11,12 @@ import {
   AlertTriangle,
   Contact,
   ClipboardList,
-  Files
+  Files,
+  CheckSquare,
+  MousePointerClick,
+  HardHat,
+  FileBadge,
+  ClipboardCheck
 } from 'lucide-react';
 import styles from './Sidebar.module.css';
 import Logo from './Logo';
@@ -60,6 +65,13 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 const navItems = [
   { name: 'Dashboard', icon: LayoutDashboard, path: '/' },
   { name: 'Projects', icon: Briefcase, path: '/projects' },
+  { name: 'Site Visits', icon: HardHat, path: '/site-visits' },
+  { name: 'Requirements', icon: ClipboardList, path: '/requirements' },
+  { name: 'Checklists', icon: CheckSquare, path: '/checklists' },
+  { name: 'Selections', icon: MousePointerClick, path: '/selections' },
+  { name: 'Vendors', icon: Contact, path: '/vendors' },
+  { name: 'Quotations', icon: FileBadge, path: '/quotations' },
+  { name: 'Audits', icon: ClipboardCheck, path: '/audits' },
   { name: 'Users', icon: Users, path: '/users' },
   { name: 'Deficiencies', icon: AlertTriangle, path: '/deficiencies' },
   { name: 'Directory', icon: Contact, path: '/directory' },

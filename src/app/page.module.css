@@ -134,3 +134,9 @@
     grid-template-columns: 1fr;
   }
 }
+
+@media (max-width: 600px) {
+  .gridForm, .formRow {
+    grid-template-columns: 1fr !important;
+  }
+}

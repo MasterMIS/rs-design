@@ -27,5 +27,40 @@ export const CONFIG = {
     SHEET_ID: '1yYCiKuBwIBe-a_ItqJTowrd5Cupzv7sPuzvUS3oFHfI',
     SHEET_NAME: 'Documents',
     FOLDER_ID: '1wme6FTT1uL4KxbVQ48iOR0JTcblEWBWU',
+  },
+  REQUIREMENT: {
+    SHEET_ID: '1zswhVHwgdjkhaSrpFfxFuwML4h8KEezFYGJyWAZXPQg',
+    SHEET_NAME: 'Requirement',
+    FOLDER_ID: '1k52K8jnrnQUYOE1Qkmc2zbuhYrAn-Ua3',
+  },
+  SELECTION: {
+    SHEET_ID: '18L55HawLfZvrZLNEVKt9HJ9-4hFMjVVqMCBXWx85gTc',
+    SHEET_NAME: 'Selection',
+    FOLDER_ID: '154gK-8ONt0eZfaq84BCIKnH-j6aVdunB',
+  },
+  SITE_VISIT: {
+    SHEET_ID: '1XclQa2UQwnafqwB39pLO9CgqskEmSVHsvJeONSArVms',
+    SHEET_NAME: 'Site Visit',
+    FOLDER_ID: '1Cx276hujw-alfjt-OSe_K8UNdynVvMDn',
+  },
+  CHECKLIST: {
+    SHEET_ID: '1PJZy3Rf9k3VIexBMhD8l51hfiJ20zRLthgiF7RZo4Zw',
+    TEMPLATES_SHEET: 'Templates',
+    SUBMISSIONS_SHEET: 'Project Checklists',
+  },
+  VENDOR: {
+    SHEET_ID: '1Hgb6Y0WpbPnvD-y4CXoOumLaPhIeQQhUf4JxH1rv3Kw',
+    SHEET_NAME: 'Vendor Management',
+    FOLDER_ID: '1dV-v7rjFwqd-7NPdmMv6r8DNTBDWOHwd',
+  },
+  QUOTATION: {
+    SHEET_ID: '1BYwc9D287pnCKyLRssemBMgP5EKqM9nhhicVL6CVDGw',
+    SHEET_NAME: 'Quotation',
+    FOLDER_ID: '1iFZo939b0lYvAMze9gPhwxs1E3x_FezR',
+  },
+  AUDIT: {
+    SHEET_ID: '1SLFLFiaQu4xrTKb9p7ptgg_VoqjlHclPYx40nyqzXH0',
+    SHEET_NAME: 'Audit',
+    FOLDER_ID: '1o3emtVZrG8SXM96XsSZ-6bUhzycLIy6z',
   }
 };

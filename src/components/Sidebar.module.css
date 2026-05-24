@@ -14,11 +14,15 @@
 
 .logoContainer {
   height: var(--header-height);
+  min-height: var(--header-height);
+  max-height: var(--header-height);
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 20px; /* Reduced padding */
+  padding: 0 20px;
   border-bottom: 1px solid var(--border-color);
+  box-sizing: border-box;
 }
 
 .logoLink {
