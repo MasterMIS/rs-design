@@ -14,13 +14,13 @@ const FOLDER_ID = CONFIG.SITE_VISIT.FOLDER_ID;
 
 export async function GET() {
   try {
-    const data = await getSheetsData(SHEET_ID, `${SHEET_NAME}!A2:L1000`);
+    const data = await getSheetsData(SHEET_ID, `${SHEET_NAME}!A2:I1000`);
 
     if (!data || data.length === 0) return NextResponse.json([]);
 
     const siteVisits = data.map((row: string[], index: number) => {
       let files = [];
-      const rawFiles = row[10] || '';
+      const rawFiles = row[7] || '';
       
       if (rawFiles.trim().startsWith('[')) {
         try {
@@ -47,11 +47,8 @@ export async function GET() {
         purpose: row[4] || '',
         visitedBy: row[5] || '',
         attendees: row[6] || '',
-        status: row[7] || 'On Track',
-        observations: row[8] || '',
-        actionItems: row[9] || '',
         files: normalizedFiles,
-        remarks: row[11] || '',
+        remarks: row[8] || '',
         id: row[3] || `SV-ROW-${index + 2}`, // Using visitNo as ID
       };
     });
@@ -64,13 +61,7 @@ export async function GET() {
   }
 }
 
-function generateVisitNo() {
-  const date = new Date();
-  const year = date.getFullYear().toString().slice(-2);
-  const month = (date.getMonth() + 1).toString().padStart(2, '0');
-  const randomStr = Math.floor(1000 + Math.random() * 9000).toString();
-  return `SV-${year}${month}-${randomStr}`;
-}
+
 
 export async function POST(request: NextRequest) {
   try {
@@ -80,9 +71,6 @@ export async function POST(request: NextRequest) {
     const purpose = formData.get('purpose') as string;
     const visitedBy = formData.get('visitedBy') as string;
     const attendees = formData.get('attendees') as string;
-    const status = (formData.get('status') as string) || 'On Track';
-    const observations = formData.get('observations') as string;
-    const actionItems = formData.get('actionItems') as string;
     const remarks = formData.get('remarks') as string;
 
     const files = formData.getAll('files') as File[];
@@ -118,7 +106,7 @@ export async function POST(request: NextRequest) {
             uploadedFiles.push({
               title: fileTitles[i] || file.name,
               name: file.name,
-              url: `https://lh3.googleusercontent.com/d/${driveFile.id}`
+              url: `https://drive.google.com/file/d/${driveFile.id}/view`
             });
           }
         }
@@ -127,7 +115,19 @@ export async function POST(request: NextRequest) {
 
     const timestamp = new Date().toISOString();
     const filesJson = JSON.stringify(uploadedFiles);
-    const visitNo = generateVisitNo();
+    const existingData = await getSheetsData(SHEET_ID, `${SHEET_NAME}!D2:D1000`);
+    let maxId = 0;
+    if (existingData) {
+      existingData.forEach((row: string[]) => {
+        if (row[0]) {
+          const match = row[0].match(/Visit-(\d+)/i);
+          if (match && match[1]) {
+            maxId = Math.max(maxId, parseInt(match[1], 10));
+          }
+        }
+      });
+    }
+    const visitNo = `Visit-${maxId + 1}`;
 
     const newRow = [
       timestamp,
@@ -137,9 +137,6 @@ export async function POST(request: NextRequest) {
       purpose || '',
       visitedBy || '',
       attendees || '',
-      status,
-      observations || '',
-      actionItems || '',
       filesJson,
       remarks || ''
     ];
@@ -170,9 +167,6 @@ export async function PUT(request: NextRequest) {
     const purpose = formData.get('purpose') as string;
     const visitedBy = formData.get('visitedBy') as string;
     const attendees = formData.get('attendees') as string;
-    const status = formData.get('status') as string;
-    const observations = formData.get('observations') as string;
-    const actionItems = formData.get('actionItems') as string;
     const remarks = formData.get('remarks') as string;
 
     const existingFilesJson = formData.get('existingFiles') as string;
@@ -216,7 +210,7 @@ export async function PUT(request: NextRequest) {
             finalFilesList.push({
               title: newFileTitles[i] || file.name,
               name: file.name,
-              url: `https://lh3.googleusercontent.com/d/${driveFile.id}`
+              url: `https://drive.google.com/file/d/${driveFile.id}/view`
             });
           }
         }
@@ -233,14 +227,11 @@ export async function PUT(request: NextRequest) {
       purpose || '',
       visitedBy || '',
       attendees || '',
-      status || 'On Track',
-      observations || '',
-      actionItems || '',
       filesJson,
       remarks || ''
     ];
 
-    await updateSheetRow(SHEET_ID, `${SHEET_NAME}!A${rowIndex}:L${rowIndex}`, [updatedRow]);
+    await updateSheetRow(SHEET_ID, `${SHEET_NAME}!A${rowIndex}:I${rowIndex}`, [updatedRow]);
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {

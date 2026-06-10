@@ -98,7 +98,7 @@ export default function LoginPage() {
                   <input 
                     type="text" 
                     id="name" 
-                    placeholder="Enter your name" 
+                    placeholder=" " 
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     required
@@ -113,7 +113,7 @@ export default function LoginPage() {
                   <input 
                     type={showPassword ? "text" : "password"} 
                     id="password" 
-                    placeholder="Enter your password" 
+                    placeholder=" " 
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
@@ -137,7 +137,7 @@ export default function LoginPage() {
                   <input 
                     type="text" 
                     id="projectName" 
-                    placeholder="Enter associated project name" 
+                    placeholder=" " 
                     value={projectName}
                     onChange={(e) => setProjectName(e.target.value)}
                     required
@@ -152,7 +152,7 @@ export default function LoginPage() {
                   <input 
                     type={showPassword ? "text" : "password"} 
                     id="projectCode" 
-                    placeholder="Enter project passcode" 
+                    placeholder=" " 
                     value={projectCode}
                     onChange={(e) => setProjectCode(e.target.value)}
                     required

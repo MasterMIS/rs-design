@@ -1,22 +1,21 @@
 :root {
-  --primary: #3bafda;
-  --primary-dark: #2da1c8;
-  --primary-light: #e6f7fd;
-  --secondary: #6c757d;
-  --success: #27ce8a;
-  --info: #3bafda;
-  --warning: #f1b44c;
-  --danger: #f1556c;
-  --bg-main: #e8eff9; /* Premium soft ice-blue background (was #f5f7fb) */
-  --bg-card: #ffffff; /* Clean white cards for clean layers */
-  --bg-sidebar: #ffffff; /* Clean white sidebar */
-  --text-main: #566583; /* Rich slate-blue body text (was #6e768e) */
-  --text-heading: #1e293b; /* Deep slate-navy for strong headings (was #343a40) */
-  --text-light: #8ea2bc; /* Soft cool-blue gray for secondary text (was #98a6ad) */
-  --border-color: #d6e2f3; /* Premium cool-blue borders (was #e3e6ef) */
-  --chart-grid: #e2ecf7; /* Matching soft blue-gray grid lines for charts */
-  --header-height: 70px;
-  --sidebar-width: 220px; /* Reduced from 250px */
+  --primary: #6366f1; /* Vibrant Indigo */
+  --primary-dark: #4f46e5;
+  --primary-light: #e0e7ff;
+  --secondary: #64748b;
+  --success: #10b981; /* Emerald */
+  --info: #0ea5e9; /* Sky */
+  --warning: #f59e0b; /* Amber */
+  --danger: #ef4444; /* Rose */
+  --bg-main: #f8fafc; /* Very light slate for premium feel */
+  --bg-card: #ffffff;
+  --text-main: #334155;
+  --text-heading: #0f172a;
+  --text-light: #94a3b8;
+  --border-color: #e2e8f0;
+  --chart-grid: #f1f5f9;
+  --header-height: 96px; /* Taller banner style */
+  --banner-bg: linear-gradient(90deg, #4f46e5 0%, #1e1b4b 100%); /* Light left, Dark right */
 }
 
 [data-theme='dark'] {
@@ -54,16 +53,15 @@ body {
 
 .main-content {
   flex: 1;
-  margin-left: var(--sidebar-width);
+  width: 100%;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  transition: all 0.3s ease;
 }
 
 .page-container {
   flex: 1;
-  padding: 24px;
+  padding: 12px 24px 24px 24px; /* Reduced top padding */
 }
 
 /* Scrollbar Styles */
@@ -101,8 +99,81 @@ body {
   to { transform: translateY(0); opacity: 1; }
 }
 
-@media (max-width: 992px) {
-  .main-content {
-    margin-left: 0;
-  }
+/* Global Floating Labels */
+div[class*="formGroup"] {
+  position: relative;
+  padding-top: 10px;
 }
+
+div[class*="formGroup"] > label {
+  position: absolute;
+  top: 26px; /* Vertically centered inside the input */
+  left: 14px;
+  font-size: 0.9rem;
+  color: var(--text-light);
+  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  pointer-events: none;
+  background-color: transparent;
+  padding: 0 4px;
+  margin: 0;
+}
+
+div[class*="formGroup"]:has(input:focus, textarea:focus, select:focus) > label,
+div[class*="formGroup"]:has(input:not(:placeholder-shown), textarea:not(:placeholder-shown), select:not([value=""])) > label,
+div[class*="formGroup"][data-has-value="true"] > label,
+div[class*="formGroup"][data-is-open="true"] > label {
+  top: 2px; /* Exactly aligns with the top border of the input */
+  left: 12px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #4f46e5; /* Match banner blue */
+  background-color: var(--bg-card); /* White background to hide the border line behind the text */
+  padding: 0 4px; /* Space around text */
+}
+
+/* Hide SVG icons inside floating labels if they mess up alignment */
+div[class*="formGroup"] > label svg {
+  display: none;
+}
+
+/* Global Breadcrumb */
+.breadcrumbNav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  margin-bottom: 6px;
+}
+
+.breadcrumbNav a {
+  color: var(--text-light);
+  text-decoration: none;
+  font-weight: 600;
+  transition: color 0.2s ease;
+}
+
+.breadcrumbNav a:hover {
+  color: var(--primary);
+}
+
+.breadcrumbNav .separator {
+  color: var(--text-light);
+  opacity: 0.5;
+  font-size: 0.75rem;
+}
+
+.breadcrumbNav .current {
+  color: var(--text-heading);
+  font-weight: 700;
+}
+
+.project-breadcrumb {
+  color: var(--primary);
+  font-weight: 700;
+  background-color: var(--primary-light);
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+}
+
+

@@ -14,13 +14,13 @@ const FOLDER_ID = CONFIG.REQUIREMENT.FOLDER_ID;
 
 export async function GET() {
   try {
-    const data = await getSheetsData(SHEET_ID, `${SHEET_NAME}!A2:L1000`);
+    const data = await getSheetsData(SHEET_ID, `${SHEET_NAME}!A2:H1000`);
 
     if (!data || data.length === 0) return NextResponse.json([]);
 
     const requirements = data.map((row: string[], index: number) => {
       let files = [];
-      const rawFiles = row[9] || '';
+      const rawFiles = row[5] || '';
       
       if (rawFiles.trim().startsWith('[')) {
         try {
@@ -45,13 +45,9 @@ export async function GET() {
         title: row[2] || '',
         requirementNo: row[3] || '',
         category: row[4] || '',
-        status: row[5] || 'Pending',
-        priority: row[6] || 'Medium',
-        assignedTo: row[7] || '',
-        targetDate: row[8] || '',
         files: normalizedFiles,
-        remarks: row[10] || '',
-        id: row[11] || `REQ-ROW-${index + 2}`,
+        remarks: row[6] || '',
+        id: row[7] || `REQ-ROW-${index + 2}`,
       };
     });
 
@@ -77,10 +73,6 @@ export async function POST(request: NextRequest) {
     const project = formData.get('project') as string;
     const title = formData.get('title') as string;
     const category = formData.get('category') as string;
-    const status = (formData.get('status') as string) || 'Pending';
-    const priority = (formData.get('priority') as string) || 'Medium';
-    const assignedTo = formData.get('assignedTo') as string;
-    const targetDate = formData.get('targetDate') as string;
     const remarks = formData.get('remarks') as string;
 
     const files = formData.getAll('files') as File[];
@@ -134,10 +126,6 @@ export async function POST(request: NextRequest) {
       title,
       requirementNo,
       category || '',
-      status,
-      priority,
-      assignedTo || '',
-      targetDate || '',
       filesJson,
       remarks || '',
       reqId
@@ -167,10 +155,6 @@ export async function PUT(request: NextRequest) {
     const title = formData.get('title') as string;
     const requirementNo = formData.get('requirementNo') as string;
     const category = formData.get('category') as string;
-    const status = formData.get('status') as string;
-    const priority = formData.get('priority') as string;
-    const assignedTo = formData.get('assignedTo') as string;
-    const targetDate = formData.get('targetDate') as string;
     const remarks = formData.get('remarks') as string;
     const id = formData.get('id') as string;
 
@@ -230,16 +214,12 @@ export async function PUT(request: NextRequest) {
       title,
       requirementNo || '',
       category || '',
-      status || 'Pending',
-      priority || 'Medium',
-      assignedTo || '',
-      targetDate || '',
       filesJson,
       remarks || '',
       id
     ];
 
-    await updateSheetRow(SHEET_ID, `${SHEET_NAME}!A${rowIndex}:L${rowIndex}`, [updatedRow]);
+    await updateSheetRow(SHEET_ID, `${SHEET_NAME}!A${rowIndex}:H${rowIndex}`, [updatedRow]);
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {

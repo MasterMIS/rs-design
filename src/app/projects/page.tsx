@@ -14,6 +14,9 @@ import {
 import styles from './projects.module.css';
 import Modal from '@/components/Modal';
 import GlobalLoading from '@/components/GlobalLoading';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useProject } from '@/context/ProjectContext';
 
 interface Project {
   id: string;
@@ -27,6 +30,8 @@ interface Project {
 }
 
 export default function ProjectsPage() {
+  const router = useRouter();
+  const { setActiveProject } = useProject();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -186,13 +191,27 @@ export default function ProjectsPage() {
     setFormData(newData);
   };
 
+  const navigateToModule = (path: string) => {
+    if (viewingProject) {
+      setActiveProject({ id: viewingProject.id, name: viewingProject.basicInfo.name });
+      router.push(path);
+    }
+  };
+
   if (viewingProject) {
     return (
       <div className={styles.detailContainer}>
-        <div className={styles.detailHeader}>
-          <button className={styles.backBtn} onClick={() => setViewingProject(null)}>
-            <ArrowLeft size={20} /> Back to Projects
-          </button>
+        <div className={styles.header} style={{ marginBottom: '16px' }}>
+          <div className={styles.titleSection}>
+            <h2>Project Portfolio</h2>
+            <div className="breadcrumbNav">
+              <Link href="/">Dashboard</Link>
+              <span className="separator">&gt;</span>
+              <span onClick={() => setViewingProject(null)} style={{ cursor: 'pointer', color: 'var(--primary)', fontWeight: 600 }}>Project Portfolio</span>
+              <span className="separator">&gt;</span>
+              <span className="current">{viewingProject.basicInfo.name}</span>
+            </div>
+          </div>
           <div className={styles.detailActions}>
             <button className={styles.editBtnDetail} onClick={() => handleEdit(viewingProject)}>
               <Edit2 size={18} /> Edit Project
@@ -297,6 +316,72 @@ export default function ProjectsPage() {
           <div className={styles.descriptionSection}>
             <div className={styles.cardHeaderSmall}><FileText size={18} /> Project Description</div>
             <p>{viewingProject.basicInfo.description || 'No description provided.'}</p>
+          </div>
+
+          <div className={styles.modulesSection}>
+            <div className={styles.cardHeaderSmall}><LayoutGrid size={18} /> Jump to Module</div>
+            <div className={styles.modulesGrid}>
+              <button className={styles.moduleTile} onClick={() => navigateToModule('/site-visits')}>
+                <div className={styles.moduleIconWrapper} style={{ backgroundColor: 'rgba(59, 175, 218, 0.1)', color: 'var(--primary)' }}>
+                  <MapPin size={24} />
+                </div>
+                <span>Site Visits</span>
+              </button>
+              <button className={styles.moduleTile} onClick={() => navigateToModule('/requirements')}>
+                <div className={styles.moduleIconWrapper} style={{ backgroundColor: 'rgba(246, 173, 85, 0.1)', color: '#f6ad55' }}>
+                  <Briefcase size={24} />
+                </div>
+                <span>Requirements</span>
+              </button>
+              <button className={styles.moduleTile} onClick={() => navigateToModule('/selections')}>
+                <div className={styles.moduleIconWrapper} style={{ backgroundColor: 'rgba(110, 206, 178, 0.1)', color: '#6eceb2' }}>
+                  <Layers size={24} />
+                </div>
+                <span>Selections</span>
+              </button>
+              <button className={styles.moduleTile} onClick={() => navigateToModule('/documents')}>
+                <div className={styles.moduleIconWrapper} style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', color: 'var(--danger)' }}>
+                  <FileText size={24} />
+                </div>
+                <span>Documents</span>
+              </button>
+              <button className={styles.moduleTile} onClick={() => navigateToModule('/mom')}>
+                <div className={styles.moduleIconWrapper} style={{ backgroundColor: 'rgba(159, 122, 234, 0.1)', color: '#9f7aea' }}>
+                  <Calendar size={24} />
+                </div>
+                <span>Meetings (MoM)</span>
+              </button>
+              <button className={styles.moduleTile} onClick={() => navigateToModule('/directory')}>
+                <div className={styles.moduleIconWrapper} style={{ backgroundColor: 'rgba(56, 161, 105, 0.1)', color: '#38a169' }}>
+                  <Contact size={24} />
+                </div>
+                <span>Directory</span>
+              </button>
+              <button className={styles.moduleTile} onClick={() => navigateToModule('/quotations')}>
+                <div className={styles.moduleIconWrapper} style={{ backgroundColor: 'rgba(236, 72, 153, 0.1)', color: '#ec4899' }}>
+                  <DollarSign size={24} />
+                </div>
+                <span>Quotations</span>
+              </button>
+              <button className={styles.moduleTile} onClick={() => navigateToModule('/audits')}>
+                <div className={styles.moduleIconWrapper} style={{ backgroundColor: 'rgba(16, 185, 129, 0.1)', color: '#10b981' }}>
+                  <ShieldCheck size={24} />
+                </div>
+                <span>Audits & Inspections</span>
+              </button>
+              <button className={styles.moduleTile} onClick={() => navigateToModule('/checklists')}>
+                <div className={styles.moduleIconWrapper} style={{ backgroundColor: 'rgba(99, 102, 241, 0.1)', color: '#6366f1' }}>
+                  <CheckCircle size={24} />
+                </div>
+                <span>Checklists</span>
+              </button>
+              <button className={styles.moduleTile} onClick={() => navigateToModule('/deficiencies')}>
+                <div className={styles.moduleIconWrapper} style={{ backgroundColor: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b' }}>
+                  <AlertTriangle size={24} />
+                </div>
+                <span>Snags / Deficiencies</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -453,7 +538,11 @@ export default function ProjectsPage() {
       <div className={styles.header}>
         <div className={styles.titleSection}>
           <h2>Project Portfolio</h2>
-          <p>Track and manage your architectural and design projects.</p>
+          <div className="breadcrumbNav" style={{ marginBottom: '4px' }}>
+            <Link href="/">Dashboard</Link>
+            <span className="separator">&gt;</span>
+            <span className="current">Project Portfolio</span>
+          </div>
         </div>
         <div className={styles.headerActions}>
           <div className={styles.viewToggleGroup}>

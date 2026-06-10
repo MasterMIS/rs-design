@@ -21,6 +21,19 @@ export default function Modal({ isOpen, onClose, title, children, width, type = 
     if (isOpen) {
       window.addEventListener('keydown', handleEsc);
       document.body.style.overflow = 'hidden';
+      
+      // Inject placeholder=" " to support floating labels via CSS :has(:placeholder-shown)
+      setTimeout(() => {
+        const modalEl = document.querySelector(`.${styles.modal}`);
+        if (modalEl) {
+          const inputs = modalEl.querySelectorAll('input:not([type="checkbox"]):not([type="radio"]), textarea, select');
+          inputs.forEach(input => {
+            if (!input.hasAttribute('placeholder')) {
+              input.setAttribute('placeholder', ' ');
+            }
+          });
+        }
+      }, 50);
     }
     return () => {
       window.removeEventListener('keydown', handleEsc);

@@ -51,7 +51,6 @@ export default function DocumentsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
   const [expandedProjects, setExpandedProjects] = useState<Record<string, boolean>>({});
 
   // Search and Filter States
@@ -69,6 +68,7 @@ export default function DocumentsPage() {
   // File Upload Staging
   const [stagedFiles, setStagedFiles] = useState<StagedFileObject[]>([]);
   const [existingFiles, setExistingFiles] = useState<AttachedFile[]>([]);
+  const [uploadMode, setUploadMode] = useState<'images' | 'pdf'>('images');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Form Fields State
@@ -105,18 +105,7 @@ export default function DocumentsPage() {
     fetchDocuments();
     fetchProjects();
 
-    const saved = localStorage.getItem('dms_view_mode') as 'card' | 'table';
-    if (saved === 'card' || saved === 'table') {
-      setTimeout(() => {
-        setViewMode(saved);
-      }, 0);
-    }
-  }, []);
-
-  const handleViewModeChange = (mode: 'card' | 'table') => {
-    setViewMode(mode);
-    localStorage.setItem('dms_view_mode', mode);
-  };
+    }, []);
 
   async function fetchDocuments() {
     try {
@@ -163,6 +152,7 @@ export default function DocumentsPage() {
   const handleCreateNew = () => {
     setEditingDoc(null);
     setStagedFiles([]);
+    setUploadMode('images');
     setExistingFiles([]);
     setFormFields({
       project: projects[0]?.basicInfo?.name || '',
@@ -181,7 +171,9 @@ export default function DocumentsPage() {
   const handleEdit = (doc: DocumentEntry) => {
     setEditingDoc(doc);
     setStagedFiles([]);
+    setUploadMode('images');
     setExistingFiles(doc.files || []);
+    setUploadMode('images');
     setFormFields({
       project: doc.project,
       title: doc.title,
@@ -385,113 +377,6 @@ export default function DocumentsPage() {
       </div>
 
       {/* Summary stats */}
-      <div className={styles.statsGrid}>
-        <div className={`${styles.statCard} ${styles.total}`}>
-          <div className={styles.statIcon}>
-            <Files size={18} />
-          </div>
-          <div className={styles.statInfo}>
-            <h3>{totalCount}</h3>
-            <p>Total Managed</p>
-          </div>
-        </div>
-        <div className={`${styles.statCard} ${styles.contracts}`}>
-          <div className={styles.statIcon}>
-            <FileText size={18} />
-          </div>
-          <div className={styles.statInfo}>
-            <h3>{activeContractsCount}</h3>
-            <p>Executed Contracts</p>
-          </div>
-        </div>
-        <div className={`${styles.statCard} ${styles.permits}`}>
-          <div className={styles.statIcon}>
-            <CalendarCheck size={18} />
-          </div>
-          <div className={styles.statInfo}>
-            <h3>{activePermitsCount}</h3>
-            <p>Active Permits</p>
-          </div>
-        </div>
-        <div className={`${styles.statCard} ${styles.drawings}`}>
-          <div className={styles.statIcon}>
-            <FolderOpen size={18} />
-          </div>
-          <div className={styles.statInfo}>
-            <h3>{designDrawingsCount}</h3>
-            <p>Design Drawings</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Filter toolbar */}
-      <div className={styles.filtersBar}>
-        <div className={styles.searchWrapper}>
-          <Search size={18} className={styles.searchIcon} />
-          <input
-            type="text"
-            placeholder="Search document title, version ref, stakeholders, remarks..."
-            className={styles.searchInput}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
-
-        <div className={styles.filterControls}>
-          <select
-            className={styles.filterSelect}
-            value={filterProject}
-            onChange={(e) => setFilterProject(e.target.value)}
-          >
-            <option value="">All Projects</option>
-            {uniqueProjectsList.map(proj => (
-              <option key={proj} value={proj}>{proj}</option>
-            ))}
-          </select>
-
-          <select
-            className={styles.filterSelect}
-            value={filterCategory}
-            onChange={(e) => setFilterCategory(e.target.value)}
-          >
-            <option value="">All Categories</option>
-            {categories.map(cat => (
-              <option key={cat} value={cat}>{cat}</option>
-            ))}
-          </select>
-
-          <select
-            className={styles.filterSelect}
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-          >
-            <option value="">All Statuses</option>
-            {statuses.map(status => (
-              <option key={status} value={status}>{status}</option>
-            ))}
-          </select>
-
-          <div className={styles.viewToggleGroup}>
-            <button
-              type="button"
-              className={`${styles.viewToggleBtn} ${viewMode === 'card' ? styles.activeView : ''}`}
-              onClick={() => handleViewModeChange('card')}
-              title="Grouped Cards"
-            >
-              <LayoutGrid size={18} />
-            </button>
-            <button
-              type="button"
-              className={`${styles.viewToggleBtn} ${viewMode === 'table' ? styles.activeView : ''}`}
-              onClick={() => handleViewModeChange('table')}
-              title="Compact Table"
-            >
-              <List size={18} />
-            </button>
-          </div>
-        </div>
-      </div>
-
       {/* Main listing view */}
       {loading ? (
         <div style={{ display: 'flex', justifyContent: 'center', padding: '100px 0', color: 'var(--text-light)' }}>
@@ -501,112 +386,7 @@ export default function DocumentsPage() {
         <div style={{ display: 'flex', justifyContent: 'center', padding: '100px 0', color: 'var(--text-light)' }}>
           <p>No document files found matching filters.</p>
         </div>
-      ) : viewMode === 'card' ? (
-        <div className={styles.projectGroupSection}>
-          {Object.keys(groupedData).map(projectKey => {
-            const projectDocs = groupedData[projectKey];
-            const isOpen = expandedProjects[projectKey] !== false;
-
-            return (
-              <div key={projectKey} className={styles.projectGroupSection}>
-                {/* Collapsible Project Banner */}
-                <div className={styles.projectGroupHeader} style={{ cursor: 'pointer' }} onClick={() => toggleProject(projectKey)}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    {isOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-                    <h3>{projectKey} ({projectDocs.length})</h3>
-                  </div>
-                </div>
-
-                {isOpen && (
-                  <div className={styles.docGrid}>
-                    {projectDocs.map(doc => (
-                      <div key={doc.id} className={styles.docCard}>
-                        <div className={styles.cardHeader}>
-                          <span className={styles.cardTitle}>{doc.title}</span>
-                          <span className={`${styles.statusBadge} ${styles[doc.status.replace(/\s+/g, '').toLowerCase()]}`}>
-                            {doc.status}
-                          </span>
-                        </div>
-
-                        <span className={styles.categoryTag}>{doc.category}</span>
-
-                        <div className={styles.cardMeta}>
-                          {doc.referenceNumber && (
-                            <span className={styles.metaItem}>
-                              <Tag size={13} />
-                              Ref: {doc.referenceNumber}
-                            </span>
-                          )}
-                          <span className={styles.metaItem}>
-                            <Calendar size={13} />
-                            Issued: {doc.issueDate ? new Date(doc.issueDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
-                          </span>
-                          {doc.expiryDate && (
-                            <span className={styles.metaItem}>
-                              <CalendarCheck size={13} style={{ color: doc.status === 'Expired' ? 'var(--danger)' : '#f39c12' }} />
-                              Expires: {new Date(doc.expiryDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
-                            </span>
-                          )}
-                        </div>
-
-                        <div className={styles.cardBody}>
-                          {doc.stakeholders && (
-                            <div className={styles.sectionBlock}>
-                              <strong>Stakeholders Involved</strong>
-                              <p>{doc.stakeholders}</p>
-                            </div>
-                          )}
-
-                          {/* Multi file list display block */}
-                          <div className={styles.filesListBlock}>
-                            <strong>Attached Files ({doc.files?.length || 0})</strong>
-                            {doc.files && doc.files.length > 0 ? (
-                              <div className={styles.filesGrid}>
-                                {doc.files.map((file, idx) => (
-                                  <a key={idx} href={file.url} target="_blank" rel="noopener noreferrer" className={styles.fileItemLink} title={`Download/View ${file.title}`}>
-                                    <span className={styles.fileLinkTitle}>
-                                      <Link2 size={13} className={styles.fileIcon} />
-                                      {file.title}
-                                    </span>
-                                    {file.name && file.name !== file.title && (
-                                      <span className={styles.fileLinkSub}>
-                                        Source: {file.name}
-                                      </span>
-                                    )}
-                                  </a>
-                                ))}
-                              </div>
-                            ) : (
-                              <span className={styles.noFilesText}>No files uploaded</span>
-                            )}
-                          </div>
-
-                          {doc.remarks && (
-                            <div className={styles.sectionBlock}>
-                              <strong>Description & Remarks</strong>
-                              <p style={{ fontSize: '0.75rem' }}>{doc.remarks}</p>
-                            </div>
-                          )}
-                        </div>
-
-                        <div className={styles.cardActions}>
-                          <button className={styles.controlBtn} onClick={() => handleEdit(doc)} title="Edit Document Record">
-                            <Edit2 size={13} />
-                          </button>
-                          <button className={`${styles.controlBtn} ${styles.delete}`} onClick={() => confirmDelete(doc)} title="Delete Document Record">
-                            <Trash2 size={13} />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        <div className={styles.tableContainer}>
+      ) : (<div className={styles.tableContainer}>
           <table className={styles.docTable}>
             <thead>
               <tr>
@@ -802,12 +582,24 @@ export default function DocumentsPage() {
           {/* Drag & Drop File Upload Staging Box */}
           <div className={styles.formGroup}>
             <label><FileUp size={14} /> Attached Document Files (Select Multiple)</label>
+            
+            <div style={{ display: 'flex', gap: '16px', fontSize: '0.8rem', color: 'var(--text-main)', marginBottom: '8px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                <input type="radio" name="uploadMode" checked={uploadMode === 'images'} onChange={() => { setUploadMode('images'); setStagedFiles([]); }} />
+                Images (Auto-convert to PDF)
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                <input type="radio" name="uploadMode" checked={uploadMode === 'pdf'} onChange={() => { setUploadMode('pdf'); setStagedFiles([]); }} />
+                PDF Documents
+              </label>
+            </div>
+
             <div className={styles.uploadBox} onClick={() => fileInputRef.current?.click()}>
               <input
                 type="file"
                 ref={fileInputRef}
                 onChange={handleFileChange}
-                accept=".pdf,.doc,.docx,.xls,.xlsx,.dwg,.dxf,.zip,image/*"
+                accept={uploadMode === 'images' ? 'image/*' : '.pdf,.doc,.docx,.xls,.xlsx,.dwg,.dxf,.zip,image/*'}
                 multiple
               />
               <label>
@@ -825,7 +617,11 @@ export default function DocumentsPage() {
                   {stagedFiles.map((item, idx) => (
                     <div key={idx} className={styles.stagedFileItem}>
                       <div className={styles.stagedFileLeft}>
-                        <FileText size={14} style={{ color: 'var(--text-light)', flexShrink: 0 }} />
+                        {uploadMode === 'images' ? (
+                          <img src={URL.createObjectURL(item.file)} alt="Preview" style={{ width: '40px', height: '40px', objectFit: 'cover', borderRadius: '4px' }} />
+                        ) : (
+                          <FileText size={14} style={{ color: 'var(--text-light)', flexShrink: 0 }} />
+                        )}
                         <span className={styles.stagedFileName} title={item.file.name}>
                           {item.file.name}
                         </span>

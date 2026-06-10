@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
 import {
   Plus, Search, Edit2, Trash2, LayoutGrid, List,
   Calendar, Building, Tag, CheckCircle, FileText,
@@ -9,6 +10,8 @@ import {
 } from 'lucide-react';
 import styles from './requirements.module.css';
 import Modal from '@/components/Modal';
+import { useProject } from '@/context/ProjectContext';
+import jsPDF from 'jspdf';
 
 interface FileAttachment {
   title: string;
@@ -40,18 +43,17 @@ interface Project {
 }
 
 export default function RequirementsPage() {
+  const { activeProject } = useProject();
   const [requirements, setRequirements] = useState<Requirement[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [users, setUsers] = useState<{name: string}[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
-
+  const [uploadMode, setUploadMode] = useState<'images' | 'pdf'>('images');
+  
   // Search and Filter States
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterProject, setFilterProject] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
-  const [filterStatus, setFilterStatus] = useState('');
 
   // Modals States
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -59,15 +61,10 @@ export default function RequirementsPage() {
   const [editingReq, setEditingReq] = useState<Requirement | null>(null);
   const [reqToDelete, setReqToDelete] = useState<Requirement | null>(null);
 
-  // Form States
   const [formFields, setFormFields] = useState({
     project: '',
     title: '',
     category: 'Material',
-    status: 'Pending',
-    priority: 'Medium',
-    assignedTo: '',
-    targetDate: '',
     remarks: '',
   });
 
@@ -77,24 +74,13 @@ export default function RequirementsPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const categories = ['Material', 'Manpower', 'Design', 'Machinery', 'Consultation', 'Other'];
-  const statuses = ['Pending', 'In Progress', 'Fulfilled', 'Cancelled'];
-  const priorities = ['High', 'Medium', 'Low'];
 
   useEffect(() => {
     fetchRequirements();
     fetchProjects();
     fetchUsers();
 
-    const saved = localStorage.getItem('requirements_view_mode') as 'card' | 'table';
-    if (saved === 'card' || saved === 'table') {
-      setTimeout(() => setViewMode(saved), 0);
-    }
-  }, []);
-
-  const handleViewModeChange = (mode: 'card' | 'table') => {
-    setViewMode(mode);
-    localStorage.setItem('requirements_view_mode', mode);
-  };
+    }, []);
 
   async function fetchUsers() {
     try {
@@ -138,18 +124,15 @@ export default function RequirementsPage() {
   const handleCreateNew = () => {
     setEditingReq(null);
     setFormFields({
-      project: projects[0]?.basicInfo?.name || '',
+      project: activeProject ? activeProject.name : (projects[0]?.basicInfo?.name || ''),
       title: '',
       category: categories[0],
-      status: 'Pending',
-      priority: 'Medium',
-      assignedTo: '',
-      targetDate: '',
       remarks: '',
     });
     setSelectedFiles([]);
     setNewFileTitles([]);
     setExistingFiles([]);
+    setUploadMode('images');
     setIsModalOpen(true);
   };
 
@@ -159,15 +142,12 @@ export default function RequirementsPage() {
       project: req.project,
       title: req.title,
       category: req.category,
-      status: req.status,
-      priority: req.priority,
-      assignedTo: req.assignedTo,
-      targetDate: req.targetDate,
       remarks: req.remarks,
     });
     setSelectedFiles([]);
     setNewFileTitles([]);
     setExistingFiles(req.files || []);
+    setUploadMode('images');
     setIsModalOpen(true);
   };
 
@@ -219,14 +199,65 @@ export default function RequirementsPage() {
       formData.append('project', formFields.project);
       formData.append('title', formFields.title);
       formData.append('category', formFields.category);
-      formData.append('status', formFields.status);
-      formData.append('priority', formFields.priority);
-      formData.append('assignedTo', formFields.assignedTo);
-      formData.append('targetDate', formFields.targetDate);
       formData.append('remarks', formFields.remarks);
 
-      selectedFiles.forEach((file) => formData.append('files', file));
-      formData.append('fileTitles', JSON.stringify(newFileTitles));
+      let finalFiles = selectedFiles;
+      let finalFileTitles = selectedFiles.map((_, i) => newFileTitles[i] || 'Attachment');
+
+      if (uploadMode === 'images' && selectedFiles.length > 0) {
+        const pdf = new jsPDF();
+        
+        for (let i = 0; i < selectedFiles.length; i++) {
+          const file = selectedFiles[i];
+          const imgUrl = URL.createObjectURL(file);
+          
+          const img = new Image();
+          img.src = imgUrl;
+          await new Promise((resolve) => {
+            img.onload = () => resolve(true);
+            img.onerror = () => resolve(false);
+          });
+
+          if (!img.width) {
+            URL.revokeObjectURL(imgUrl);
+            continue;
+          }
+
+          const pdfWidth = pdf.internal.pageSize.getWidth();
+          const pdfHeight = pdf.internal.pageSize.getHeight();
+          const imgRatio = img.width / img.height;
+          const pdfRatio = pdfWidth / pdfHeight;
+
+          let finalWidth = pdfWidth;
+          let finalHeight = pdfHeight;
+
+          if (imgRatio > pdfRatio) {
+            finalHeight = pdfWidth / imgRatio;
+          } else {
+            finalWidth = pdfHeight * imgRatio;
+          }
+
+          const x = (pdfWidth - finalWidth) / 2;
+          const y = (pdfHeight - finalHeight) / 2;
+
+          if (i > 0) {
+            pdf.addPage();
+            pdf.setPage(i + 1);
+          }
+          
+          const format = file.type === 'image/png' ? 'PNG' : 'JPEG';
+          pdf.addImage(img, format, x, y, finalWidth, finalHeight, `img_${i}`);
+          URL.revokeObjectURL(imgUrl);
+        }
+
+        const pdfBlob = pdf.output('blob');
+        const pdfFile = new File([pdfBlob], `Requirement_Images_${Date.now()}.pdf`, { type: 'application/pdf' });
+        finalFiles = [pdfFile];
+        finalFileTitles = ['Requirement Images (Combined PDF)'];
+      }
+
+      finalFiles.forEach((file) => formData.append('files', file));
+      formData.append('fileTitles', JSON.stringify(finalFileTitles));
 
       let res;
       if (editingReq) {
@@ -295,11 +326,10 @@ export default function RequirementsPage() {
       req.assignedTo.toLowerCase().includes(searchQuery.toLowerCase()) ||
       req.remarks.toLowerCase().includes(searchQuery.toLowerCase());
 
-    const matchesProject = filterProject === '' || req.project === filterProject;
+    const matchesProject = activeProject ? req.project === activeProject.name : true;
     const matchesCategory = filterCategory === '' || req.category === filterCategory;
-    const matchesStatus = filterStatus === '' || req.status === filterStatus;
 
-    return matchesSearch && matchesProject && matchesCategory && matchesStatus;
+    return matchesSearch && matchesProject && matchesCategory;
   });
 
   const uniqueProjectsList = Array.from(new Set(requirements.map(r => r.project))).filter(Boolean);
@@ -313,84 +343,58 @@ export default function RequirementsPage() {
     groupedData[req.project].push(req);
   });
 
-  const pendingCount = requirements.filter(r => r.status === 'Pending').length;
-  const inProgressCount = requirements.filter(r => r.status === 'In Progress').length;
-  const fulfilledCount = requirements.filter(r => r.status === 'Fulfilled').length;
+
 
   return (
     <div className={styles.container}>
       <div className={styles.header}>
         <div className={styles.titleSection}>
           <h2>Project Requirements</h2>
-          <p>Track materials, design decisions, manpower, and other project needs.</p>
+          <div className="breadcrumbNav">
+            <Link href="/">Dashboard</Link>
+            <span className="separator">&gt;</span>
+            <Link href="/projects">Project Portfolio</Link>
+            {activeProject && (
+              <>
+                <span className="separator">&gt;</span>
+                <span className="project-breadcrumb">{activeProject.name}</span>
+              </>
+            )}
+            <span className="separator">&gt;</span>
+            <span className="current">Project Requirements</span>
+          </div>
         </div>
-        <div className={styles.headerActions}>
+        <div className={styles.headerActions} style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div className={styles.filtersBar} style={{ padding: '6px 12px', margin: 0 }}>
+            <div className={styles.searchWrapper}>
+              <Search size={18} className={styles.searchIcon} />
+              <input 
+                type="text" 
+                placeholder="Search reqs, IDs, owners..." 
+                className={styles.searchInput}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+            
+            <div className={styles.filterControls}>
+              <select 
+                className={styles.filterSelect}
+                value={filterCategory}
+                onChange={(e) => setFilterCategory(e.target.value)}
+              >
+                <option value="">All Categories</option>
+                {Array.from(new Set(requirements.map(r => r.category))).filter(Boolean).map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+
+              
+            </div>
+          </div>
           <button className={styles.addButton} onClick={handleCreateNew}>
-            <Plus size={18} />
-            <span>Add Requirement</span>
+            <Plus size={18} /> Add Requirement
           </button>
-        </div>
-      </div>
-
-      <div className={styles.statsGrid}>
-        <div className={`${styles.statCard} ${styles.total}`}>
-          <div className={styles.statIcon}><CheckSquare size={18} /></div>
-          <div className={styles.statInfo}>
-            <h3>{requirements.length}</h3>
-            <p>Total Reqs</p>
-          </div>
-        </div>
-        <div className={`${styles.statCard} ${styles.pending}`}>
-          <div className={styles.statIcon}><Clock size={18} /></div>
-          <div className={styles.statInfo}>
-            <h3>{pendingCount}</h3>
-            <p>Pending</p>
-          </div>
-        </div>
-        <div className={`${styles.statCard} ${styles.inprogress}`}>
-          <div className={styles.statIcon}><PlayCircle size={18} /></div>
-          <div className={styles.statInfo}>
-            <h3>{inProgressCount}</h3>
-            <p>In Progress</p>
-          </div>
-        </div>
-        <div className={`${styles.statCard} ${styles.fulfilled}`}>
-          <div className={styles.statIcon}><CheckCircle size={18} /></div>
-          <div className={styles.statInfo}>
-            <h3>{fulfilledCount}</h3>
-            <p>Fulfilled</p>
-          </div>
-        </div>
-      </div>
-
-      <div className={styles.filtersBar}>
-        <div className={styles.searchWrapper}>
-          <Search size={18} className={styles.searchIcon} />
-          <input
-            type="text"
-            placeholder="Search reqs, IDs, owners..."
-            className={styles.searchInput}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
-        <div className={styles.filterControls}>
-          <select className={styles.filterSelect} value={filterProject} onChange={(e) => setFilterProject(e.target.value)}>
-            <option value="">All Projects</option>
-            {uniqueProjectsList.map(proj => <option key={proj} value={proj}>{proj}</option>)}
-          </select>
-          <select className={styles.filterSelect} value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
-            <option value="">All Categories</option>
-            {uniqueCategoriesList.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-          </select>
-          <select className={styles.filterSelect} value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
-            <option value="">All Statuses</option>
-            {statuses.map(st => <option key={st} value={st}>{st}</option>)}
-          </select>
-          <div className={styles.viewToggleGroup}>
-            <button className={`${styles.viewToggleBtn} ${viewMode === 'card' ? styles.activeView : ''}`} onClick={() => handleViewModeChange('card')}><LayoutGrid size={18} /></button>
-            <button className={`${styles.viewToggleBtn} ${viewMode === 'table' ? styles.activeView : ''}`} onClick={() => handleViewModeChange('table')}><List size={18} /></button>
-          </div>
         </div>
       </div>
 
@@ -402,71 +406,6 @@ export default function RequirementsPage() {
         <div style={{ display: 'flex', justifyContent: 'center', padding: '100px 0', color: 'var(--text-light)' }}>
           <p>No requirements found.</p>
         </div>
-      ) : viewMode === 'card' ? (
-        <div className={styles.projectGroupSection}>
-          {Object.keys(groupedData).map(projectKey => (
-            <div key={projectKey}>
-              <div className={styles.projectGroupHeader}>
-                <h3>{projectKey}</h3>
-              </div>
-              <div className={styles.reqGrid} style={{ marginTop: '16px' }}>
-                {groupedData[projectKey].map(req => (
-                  <div key={req.id} className={styles.reqCard}>
-                    <div className={styles.cardHeader}>
-                      <div className={styles.cardTitle}>{req.title}</div>
-                      <span className={`${styles.statusBadge} ${styles[req.status.replace(' ', '_')]}`}>{req.status}</span>
-                    </div>
-                    <div className={styles.cardMeta}>
-                      <div className={styles.metaItem} title="Requirement No">
-                        <Tag size={12} /> {req.requirementNo}
-                      </div>
-                      <div className={styles.metaItem} title="Target Date">
-                        <Calendar size={12} /> {req.targetDate || 'No date'}
-                      </div>
-                      <div className={styles.metaItem} title="Priority">
-                        <span className={`${styles.priorityBadge} ${styles[req.priority]}`}>{req.priority}</span>
-                      </div>
-                    </div>
-                    <div className={styles.cardBody}>
-                      <span className={styles.categoryTag}>{req.category}</span>
-                      {req.assignedTo && (
-                        <div className={styles.sectionBlock}>
-                          <strong>Assigned To</strong>
-                          <p>{req.assignedTo}</p>
-                        </div>
-                      )}
-                      {req.remarks && (
-                        <div className={styles.sectionBlock}>
-                          <strong>Remarks</strong>
-                          <p>{req.remarks}</p>
-                        </div>
-                      )}
-                      {req.files && req.files.length > 0 && (
-                        <div className={styles.filesListBlock}>
-                          <strong>Attachments ({req.files.length})</strong>
-                          <div className={styles.filesGrid}>
-                            {req.files.map((file, i) => (
-                              <a key={i} href={file.url} target="_blank" rel="noopener noreferrer" className={styles.fileItemLink}>
-                                <span className={styles.fileLinkTitle}>
-                                  <FileText size={14} className={styles.fileIcon} />
-                                  {file.title || file.name}
-                                </span>
-                              </a>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    <div className={styles.cardActions}>
-                      <button className={styles.controlBtn} onClick={() => handleEdit(req)}><Edit2 size={13} /></button>
-                      <button className={`${styles.controlBtn} ${styles.delete}`} onClick={() => confirmDelete(req)}><Trash2 size={13} /></button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
       ) : (
         <div className={styles.tableContainer}>
           <table className={styles.reqTable}>
@@ -477,10 +416,6 @@ export default function RequirementsPage() {
                 <th>Project</th>
                 <th>Title & Desc</th>
                 <th>Category</th>
-                <th>Status</th>
-                <th>Priority</th>
-                <th>Assigned To</th>
-                <th>Target Date</th>
                 <th>Files</th>
               </tr>
             </thead>
@@ -502,10 +437,6 @@ export default function RequirementsPage() {
                     </div>
                   </td>
                   <td>{req.category}</td>
-                  <td><span className={`${styles.statusBadge} ${styles[req.status.replace(' ', '_')]}`}>{req.status}</span></td>
-                  <td><span className={`${styles.priorityBadge} ${styles[req.priority]}`}>{req.priority}</span></td>
-                  <td>{req.assignedTo || '—'}</td>
-                  <td>{req.targetDate || '—'}</td>
                   <td>
                     <div className={styles.tableFilesCell}>
                       {req.files && req.files.length > 0 ? (
@@ -537,13 +468,17 @@ export default function RequirementsPage() {
           <div className={styles.formRow}>
             <div className={styles.formGroup}>
               <label><Building size={14} /> Project *</label>
-              <select name="project" value={formFields.project} onChange={handleInputChange} className={styles.formSelect} required>
-                {projects.length > 0 ? projects.map(p => <option key={p.id} value={p.basicInfo.name}>{p.basicInfo.name}</option>) : <option value="">No Active Projects</option>}
-              </select>
+              {activeProject ? (
+                <input type="text" value={activeProject.name} disabled className={styles.formInput} style={{ backgroundColor: 'var(--bg-main)', color: 'var(--text-light)', cursor: 'not-allowed' }} />
+              ) : (
+                <select name="project" value={formFields.project} onChange={handleInputChange} className={styles.formSelect} required>
+                  {projects.length > 0 ? projects.map(p => <option key={p.id} value={p.basicInfo.name}>{p.basicInfo.name}</option>) : <option value="">No Active Projects</option>}
+                </select>
+              )}
             </div>
             <div className={styles.formGroup}>
               <label><CheckSquare size={14} /> Title *</label>
-              <input type="text" name="title" value={formFields.title} onChange={handleInputChange} className={styles.formInput} placeholder="e.g. Paint Approval, Extra Manpower" required />
+              <input type="text" name="title" value={formFields.title} onChange={handleInputChange} className={styles.formInput} placeholder=" " required />
             </div>
           </div>
 
@@ -555,47 +490,26 @@ export default function RequirementsPage() {
               </select>
             </div>
             <div className={styles.formGroup}>
-              <label><AlertCircle size={14} /> Status</label>
-              <select name="status" value={formFields.status} onChange={handleInputChange} className={styles.formSelect}>
-                {statuses.map(st => <option key={st} value={st}>{st}</option>)}
-              </select>
+              <label><FileText size={14} /> Remarks / Description</label>
+              <textarea name="remarks" value={formFields.remarks} onChange={handleInputChange} className={styles.formTextarea} placeholder=" " />
             </div>
           </div>
 
-          <div className={styles.formRow}>
-            <div className={styles.formGroup}>
-              <label><AlertCircle size={14} /> Priority</label>
-              <select name="priority" value={formFields.priority} onChange={handleInputChange} className={styles.formSelect}>
-                {priorities.map(p => <option key={p} value={p}>{p}</option>)}
-              </select>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', position: 'relative', marginTop: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <label style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-heading)', display: 'flex', alignItems: 'center', gap: '6px' }}><Paperclip size={14} /> Documents & Attachments</label>
+              <div style={{ display: 'flex', gap: '8px', background: 'var(--bg-main)', padding: '4px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                <button type="button" style={{ padding: '6px 12px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 600, border: 'none', cursor: 'pointer', background: uploadMode === 'images' ? 'var(--primary)' : 'transparent', color: uploadMode === 'images' ? 'white' : 'var(--text-light)', transition: 'all 0.2s' }} onClick={() => setUploadMode('images')}>📸 Images to PDF</button>
+                <button type="button" style={{ padding: '6px 12px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 600, border: 'none', cursor: 'pointer', background: uploadMode === 'pdf' ? 'var(--primary)' : 'transparent', color: uploadMode === 'pdf' ? 'white' : 'var(--text-light)', transition: 'all 0.2s' }} onClick={() => setUploadMode('pdf')}>📄 Upload PDF Directly</button>
+              </div>
             </div>
-            <div className={styles.formGroup}>
-              <label><Calendar size={14} /> Target Date</label>
-              <input type="date" name="targetDate" value={formFields.targetDate} onChange={handleInputChange} className={styles.formInput} />
-            </div>
-          </div>
 
-          <div className={styles.formGroup}>
-            <label><Tag size={14} /> Assigned To</label>
-            <select name="assignedTo" value={formFields.assignedTo} onChange={handleInputChange} className={styles.formSelect}>
-              <option value="">Unassigned</option>
-              {users.map(u => <option key={u.name} value={u.name}>{u.name}</option>)}
-            </select>
-          </div>
-
-          <div className={styles.formGroup}>
-            <label><FileText size={14} /> Remarks / Description</label>
-            <textarea name="remarks" value={formFields.remarks} onChange={handleInputChange} className={styles.formTextarea} placeholder="Detailed notes..." />
-          </div>
-
-          <div className={styles.formGroup} style={{ marginTop: '8px' }}>
-            <label><Paperclip size={14} /> Documents & Attachments</label>
             <div className={styles.uploadBox} onClick={() => fileInputRef.current?.click()}>
               <label>
                 <UploadCloud size={24} style={{ color: 'var(--primary)' }} />
-                <span>Click to browse or drag and drop files</span>
+                <span>{uploadMode === 'images' ? 'Click or drag images to merge into a single PDF' : 'Click or drag a PDF document'}</span>
               </label>
-              <input type="file" multiple ref={fileInputRef} onChange={handleFileSelect} />
+              <input type="file" multiple={uploadMode === 'images'} accept={uploadMode === 'images' ? "image/*" : ".pdf"} ref={fileInputRef} onChange={handleFileSelect} />
             </div>
 
             {(existingFiles.length > 0 || selectedFiles.length > 0) && (

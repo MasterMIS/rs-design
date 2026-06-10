@@ -48,11 +48,6 @@ export const CONFIG = {
     TEMPLATES_SHEET: 'Templates',
     SUBMISSIONS_SHEET: 'Project Checklists',
   },
-  VENDOR: {
-    SHEET_ID: '1Hgb6Y0WpbPnvD-y4CXoOumLaPhIeQQhUf4JxH1rv3Kw',
-    SHEET_NAME: 'Vendor Management',
-    FOLDER_ID: '1dV-v7rjFwqd-7NPdmMv6r8DNTBDWOHwd',
-  },
   QUOTATION: {
     SHEET_ID: '1BYwc9D287pnCKyLRssemBMgP5EKqM9nhhicVL6CVDGw',
     SHEET_NAME: 'Quotation',

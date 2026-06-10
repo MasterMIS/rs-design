@@ -529,18 +529,19 @@
 }
 
 .formInput, .formSelect, .formTextarea {
-  padding: 12px;
+  padding: 12px 14px;
   border-radius: 10px;
-  border: 1px solid var(--border-color);
-  background-color: var(--bg-main);
-  color: var(--text-main);
-  font-size: 0.9rem;
-  transition: all 0.2s;
+  border: 2px solid #cbd5e1;
+  background-color: transparent;
+  color: var(--text-heading);
+  font-size: 0.95rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
   width: 100%;
 }
 
 .formInput:focus, .formSelect:focus, .formTextarea:focus {
-  border-color: var(--primary);
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
   outline: none;
 }
 

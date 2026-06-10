@@ -9,6 +9,19 @@ import {
 } from 'lucide-react';
 import styles from './site-visits.module.css';
 import Modal from '@/components/Modal';
+import { useProject } from '@/context/ProjectContext';
+import Link from 'next/link';
+import jsPDF from 'jspdf';
+
+const formatDate = (dateStr: string) => {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return dateStr;
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = date.toLocaleString('default', { month: 'short' });
+  const year = String(date.getFullYear()).slice(-2);
+  return `${day} ${month} ${year}`;
+};
 
 interface FileAttachment {
   title: string;
@@ -43,16 +56,15 @@ interface Project {
 export default function SiteVisitsPage() {
   const [siteVisits, setSiteVisits] = useState<SiteVisit[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
-  const [users, setUsers] = useState<{name: string}[]>([]);
+  const [users, setUsers] = useState<{ name: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
+  const { activeProject } = useProject();
 
   // Search and Filter States
   const [searchQuery, setSearchQuery] = useState('');
   const [filterProject, setFilterProject] = useState('');
   const [filterPurpose, setFilterPurpose] = useState('');
-  const [filterStatus, setFilterStatus] = useState('');
 
   // Modals States
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -66,36 +78,37 @@ export default function SiteVisitsPage() {
     project: '',
     purpose: 'Initial Survey',
     attendees: '',
-    status: 'On Track',
-    observations: '',
-    actionItems: '',
     remarks: '',
   });
 
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [newFileTitles, setNewFileTitles] = useState<string[]>([]);
   const [existingFiles, setExistingFiles] = useState<FileAttachment[]>([]);
+  const [uploadMode, setUploadMode] = useState<'images' | 'pdf'>('images');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const purposes = ['Initial Survey', 'Progress Check', 'Quality Inspection', 'Client Meeting', 'Issue Resolution', 'Final Handover', 'Other'];
-  const statuses = ['On Track', 'Delayed', 'Critical Issues', 'Completed'];
+  const [userSearchTerm, setUserSearchTerm] = useState('');
+  const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsUserDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+
 
   useEffect(() => {
     fetchSiteVisits();
     fetchProjects();
     fetchUsers();
 
-    const saved = localStorage.getItem('sitevisits_view_mode') as 'card' | 'table';
-    if (saved === 'card' || saved === 'table') {
-      setTimeout(() => setViewMode(saved), 0);
-    }
   }, []);
-
-  const handleViewModeChange = (mode: 'card' | 'table') => {
-    setViewMode(mode);
-    localStorage.setItem('sitevisits_view_mode', mode);
-  };
 
   async function fetchUsers() {
     try {
@@ -140,18 +153,15 @@ export default function SiteVisitsPage() {
     setEditingVisit(null);
     setFormFields({
       visitDate: new Date().toISOString().split('T')[0],
-      project: projects[0]?.basicInfo?.name || '',
-      purpose: purposes[0],
+      project: activeProject ? activeProject.name : (projects[0]?.basicInfo?.name || ''),
+      purpose: '',
       attendees: '',
-      status: 'On Track',
-      observations: '',
-      actionItems: '',
       remarks: '',
     });
     setSelectedUsers([]);
     setSelectedFiles([]);
-    setNewFileTitles([]);
     setExistingFiles([]);
+    setUploadMode('images');
     setIsModalOpen(true);
   };
 
@@ -162,15 +172,12 @@ export default function SiteVisitsPage() {
       project: visit.project,
       purpose: visit.purpose,
       attendees: visit.attendees,
-      status: visit.status,
-      observations: visit.observations,
-      actionItems: visit.actionItems,
       remarks: visit.remarks,
     });
     setSelectedUsers(visit.visitedBy ? visit.visitedBy.split(',').map(s => s.trim()).filter(Boolean) : []);
     setSelectedFiles([]);
-    setNewFileTitles([]);
     setExistingFiles(visit.files || []);
+    setUploadMode('images');
     setIsModalOpen(true);
   };
 
@@ -180,7 +187,7 @@ export default function SiteVisitsPage() {
   };
 
   const handleUserToggle = (userName: string) => {
-    setSelectedUsers(prev => 
+    setSelectedUsers(prev =>
       prev.includes(userName) ? prev.filter(u => u !== userName) : [...prev, userName]
     );
   };
@@ -190,29 +197,15 @@ export default function SiteVisitsPage() {
     if (e.target.files) {
       const filesArr = Array.from(e.target.files);
       setSelectedFiles(prev => [...prev, ...filesArr]);
-      setNewFileTitles(prev => [...prev, ...filesArr.map(f => f.name)]);
     }
   };
 
   const handleRemoveNewFile = (index: number) => {
     setSelectedFiles(prev => prev.filter((_, i) => i !== index));
-    setNewFileTitles(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleRemoveExistingFile = (index: number) => {
     setExistingFiles(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const handleNewFileTitleChange = (index: number, newTitle: string) => {
-    const updated = [...newFileTitles];
-    updated[index] = newTitle;
-    setNewFileTitles(updated);
-  };
-
-  const handleExistingFileTitleChange = (index: number, newTitle: string) => {
-    const updated = [...existingFiles];
-    updated[index] = { ...updated[index], title: newTitle };
-    setExistingFiles(updated);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -230,13 +223,65 @@ export default function SiteVisitsPage() {
       formData.append('purpose', formFields.purpose);
       formData.append('visitedBy', selectedUsers.join(', '));
       formData.append('attendees', formFields.attendees);
-      formData.append('status', formFields.status);
-      formData.append('observations', formFields.observations);
-      formData.append('actionItems', formFields.actionItems);
       formData.append('remarks', formFields.remarks);
 
-      selectedFiles.forEach((file) => formData.append('files', file));
-      formData.append('fileTitles', JSON.stringify(newFileTitles));
+      let finalFiles = selectedFiles;
+      let finalFileTitles = selectedFiles.map(f => f.name);
+
+      if (uploadMode === 'images' && selectedFiles.length > 0) {
+        const pdf = new jsPDF();
+        
+        for (let i = 0; i < selectedFiles.length; i++) {
+          const file = selectedFiles[i];
+          const imgUrl = URL.createObjectURL(file);
+          
+          const img = new Image();
+          img.src = imgUrl;
+          await new Promise((resolve) => {
+            img.onload = () => resolve(true);
+            img.onerror = () => resolve(false);
+          });
+
+          if (!img.width) {
+            URL.revokeObjectURL(imgUrl);
+            continue;
+          }
+
+          const pdfWidth = pdf.internal.pageSize.getWidth();
+          const pdfHeight = pdf.internal.pageSize.getHeight();
+          const imgRatio = img.width / img.height;
+          const pdfRatio = pdfWidth / pdfHeight;
+
+          let finalWidth = pdfWidth;
+          let finalHeight = pdfHeight;
+
+          if (imgRatio > pdfRatio) {
+            finalHeight = pdfWidth / imgRatio;
+          } else {
+            finalWidth = pdfHeight * imgRatio;
+          }
+
+          const x = (pdfWidth - finalWidth) / 2;
+          const y = (pdfHeight - finalHeight) / 2;
+
+          if (i > 0) {
+            pdf.addPage();
+            pdf.setPage(i + 1);
+          }
+          
+          const format = file.type === 'image/png' ? 'PNG' : 'JPEG';
+          pdf.addImage(img, format, x, y, finalWidth, finalHeight, `img_${i}`);
+          URL.revokeObjectURL(imgUrl);
+        }
+
+        const pdfBlob = pdf.output('blob');
+        const pdfFile = new File([pdfBlob], `Site_Photos_${Date.now()}.pdf`, { type: 'application/pdf' });
+        finalFiles = [pdfFile];
+        finalFileTitles = ['Site Photos (Combined PDF)'];
+      }
+
+      finalFiles.forEach((file) => formData.append('files', file));
+      formData.append('fileTitles', JSON.stringify(finalFileTitles));
 
       let res;
       if (editingVisit) {
@@ -298,18 +343,19 @@ export default function SiteVisitsPage() {
 
   // Filtering
   const filteredVisits = siteVisits.filter(visit => {
+    // If we are in project-centric mode, force filter by activeProject
+    if (activeProject && visit.project !== activeProject.name) return false;
+
     const matchesSearch =
       visit.visitNo.toLowerCase().includes(searchQuery.toLowerCase()) ||
       visit.purpose.toLowerCase().includes(searchQuery.toLowerCase()) ||
       visit.visitedBy.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      visit.attendees.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      visit.observations.toLowerCase().includes(searchQuery.toLowerCase());
+      visit.attendees.toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesProject = filterProject === '' || visit.project === filterProject;
     const matchesPurpose = filterPurpose === '' || visit.purpose === filterPurpose;
-    const matchesStatus = filterStatus === '' || visit.status === filterStatus;
 
-    return matchesSearch && matchesProject && matchesPurpose && matchesStatus;
+    return matchesSearch && matchesProject && matchesPurpose;
   });
 
   const uniqueProjectsList = Array.from(new Set(siteVisits.map(s => s.project))).filter(Boolean);
@@ -323,86 +369,54 @@ export default function SiteVisitsPage() {
     groupedData[visit.project].push(visit);
   });
 
-  const onTrackCount = siteVisits.filter(s => s.status === 'On Track').length;
-  const delayedCount = siteVisits.filter(s => s.status === 'Delayed').length;
-  const issuesCount = siteVisits.filter(s => s.status === 'Critical Issues').length;
+
 
   return (
     <div className={styles.container}>
       <div className={styles.header}>
         <div className={styles.titleSection}>
           <h2>Site Visits</h2>
-          <p>Track field inspections, client meetings, and site progress.</p>
+          <div className="breadcrumbNav">
+            <Link href="/">Dashboard</Link>
+            <span className="separator">&gt;</span>
+            <Link href="/projects">Project Portfolio</Link>
+            {activeProject && (
+              <>
+                <span className="separator">&gt;</span>
+                <span className="project-breadcrumb">{activeProject.name}</span>
+              </>
+            )}
+            <span className="separator">&gt;</span>
+            <span className="current">Site Visits & Updates</span>
+          </div>
         </div>
-        <div className={styles.headerActions}>
+        <div className={styles.headerActions} style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div className={styles.filtersBar} style={{ padding: '6px 12px', margin: 0 }}>
+            <div className={styles.searchWrapper}>
+              <Search size={18} className={styles.searchIcon} />
+              <input
+                type="text"
+                placeholder="Search attendees, IDs..."
+                className={styles.searchInput}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+            <div className={styles.filterControls}>
+
+              <select className={styles.filterSelect} value={filterPurpose} onChange={(e) => setFilterPurpose(e.target.value)}>
+                <option value="">All Purposes</option>
+                {uniquePurposesList.map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </div>
+          </div>
           <button className={styles.addButton} onClick={handleCreateNew}>
-            <Plus size={18} />
-            <span>Add Site Visit</span>
+            <Plus size={18} /> Add Site Visit
           </button>
         </div>
       </div>
 
-      <div className={styles.statsGrid}>
-        <div className={`${styles.statCard} ${styles.total}`}>
-          <div className={styles.statIcon}><MapPin size={18} /></div>
-          <div className={styles.statInfo}>
-            <h3>{siteVisits.length}</h3>
-            <p>Total Visits</p>
-          </div>
-        </div>
-        <div className={`${styles.statCard} ${styles.ontrack}`}>
-          <div className={styles.statIcon}><CheckCircle size={18} /></div>
-          <div className={styles.statInfo}>
-            <h3>{onTrackCount}</h3>
-            <p>On Track</p>
-          </div>
-        </div>
-        <div className={`${styles.statCard} ${styles.delayed}`}>
-          <div className={styles.statIcon}><Clock size={18} /></div>
-          <div className={styles.statInfo}>
-            <h3>{delayedCount}</h3>
-            <p>Delayed</p>
-          </div>
-        </div>
-        <div className={`${styles.statCard} ${styles.issues}`}>
-          <div className={styles.statIcon}><AlertCircle size={18} /></div>
-          <div className={styles.statInfo}>
-            <h3>{issuesCount}</h3>
-            <p>Critical Issues</p>
-          </div>
-        </div>
-      </div>
 
-      <div className={styles.filtersBar}>
-        <div className={styles.searchWrapper}>
-          <Search size={18} className={styles.searchIcon} />
-          <input
-            type="text"
-            placeholder="Search attendees, observations, IDs..."
-            className={styles.searchInput}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
-        <div className={styles.filterControls}>
-          <select className={styles.filterSelect} value={filterProject} onChange={(e) => setFilterProject(e.target.value)}>
-            <option value="">All Projects</option>
-            {uniqueProjectsList.map(proj => <option key={proj} value={proj}>{proj}</option>)}
-          </select>
-          <select className={styles.filterSelect} value={filterPurpose} onChange={(e) => setFilterPurpose(e.target.value)}>
-            <option value="">All Purposes</option>
-            {uniquePurposesList.map(p => <option key={p} value={p}>{p}</option>)}
-          </select>
-          <select className={styles.filterSelect} value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
-            <option value="">All Statuses</option>
-            {statuses.map(st => <option key={st} value={st}>{st}</option>)}
-          </select>
-          <div className={styles.viewToggleGroup}>
-            <button className={`${styles.viewToggleBtn} ${viewMode === 'card' ? styles.activeView : ''}`} onClick={() => handleViewModeChange('card')}><LayoutGrid size={18} /></button>
-            <button className={`${styles.viewToggleBtn} ${viewMode === 'table' ? styles.activeView : ''}`} onClick={() => handleViewModeChange('table')}><List size={18} /></button>
-          </div>
-        </div>
-      </div>
 
       {loading ? (
         <div style={{ display: 'flex', justifyContent: 'center', padding: '100px 0', color: 'var(--text-light)' }}>
@@ -412,82 +426,6 @@ export default function SiteVisitsPage() {
         <div style={{ display: 'flex', justifyContent: 'center', padding: '100px 0', color: 'var(--text-light)' }}>
           <p>No site visits found.</p>
         </div>
-      ) : viewMode === 'card' ? (
-        <div className={styles.projectGroupSection}>
-          {Object.keys(groupedData).map(projectKey => (
-            <div key={projectKey}>
-              <div className={styles.projectGroupHeader}>
-                <h3>{projectKey}</h3>
-              </div>
-              <div className={styles.svGrid} style={{ marginTop: '16px' }}>
-                {groupedData[projectKey].map(visit => (
-                  <div key={visit.id} className={styles.svCard}>
-                    <div className={styles.cardHeader}>
-                      <div className={styles.cardTitle}>{visit.purpose}</div>
-                      <span className={`${styles.statusBadge} ${styles[visit.status.replace(/\s+/g, '')]}`}>{visit.status}</span>
-                    </div>
-                    <div className={styles.cardMeta}>
-                      <div className={styles.metaItem} title="Visit No">
-                        <Tag size={12} /> {visit.visitNo}
-                      </div>
-                      <div className={styles.metaItem} title="Date">
-                        <Calendar size={12} /> {visit.visitDate}
-                      </div>
-                    </div>
-                    <div className={styles.cardBody}>
-                      <div className={styles.sectionBlock}>
-                        <strong><Users size={12} style={{ display: 'inline', marginRight: '4px' }}/>Visited By</strong>
-                        <div className={styles.usersList}>
-                          {visit.visitedBy ? visit.visitedBy.split(',').map((u, i) => (
-                            <span key={i} className={styles.userChip}>{u.trim()}</span>
-                          )) : <span style={{color: 'var(--text-light)'}}>None</span>}
-                        </div>
-                      </div>
-                      
-                      {visit.attendees && (
-                        <div className={styles.sectionBlock}>
-                          <strong>Other Attendees</strong>
-                          <p>{visit.attendees}</p>
-                        </div>
-                      )}
-                      {visit.observations && (
-                        <div className={styles.sectionBlock}>
-                          <strong>Key Observations</strong>
-                          <p>{visit.observations}</p>
-                        </div>
-                      )}
-                      {visit.actionItems && (
-                        <div className={styles.sectionBlock}>
-                          <strong>Action Items</strong>
-                          <p>{visit.actionItems}</p>
-                        </div>
-                      )}
-                      {visit.files && visit.files.length > 0 && (
-                        <div className={styles.filesListBlock}>
-                          <strong>Attachments ({visit.files.length})</strong>
-                          <div className={styles.filesGrid}>
-                            {visit.files.map((file, i) => (
-                              <a key={i} href={file.url} target="_blank" rel="noopener noreferrer" className={styles.fileItemLink}>
-                                <span className={styles.fileLinkTitle}>
-                                  <FileText size={14} className={styles.fileIcon} />
-                                  {file.title || file.name}
-                                </span>
-                              </a>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    <div className={styles.cardActions}>
-                      <button className={styles.controlBtn} onClick={() => handleEdit(visit)}><Edit2 size={13} /></button>
-                      <button className={`${styles.controlBtn} ${styles.delete}`} onClick={() => confirmDelete(visit)}><Trash2 size={13} /></button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
       ) : (
         <div className={styles.tableContainer}>
           <table className={styles.svTable}>
@@ -495,16 +433,15 @@ export default function SiteVisitsPage() {
               <tr>
                 <th>Actions</th>
                 <th>Visit No</th>
-                <th>Project</th>
                 <th>Date & Purpose</th>
-                <th>Status</th>
                 <th>Visited By</th>
-                <th>Observations</th>
+                <th>Other Attendees</th>
+                <th>Remarks</th>
                 <th>Files</th>
               </tr>
             </thead>
             <tbody>
-              {filteredVisits.map(visit => (
+              {[...filteredVisits].reverse().map(visit => (
                 <tr key={visit.id}>
                   <td>
                     <div className={styles.tableActions}>
@@ -513,14 +450,12 @@ export default function SiteVisitsPage() {
                     </div>
                   </td>
                   <td><strong>{visit.visitNo}</strong></td>
-                  <td>{visit.project}</td>
                   <td>
                     <div className={styles.tableTitleCell}>
-                      <span className={styles.tableRepName}>{visit.visitDate}</span>
+                      <span className={styles.tableRepName}>{formatDate(visit.visitDate)}</span>
                       <span className={styles.tableRepDetail}>{visit.purpose}</span>
                     </div>
                   </td>
-                  <td><span className={`${styles.statusBadge} ${styles[visit.status.replace(/\s+/g, '')]}`}>{visit.status}</span></td>
                   <td>
                     <div className={styles.usersList} style={{ maxWidth: '150px' }}>
                       {visit.visitedBy ? visit.visitedBy.split(',').map((u, i) => (
@@ -528,17 +463,22 @@ export default function SiteVisitsPage() {
                       )) : '—'}
                     </div>
                   </td>
-                  <td style={{ maxWidth: '200px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {visit.observations || '—'}
+                  <td style={{ maxWidth: '150px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {visit.attendees || '—'}
+                  </td>
+                  <td style={{ maxWidth: '300px' }}>
+                    {visit.remarks || '—'}
                   </td>
                   <td>
                     <div className={styles.tableFilesCell}>
                       {visit.files && visit.files.length > 0 ? (
-                        visit.files.map((file, i) => (
-                          <a key={i} href={file.url} target="_blank" rel="noopener noreferrer" className={styles.tableFileLink}>
-                            <Paperclip size={10} /> {file.title || 'Doc'}
-                          </a>
-                        ))
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                          {visit.files.map((file, i) => (
+                            <a key={i} href={file.url} target="_blank" rel="noopener noreferrer" title={file.title || 'Attachment'} style={{ display: 'inline-flex', padding: '6px', backgroundColor: 'var(--primary-light)', borderRadius: '6px' }}>
+                              <FileText size={18} color="var(--primary)" />
+                            </a>
+                          ))}
+                        </div>
                       ) : (
                         <span style={{ fontSize: '0.75rem', color: 'var(--text-light)' }}>None</span>
                       )}
@@ -562,7 +502,7 @@ export default function SiteVisitsPage() {
           <div className={styles.formRow}>
             <div className={styles.formGroup}>
               <label><Building size={14} /> Project *</label>
-              <select name="project" value={formFields.project} onChange={handleInputChange} className={styles.formSelect} required>
+              <select name="project" value={formFields.project} onChange={handleInputChange} className={styles.formSelect} required disabled={!!activeProject}>
                 {projects.length > 0 ? projects.map(p => <option key={p.id} value={p.basicInfo.name}>{p.basicInfo.name}</option>) : <option value="">No Active Projects</option>}
               </select>
             </div>
@@ -572,66 +512,87 @@ export default function SiteVisitsPage() {
             </div>
           </div>
 
-          <div className={styles.formRow}>
-            <div className={styles.formGroup}>
-              <label><Target size={14} /> Purpose of Visit</label>
-              <select name="purpose" value={formFields.purpose} onChange={handleInputChange} className={styles.formSelect}>
-                {purposes.map(p => <option key={p} value={p}>{p}</option>)}
-              </select>
-            </div>
-            <div className={styles.formGroup}>
-              <label><AlertCircle size={14} /> Site Status</label>
-              <select name="status" value={formFields.status} onChange={handleInputChange} className={styles.formSelect}>
-                {statuses.map(st => <option key={st} value={st}>{st}</option>)}
-              </select>
-            </div>
+          <div className={styles.formGroup}>
+            <label><Target size={14} /> Purpose of Visit</label>
+            <input type="text" name="purpose" value={formFields.purpose} onChange={handleInputChange} className={styles.formInput} placeholder=" " />
           </div>
 
-          <div className={styles.formGroup}>
+          <div 
+            className={styles.formGroup} 
+            style={{ position: 'relative' }} 
+            ref={dropdownRef}
+            data-has-value={selectedUsers.length > 0 ? "true" : "false"}
+            data-is-open={isUserDropdownOpen ? "true" : "false"}
+          >
             <label><Users size={14} /> Visited By (Our Team)</label>
-            <div className={styles.multiSelectBox}>
-              {users.map(u => (
-                <label key={u.name} className={styles.checkboxLabel}>
-                  <input 
-                    type="checkbox" 
-                    checked={selectedUsers.includes(u.name)}
-                    onChange={() => handleUserToggle(u.name)}
-                  />
-                  {u.name}
-                </label>
-              ))}
+            <div 
+              className={styles.formSelect} 
+              style={{ cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+              onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
+            >
+              <span style={{ color: selectedUsers.length === 0 ? 'var(--text-light)' : 'inherit' }}>
+                {selectedUsers.length > 0 ? selectedUsers.join(', ') : ''}
+              </span>
+              <span>▼</span>
             </div>
+            {isUserDropdownOpen && (
+              <div style={{ position: 'absolute', zIndex: 10, width: '100%', top: '65px', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '10px', boxShadow: '0 4px 15px rgba(0,0,0,0.1)', maxHeight: '250px', display: 'flex', flexDirection: 'column' }}>
+                <input 
+                  type="text" 
+                  placeholder="Search team..." 
+                  value={userSearchTerm} 
+                  onChange={(e) => setUserSearchTerm(e.target.value)}
+                  className={styles.formInput}
+                  style={{ marginBottom: '10px', padding: '8px' }}
+                  onClick={(e) => e.stopPropagation()}
+                />
+                <div style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {users.filter(u => u.name.toLowerCase().includes(userSearchTerm.toLowerCase())).map(u => (
+                    <label key={u.name} className={styles.checkboxLabel} onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={selectedUsers.includes(u.name)}
+                        onChange={() => handleUserToggle(u.name)}
+                      />
+                      {u.name}
+                    </label>
+                  ))}
+                  {users.filter(u => u.name.toLowerCase().includes(userSearchTerm.toLowerCase())).length === 0 && (
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-light)', textAlign: 'center', padding: '10px' }}>No members found.</span>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className={styles.formGroup}>
             <label><Users size={14} /> Other Attendees (Client / Vendors)</label>
-            <input type="text" name="attendees" value={formFields.attendees} onChange={handleInputChange} className={styles.formInput} placeholder="e.g. Mr. Sharma (Client), Ravi (Plumber)" />
+            <input type="text" name="attendees" value={formFields.attendees} onChange={handleInputChange} className={styles.formInput} placeholder=" " />
           </div>
 
-          <div className={styles.formRow}>
-            <div className={styles.formGroup}>
-              <label><FileText size={14} /> Key Observations</label>
-              <textarea name="observations" value={formFields.observations} onChange={handleInputChange} className={styles.formTextarea} placeholder="What was observed or discussed?" />
-            </div>
-            <div className={styles.formGroup}>
-              <label><CheckCircle size={14} /> Action Items</label>
-              <textarea name="actionItems" value={formFields.actionItems} onChange={handleInputChange} className={styles.formTextarea} placeholder="What needs to be done next?" />
-            </div>
-          </div>
-          
           <div className={styles.formGroup}>
             <label><Tag size={14} /> General Remarks</label>
-            <input type="text" name="remarks" value={formFields.remarks} onChange={handleInputChange} className={styles.formInput} placeholder="Any other notes..." />
+            <input type="text" name="remarks" value={formFields.remarks} onChange={handleInputChange} className={styles.formInput} placeholder=" " />
           </div>
 
-          <div className={styles.formGroup} style={{ marginTop: '8px' }}>
-            <label><Paperclip size={14} /> Site Photos & Documents</label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', position: 'relative', marginTop: '12px' }}>
+            <label style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-heading)', display: 'flex', alignItems: 'center', gap: '6px' }}><Paperclip size={14} /> Site Photos & Documents</label>
+            
+            <div style={{ display: 'flex', gap: '16px', marginBottom: '8px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', cursor: 'pointer' }}>
+                <input type="radio" name="uploadMode" checked={uploadMode === 'images'} onChange={() => { setUploadMode('images'); setSelectedFiles([]); }} /> Images (Auto-convert to PDF)
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', cursor: 'pointer' }}>
+                <input type="radio" name="uploadMode" checked={uploadMode === 'pdf'} onChange={() => { setUploadMode('pdf'); setSelectedFiles([]); }} /> PDF Document
+              </label>
+            </div>
+
             <div className={styles.uploadBox} onClick={() => fileInputRef.current?.click()}>
               <label>
                 <UploadCloud size={24} style={{ color: 'var(--primary)' }} />
                 <span>Click to browse or drag and drop files</span>
               </label>
-              <input type="file" multiple ref={fileInputRef} onChange={handleFileSelect} />
+              <input type="file" multiple={uploadMode === 'images'} accept={uploadMode === 'images' ? 'image/*' : 'application/pdf'} ref={fileInputRef} onChange={handleFileSelect} />
             </div>
 
             {(existingFiles.length > 0 || selectedFiles.length > 0) && (
@@ -642,19 +603,22 @@ export default function SiteVisitsPage() {
                     <div key={`exist-${i}`} className={styles.stagedFileItem}>
                       <div className={styles.stagedFileLeft} title={file.name}>
                         <FileIcon size={14} style={{ color: 'var(--text-light)' }} />
-                        <span className={styles.stagedFileName}>{file.name}</span>
+                        <span className={styles.stagedFileName}>{file.title || file.name}</span>
                       </div>
-                      <input type="text" className={styles.stagedTitleInput} value={file.title} onChange={(e) => handleExistingFileTitleChange(i, e.target.value)} placeholder="File Title" />
                       <button type="button" className={styles.removeStagedBtn} onClick={() => handleRemoveExistingFile(i)}><X size={16} /></button>
                     </div>
                   ))}
                   {selectedFiles.map((file, i) => (
                     <div key={`new-${i}`} className={styles.stagedFileItem}>
                       <div className={styles.stagedFileLeft} title={file.name}>
-                        <FileIcon size={14} style={{ color: 'var(--success)' }} />
+                        {uploadMode === 'images' ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={URL.createObjectURL(file)} alt="preview" style={{ width: '32px', height: '32px', objectFit: 'cover', borderRadius: '4px' }} />
+                        ) : (
+                          <FileIcon size={14} style={{ color: 'var(--success)' }} />
+                        )}
                         <span className={styles.stagedFileName}>{file.name}</span>
                       </div>
-                      <input type="text" className={styles.stagedTitleInput} value={newFileTitles[i]} onChange={(e) => handleNewFileTitleChange(i, e.target.value)} placeholder="File Title" />
                       <button type="button" className={styles.removeStagedBtn} onClick={() => handleRemoveNewFile(i)}><X size={16} /></button>
                     </div>
                   ))}

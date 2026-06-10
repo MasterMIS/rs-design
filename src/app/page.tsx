@@ -7,8 +7,10 @@ import {
   DollarSign, 
   ShoppingBag, 
   Users as UsersIcon,
-  Package
+  Package,
+  BriefcaseBusiness
 } from 'lucide-react';
+import Link from 'next/link';
 import { 
   BarChart, 
   Bar, 
@@ -43,8 +45,13 @@ export default function Dashboard() {
   return (
     <div className={styles.dashboard}>
       <div className={styles.pageHeader}>
-        <h2 className={styles.pageTitle}>Dashboard</h2>
-        <div className={styles.breadcrumb}>RSDesign &gt; Navigation &gt; Dashboard</div>
+        <div>
+          <h2 className={styles.pageTitle}>Dashboard</h2>
+        </div>
+        <Link href="/projects" className={styles.portfolioBtn}>
+          <BriefcaseBusiness size={18} />
+          Go to Project Portfolio
+        </Link>
       </div>
 
       <div className={styles.statsGrid}>

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
 import {
   Plus, Search, Edit2, Trash2, LayoutGrid, List,
   Calendar, Building, Tag, CheckCircle, FileText,
@@ -9,6 +10,9 @@ import {
 } from 'lucide-react';
 import styles from './selections.module.css';
 import Modal from '@/components/Modal';
+
+import { useProject } from '@/context/ProjectContext';
+import jsPDF from 'jspdf';
 
 interface FileAttachment {
   title: string;
@@ -41,12 +45,12 @@ interface Project {
 }
 
 export default function SelectionsPage() {
+  const { activeProject } = useProject();
   const [selections, setSelections] = useState<Selection[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
-  const [users, setUsers] = useState<{name: string}[]>([]);
+  const [users, setUsers] = useState<{ name: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
 
   // Search and Filter States
   const [searchQuery, setSearchQuery] = useState('');
@@ -74,8 +78,8 @@ export default function SelectionsPage() {
   });
 
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [newFileTitles, setNewFileTitles] = useState<string[]>([]);
   const [existingFiles, setExistingFiles] = useState<FileAttachment[]>([]);
+  const [uploadMode, setUploadMode] = useState<'images' | 'pdf'>('images');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const areas = ['Living Room', 'Master Bedroom', 'Guest Bedroom', 'Kitchen', 'Bathroom', 'Dining Area', 'Balcony', 'Outdoor', 'Other'];
@@ -86,16 +90,7 @@ export default function SelectionsPage() {
     fetchProjects();
     fetchUsers();
 
-    const saved = localStorage.getItem('selections_view_mode') as 'card' | 'table';
-    if (saved === 'card' || saved === 'table') {
-      setTimeout(() => setViewMode(saved), 0);
-    }
   }, []);
-
-  const handleViewModeChange = (mode: 'card' | 'table') => {
-    setViewMode(mode);
-    localStorage.setItem('selections_view_mode', mode);
-  };
 
   async function fetchUsers() {
     try {
@@ -139,8 +134,8 @@ export default function SelectionsPage() {
   const handleCreateNew = () => {
     setEditingSel(null);
     setFormFields({
-      project: projects[0]?.basicInfo?.name || '',
-      selectArea: areas[0],
+      project: activeProject ? activeProject.name : (projects[0]?.basicInfo?.name || ''),
+      selectArea: areas[0] || 'Living Room',
       areaName: '',
       productName: '',
       vendor: '',
@@ -150,8 +145,8 @@ export default function SelectionsPage() {
       remarks: '',
     });
     setSelectedFiles([]);
-    setNewFileTitles([]);
     setExistingFiles([]);
+    setUploadMode('images');
     setIsModalOpen(true);
   };
 
@@ -169,8 +164,8 @@ export default function SelectionsPage() {
       remarks: sel.remarks,
     });
     setSelectedFiles([]);
-    setNewFileTitles([]);
     setExistingFiles(sel.files || []);
+    setUploadMode('images');
     setIsModalOpen(true);
   };
 
@@ -184,29 +179,15 @@ export default function SelectionsPage() {
     if (e.target.files) {
       const filesArr = Array.from(e.target.files);
       setSelectedFiles(prev => [...prev, ...filesArr]);
-      setNewFileTitles(prev => [...prev, ...filesArr.map(f => f.name)]);
     }
   };
 
   const handleRemoveNewFile = (index: number) => {
     setSelectedFiles(prev => prev.filter((_, i) => i !== index));
-    setNewFileTitles(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleRemoveExistingFile = (index: number) => {
     setExistingFiles(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const handleNewFileTitleChange = (index: number, newTitle: string) => {
-    const updated = [...newFileTitles];
-    updated[index] = newTitle;
-    setNewFileTitles(updated);
-  };
-
-  const handleExistingFileTitleChange = (index: number, newTitle: string) => {
-    const updated = [...existingFiles];
-    updated[index] = { ...updated[index], title: newTitle };
-    setExistingFiles(updated);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -229,8 +210,63 @@ export default function SelectionsPage() {
       formData.append('assignedTo', formFields.assignedTo);
       formData.append('remarks', formFields.remarks);
 
-      selectedFiles.forEach((file) => formData.append('files', file));
-      formData.append('fileTitles', JSON.stringify(newFileTitles));
+      let finalFiles = selectedFiles;
+      let finalFileTitles = selectedFiles.map(f => f.name);
+
+      if (uploadMode === 'images' && selectedFiles.length > 0) {
+        const pdf = new jsPDF();
+
+        for (let i = 0; i < selectedFiles.length; i++) {
+          const file = selectedFiles[i];
+          const imgUrl = URL.createObjectURL(file);
+
+          const img = new Image();
+          img.src = imgUrl;
+          await new Promise((resolve) => {
+            img.onload = () => resolve(true);
+            img.onerror = () => resolve(false);
+          });
+
+          if (!img.width) {
+            URL.revokeObjectURL(imgUrl);
+            continue;
+          }
+
+          const pdfWidth = pdf.internal.pageSize.getWidth();
+          const pdfHeight = pdf.internal.pageSize.getHeight();
+          const imgRatio = img.width / img.height;
+          const pdfRatio = pdfWidth / pdfHeight;
+
+          let finalWidth = pdfWidth;
+          let finalHeight = pdfHeight;
+
+          if (imgRatio > pdfRatio) {
+            finalHeight = pdfWidth / imgRatio;
+          } else {
+            finalWidth = pdfHeight * imgRatio;
+          }
+
+          const x = (pdfWidth - finalWidth) / 2;
+          const y = (pdfHeight - finalHeight) / 2;
+
+          if (i > 0) {
+            pdf.addPage();
+            pdf.setPage(i + 1);
+          }
+
+          const format = file.type === 'image/png' ? 'PNG' : 'JPEG';
+          pdf.addImage(img, format, x, y, finalWidth, finalHeight, `img_${i}`);
+          URL.revokeObjectURL(imgUrl);
+        }
+
+        const pdfBlob = pdf.output('blob');
+        const pdfFile = new File([pdfBlob], `Selection_Photos_${Date.now()}.pdf`, { type: 'application/pdf' });
+        finalFiles = [pdfFile];
+        finalFileTitles = ['Combined Photos PDF'];
+      }
+
+      finalFiles.forEach((file) => formData.append('files', file));
+      formData.append('fileTitles', JSON.stringify(finalFileTitles));
 
       let res;
       if (editingSel) {
@@ -292,6 +328,8 @@ export default function SelectionsPage() {
 
   // Filtering
   const filteredSels = selections.filter(sel => {
+    if (activeProject && sel.project !== activeProject.name) return false;
+
     const matchesSearch =
       sel.productName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       sel.selectionNo.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -326,75 +364,52 @@ export default function SelectionsPage() {
       <div className={styles.header}>
         <div className={styles.titleSection}>
           <h2>Material & Product Selections</h2>
-          <p>Track proposals, approvals, and orders for project materials.</p>
+          <div className="breadcrumbNav">
+            <Link href="/">Dashboard</Link>
+            <span className="separator">&gt;</span>
+            <Link href="/projects">Project Portfolio</Link>
+            {activeProject && (
+              <>
+                <span className="separator">&gt;</span>
+                <span className="project-breadcrumb">{activeProject.name}</span>
+              </>
+            )}
+            <span className="separator">&gt;</span>
+            <span className="current">Material Selections</span>
+          </div>
         </div>
-        <div className={styles.headerActions}>
+        <div className={styles.headerActions} style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div className={styles.filtersBar} style={{ padding: '6px 12px', margin: 0 }}>
+            <div className={styles.searchWrapper}>
+              <Search size={18} className={styles.searchIcon} />
+              <input
+                type="text"
+                placeholder="Search products, vendors, IDs..."
+                className={styles.searchInput}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+            <div className={styles.filterControls}>
+              <select className={styles.filterSelect} value={filterProject} onChange={(e) => setFilterProject(e.target.value)}>
+                <option value="">All Projects</option>
+                {uniqueProjectsList.map(proj => <option key={proj} value={proj}>{proj}</option>)}
+              </select>
+              <select className={styles.filterSelect} value={filterArea} onChange={(e) => setFilterArea(e.target.value)}>
+                <option value="">All Areas</option>
+                {uniqueAreasList.map(area => <option key={area} value={area}>{area}</option>)}
+              </select>
+              <select className={styles.filterSelect} value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+                <option value="">All Statuses</option>
+                {statuses.map(st => <option key={st} value={st}>{st}</option>)}
+              </select>
+
+            </div>
+          </div>
           <button className={styles.addButton} onClick={handleCreateNew}>
             <Plus size={18} />
             <span>Add Selection</span>
           </button>
-        </div>
-      </div>
-
-      <div className={styles.statsGrid}>
-        <div className={`${styles.statCard} ${styles.total}`}>
-          <div className={styles.statIcon}><MousePointerClick size={18} /></div>
-          <div className={styles.statInfo}>
-            <h3>{selections.length}</h3>
-            <p>Total Selections</p>
-          </div>
-        </div>
-        <div className={`${styles.statCard} ${styles.proposed}`}>
-          <div className={styles.statIcon}><Clock size={18} /></div>
-          <div className={styles.statInfo}>
-            <h3>{proposedCount}</h3>
-            <p>Proposed</p>
-          </div>
-        </div>
-        <div className={`${styles.statCard} ${styles.approved}`}>
-          <div className={styles.statIcon}><CheckCircle size={18} /></div>
-          <div className={styles.statInfo}>
-            <h3>{approvedCount}</h3>
-            <p>Approved</p>
-          </div>
-        </div>
-        <div className={`${styles.statCard} ${styles.ordered}`}>
-          <div className={styles.statIcon}><ShoppingCart size={18} /></div>
-          <div className={styles.statInfo}>
-            <h3>{orderedCount}</h3>
-            <p>Ordered</p>
-          </div>
-        </div>
-      </div>
-
-      <div className={styles.filtersBar}>
-        <div className={styles.searchWrapper}>
-          <Search size={18} className={styles.searchIcon} />
-          <input
-            type="text"
-            placeholder="Search products, vendors, IDs..."
-            className={styles.searchInput}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
-        <div className={styles.filterControls}>
-          <select className={styles.filterSelect} value={filterProject} onChange={(e) => setFilterProject(e.target.value)}>
-            <option value="">All Projects</option>
-            {uniqueProjectsList.map(proj => <option key={proj} value={proj}>{proj}</option>)}
-          </select>
-          <select className={styles.filterSelect} value={filterArea} onChange={(e) => setFilterArea(e.target.value)}>
-            <option value="">All Areas</option>
-            {uniqueAreasList.map(area => <option key={area} value={area}>{area}</option>)}
-          </select>
-          <select className={styles.filterSelect} value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
-            <option value="">All Statuses</option>
-            {statuses.map(st => <option key={st} value={st}>{st}</option>)}
-          </select>
-          <div className={styles.viewToggleGroup}>
-            <button className={`${styles.viewToggleBtn} ${viewMode === 'card' ? styles.activeView : ''}`} onClick={() => handleViewModeChange('card')}><LayoutGrid size={18} /></button>
-            <button className={`${styles.viewToggleBtn} ${viewMode === 'table' ? styles.activeView : ''}`} onClick={() => handleViewModeChange('table')}><List size={18} /></button>
-          </div>
         </div>
       </div>
 
@@ -405,79 +420,6 @@ export default function SelectionsPage() {
       ) : filteredSels.length === 0 ? (
         <div style={{ display: 'flex', justifyContent: 'center', padding: '100px 0', color: 'var(--text-light)' }}>
           <p>No selections found.</p>
-        </div>
-      ) : viewMode === 'card' ? (
-        <div className={styles.projectGroupSection}>
-          {Object.keys(groupedData).map(projectKey => (
-            <div key={projectKey}>
-              <div className={styles.projectGroupHeader}>
-                <h3>{projectKey}</h3>
-              </div>
-              <div className={styles.selGrid} style={{ marginTop: '16px' }}>
-                {groupedData[projectKey].map(sel => (
-                  <div key={sel.id} className={styles.selCard}>
-                    <div className={styles.cardHeader}>
-                      <div className={styles.cardTitle}>{sel.productName}</div>
-                      <span className={`${styles.statusBadge} ${styles[sel.status]}`}>{sel.status}</span>
-                    </div>
-                    <div className={styles.cardMeta}>
-                      <div className={styles.metaItem} title="Selection No">
-                        <Tag size={12} /> {sel.selectionNo}
-                      </div>
-                      <div className={styles.metaItem} title="Area">
-                        <Building size={12} /> {sel.areaName || sel.selectArea}
-                      </div>
-                      {sel.estimatedCost && (
-                        <div className={styles.metaItem} title="Cost">
-                          <IndianRupee size={12} /> {sel.estimatedCost}
-                        </div>
-                      )}
-                    </div>
-                    <div className={styles.cardBody}>
-                      <span className={styles.areaTag}>{sel.selectArea}</span>
-                      
-                      <div className={styles.sectionBlock}>
-                        <strong>Vendor / Supplier</strong>
-                        <p>{sel.vendor || 'TBD'}</p>
-                      </div>
-                      
-                      {sel.assignedTo && (
-                        <div className={styles.sectionBlock}>
-                          <strong>Selected By</strong>
-                          <p>{sel.assignedTo}</p>
-                        </div>
-                      )}
-                      {sel.remarks && (
-                        <div className={styles.sectionBlock}>
-                          <strong>Remarks</strong>
-                          <p>{sel.remarks}</p>
-                        </div>
-                      )}
-                      {sel.files && sel.files.length > 0 && (
-                        <div className={styles.filesListBlock}>
-                          <strong>Attachments ({sel.files.length})</strong>
-                          <div className={styles.filesGrid}>
-                            {sel.files.map((file, i) => (
-                              <a key={i} href={file.url} target="_blank" rel="noopener noreferrer" className={styles.fileItemLink}>
-                                <span className={styles.fileLinkTitle}>
-                                  <FileText size={14} className={styles.fileIcon} />
-                                  {file.title || file.name}
-                                </span>
-                              </a>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    <div className={styles.cardActions}>
-                      <button className={styles.controlBtn} onClick={() => handleEdit(sel)}><Edit2 size={13} /></button>
-                      <button className={`${styles.controlBtn} ${styles.delete}`} onClick={() => confirmDelete(sel)}><Trash2 size={13} /></button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
         </div>
       ) : (
         <div className={styles.tableContainer}>
@@ -519,11 +461,13 @@ export default function SelectionsPage() {
                   <td>
                     <div className={styles.tableFilesCell}>
                       {sel.files && sel.files.length > 0 ? (
-                        sel.files.map((file, i) => (
-                          <a key={i} href={file.url} target="_blank" rel="noopener noreferrer" className={styles.tableFileLink}>
-                            <Paperclip size={10} /> {file.title || 'Doc'}
-                          </a>
-                        ))
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                          {sel.files.map((file, i) => (
+                            <a key={i} href={file.url} target="_blank" rel="noopener noreferrer" title={file.title || 'Attachment'} style={{ display: 'inline-flex', padding: '6px', backgroundColor: 'var(--primary-light)', borderRadius: '6px' }}>
+                              <FileText size={18} color="var(--primary)" />
+                            </a>
+                          ))}
+                        </div>
                       ) : (
                         <span style={{ fontSize: '0.75rem', color: 'var(--text-light)' }}>None</span>
                       )}
@@ -547,13 +491,17 @@ export default function SelectionsPage() {
           <div className={styles.formRow}>
             <div className={styles.formGroup}>
               <label><Building size={14} /> Project *</label>
-              <select name="project" value={formFields.project} onChange={handleInputChange} className={styles.formSelect} required>
-                {projects.length > 0 ? projects.map(p => <option key={p.id} value={p.basicInfo.name}>{p.basicInfo.name}</option>) : <option value="">No Active Projects</option>}
-              </select>
+              {activeProject ? (
+                <input type="text" value={activeProject.name} disabled className={styles.formInput} style={{ backgroundColor: 'var(--bg-main)', color: 'var(--text-light)', cursor: 'not-allowed' }} />
+              ) : (
+                <select name="project" value={formFields.project} onChange={handleInputChange} className={styles.formSelect} required>
+                  {projects.length > 0 ? projects.map(p => <option key={p.id} value={p.basicInfo.name}>{p.basicInfo.name}</option>) : <option value="">No Active Projects</option>}
+                </select>
+              )}
             </div>
             <div className={styles.formGroup}>
               <label><MousePointerClick size={14} /> Product Name *</label>
-              <input type="text" name="productName" value={formFields.productName} onChange={handleInputChange} className={styles.formInput} placeholder="e.g. Italian Marble, Kohler Faucet" required />
+              <input type="text" name="productName" value={formFields.productName} onChange={handleInputChange} className={styles.formInput} placeholder=" " required />
             </div>
           </div>
 
@@ -566,14 +514,14 @@ export default function SelectionsPage() {
             </div>
             <div className={styles.formGroup}>
               <label><Tag size={14} /> Specific Area Name</label>
-              <input type="text" name="areaName" value={formFields.areaName} onChange={handleInputChange} className={styles.formInput} placeholder="e.g. Master Bedroom" />
+              <input type="text" name="areaName" value={formFields.areaName} onChange={handleInputChange} className={styles.formInput} placeholder=" " />
             </div>
           </div>
 
           <div className={styles.formRow}>
             <div className={styles.formGroup}>
               <label><Building size={14} /> Vendor / Supplier</label>
-              <input type="text" name="vendor" value={formFields.vendor} onChange={handleInputChange} className={styles.formInput} placeholder="e.g. ABC Ceramics" />
+              <input type="text" name="vendor" value={formFields.vendor} onChange={handleInputChange} className={styles.formInput} placeholder=" " />
             </div>
             <div className={styles.formGroup}>
               <label><AlertCircle size={14} /> Status</label>
@@ -586,7 +534,7 @@ export default function SelectionsPage() {
           <div className={styles.formRow}>
             <div className={styles.formGroup}>
               <label><IndianRupee size={14} /> Estimated Cost</label>
-              <input type="text" name="estimatedCost" value={formFields.estimatedCost} onChange={handleInputChange} className={styles.formInput} placeholder="e.g. 50,000" />
+              <input type="text" name="estimatedCost" value={formFields.estimatedCost} onChange={handleInputChange} className={styles.formInput} placeholder=" " />
             </div>
             <div className={styles.formGroup}>
               <label><Tag size={14} /> Selected By</label>
@@ -599,17 +547,24 @@ export default function SelectionsPage() {
 
           <div className={styles.formGroup}>
             <label><FileText size={14} /> Remarks / Details</label>
-            <textarea name="remarks" value={formFields.remarks} onChange={handleInputChange} className={styles.formTextarea} placeholder="Dimensions, finishes, specs..." />
+            <textarea name="remarks" value={formFields.remarks} onChange={handleInputChange} className={styles.formTextarea} placeholder=" " />
           </div>
 
-          <div className={styles.formGroup} style={{ marginTop: '8px' }}>
-            <label><Paperclip size={14} /> Reference Documents & Images</label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', position: 'relative', marginTop: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <label style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-heading)', display: 'flex', alignItems: 'center', gap: '6px' }}><Paperclip size={14} /> Documents & Attachments</label>
+              <div style={{ display: 'flex', gap: '8px', background: 'var(--bg-main)', padding: '4px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                <button type="button" style={{ padding: '6px 12px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 600, border: 'none', cursor: 'pointer', background: uploadMode === 'images' ? 'var(--primary)' : 'transparent', color: uploadMode === 'images' ? 'white' : 'var(--text-light)', transition: 'all 0.2s' }} onClick={() => setUploadMode('images')}>📸 Images to PDF</button>
+                <button type="button" style={{ padding: '6px 12px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 600, border: 'none', cursor: 'pointer', background: uploadMode === 'pdf' ? 'var(--primary)' : 'transparent', color: uploadMode === 'pdf' ? 'white' : 'var(--text-light)', transition: 'all 0.2s' }} onClick={() => setUploadMode('pdf')}>📄 Upload PDF Directly</button>
+              </div>
+            </div>
+
             <div className={styles.uploadBox} onClick={() => fileInputRef.current?.click()}>
               <label>
                 <UploadCloud size={24} style={{ color: 'var(--primary)' }} />
-                <span>Click to browse or drag and drop files</span>
+                <span>{uploadMode === 'images' ? 'Click or drag images to merge into a single PDF' : 'Click or drag a PDF document'}</span>
               </label>
-              <input type="file" multiple ref={fileInputRef} onChange={handleFileSelect} />
+              <input type="file" multiple={uploadMode === 'images'} accept={uploadMode === 'images' ? 'image/*' : 'application/pdf'} ref={fileInputRef} onChange={handleFileSelect} />
             </div>
 
             {(existingFiles.length > 0 || selectedFiles.length > 0) && (
@@ -619,20 +574,26 @@ export default function SelectionsPage() {
                   {existingFiles.map((file, i) => (
                     <div key={`exist-${i}`} className={styles.stagedFileItem}>
                       <div className={styles.stagedFileLeft} title={file.name}>
-                        <FileIcon size={14} style={{ color: 'var(--text-light)' }} />
-                        <span className={styles.stagedFileName}>{file.name}</span>
+                        {uploadMode === 'images' ? (
+                          <img src={file.url} alt="Preview" style={{ width: '40px', height: '40px', objectFit: 'cover', borderRadius: '4px' }} />
+                        ) : (
+                          <FileIcon size={14} style={{ color: 'var(--text-light)' }} />
+                        )}
+                        <span className={styles.stagedFileName}>{file.title || file.name}</span>
                       </div>
-                      <input type="text" className={styles.stagedTitleInput} value={file.title} onChange={(e) => handleExistingFileTitleChange(i, e.target.value)} placeholder="File Title" />
                       <button type="button" className={styles.removeStagedBtn} onClick={() => handleRemoveExistingFile(i)}><X size={16} /></button>
                     </div>
                   ))}
                   {selectedFiles.map((file, i) => (
                     <div key={`new-${i}`} className={styles.stagedFileItem}>
                       <div className={styles.stagedFileLeft} title={file.name}>
-                        <FileIcon size={14} style={{ color: 'var(--success)' }} />
+                        {uploadMode === 'images' ? (
+                          <img src={URL.createObjectURL(file)} alt="Preview" style={{ width: '40px', height: '40px', objectFit: 'cover', borderRadius: '4px' }} />
+                        ) : (
+                          <FileIcon size={14} style={{ color: 'var(--success)' }} />
+                        )}
                         <span className={styles.stagedFileName}>{file.name}</span>
                       </div>
-                      <input type="text" className={styles.stagedTitleInput} value={newFileTitles[i]} onChange={(e) => handleNewFileTitleChange(i, e.target.value)} placeholder="File Title" />
                       <button type="button" className={styles.removeStagedBtn} onClick={() => handleRemoveNewFile(i)}><X size={16} /></button>
                     </div>
                   ))}

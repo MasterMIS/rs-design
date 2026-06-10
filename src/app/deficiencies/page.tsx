@@ -44,8 +44,6 @@ export default function DeficienciesPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
-
   // Filters state
   const [searchQuery, setSearchQuery] = useState('');
   const [filterProject, setFilterProject] = useState('');
@@ -103,18 +101,7 @@ export default function DeficienciesPage() {
     fetchDeficiencies();
     fetchProjects();
 
-    const saved = localStorage.getItem('deficiencies_view_mode') as 'card' | 'table';
-    if (saved === 'card' || saved === 'table') {
-      setTimeout(() => {
-        setViewMode(saved);
-      }, 0);
-    }
-  }, []);
-
-  const handleViewModeChange = (mode: 'card' | 'table') => {
-    setViewMode(mode);
-    localStorage.setItem('deficiencies_view_mode', mode);
-  };
+    }, []);
 
   async function fetchDeficiencies() {
     try {
@@ -382,133 +369,6 @@ export default function DeficienciesPage() {
       </div>
 
       {/* Summary Stats Overview */}
-      <div className={styles.statsGrid}>
-        <div className={`${styles.statCard} ${styles.total}`}>
-          <div className={styles.statIcon}>
-            <AlertTriangle size={20} />
-          </div>
-          <div className={styles.statInfo}>
-            <h3>{totalCount}</h3>
-            <p>Total Snags</p>
-          </div>
-        </div>
-        <div className={`${styles.statCard} ${styles.open}`}>
-          <div className={styles.statIcon}>
-            <Clock size={20} />
-          </div>
-          <div className={styles.statInfo}>
-            <h3>{openCount}</h3>
-            <p>Open Issues</p>
-          </div>
-        </div>
-        <div className={`${styles.statCard} ${styles.progress}`}>
-          <div className={styles.statIcon}>
-            <RefreshCw size={18} />
-          </div>
-          <div className={styles.statInfo}>
-            <h3>{inProgressCount}</h3>
-            <p>In Progress</p>
-          </div>
-        </div>
-        <div className={`${styles.statCard} ${styles.resolved}`}>
-          <div className={styles.statIcon}>
-            <Eye size={20} />
-          </div>
-          <div className={styles.statInfo}>
-            <h3>{resolvedCount}</h3>
-            <p>Resolved</p>
-          </div>
-        </div>
-        <div className={`${styles.statCard} ${styles.closed}`}>
-          <div className={styles.statIcon}>
-            <CheckCircle size={20} />
-          </div>
-          <div className={styles.statInfo}>
-            <h3>{closedCount}</h3>
-            <p>Closed</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Filters bar */}
-      <div className={styles.filtersBar}>
-        <div className={styles.searchWrapper}>
-          <Search size={18} className={styles.searchIcon} />
-          <input 
-            type="text" 
-            placeholder="Search deficiencies..." 
-            className={styles.searchInput}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
-
-        <div className={styles.filterControls}>
-          <select 
-            className={styles.filterSelect}
-            value={filterProject}
-            onChange={(e) => setFilterProject(e.target.value)}
-          >
-            <option value="">All Projects</option>
-            {Array.from(new Set(deficiencies.map(d => d.project))).filter(Boolean).map(p => (
-              <option key={p} value={p}>{p}</option>
-            ))}
-          </select>
-
-          <select 
-            className={styles.filterSelect}
-            value={filterCategory}
-            onChange={(e) => setFilterCategory(e.target.value)}
-          >
-            <option value="">All Trades</option>
-            {categories.map(c => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-          </select>
-
-          <select 
-            className={styles.filterSelect}
-            value={filterPriority}
-            onChange={(e) => setFilterPriority(e.target.value)}
-          >
-            <option value="">All Priorities</option>
-            {priorities.map(p => (
-              <option key={p} value={p}>{p} Priority</option>
-            ))}
-          </select>
-
-          <select 
-            className={styles.filterSelect}
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-          >
-            <option value="">All Statuses</option>
-            {statuses.map(s => (
-              <option key={s} value={s}>{s}</option>
-            ))}
-          </select>
-
-          <div className={styles.viewToggleGroup}>
-            <button 
-              type="button"
-              className={`${styles.viewToggleBtn} ${viewMode === 'card' ? styles.activeView : ''}`}
-              onClick={() => handleViewModeChange('card')}
-              title="Card View"
-            >
-              <LayoutGrid size={18} />
-            </button>
-            <button 
-              type="button"
-              className={`${styles.viewToggleBtn} ${viewMode === 'table' ? styles.activeView : ''}`}
-              onClick={() => handleViewModeChange('table')}
-              title="Table View"
-            >
-              <List size={18} />
-            </button>
-          </div>
-        </div>
-      </div>
-
       {/* Main content display */}
       {loading ? (
         <div style={{ display: 'flex', justifyContent: 'center', padding: '100px 0', color: 'var(--text-light)' }}>
@@ -518,78 +378,7 @@ export default function DeficienciesPage() {
         <div style={{ display: 'flex', justifyContent: 'center', padding: '100px 0', color: 'var(--text-light)' }}>
           <p>No deficiency snags found matching filters.</p>
         </div>
-      ) : viewMode === 'card' ? (
-        <div className={styles.cardGrid}>
-          {filteredDeficiencies.map((def) => (
-            <div key={def.id} className={styles.deficiencyCard}>
-              <div className={styles.cardTop}>
-                <div className={styles.cardHeader}>
-                  <div className={styles.cardTags}>
-                    <span className={styles.projectBadge}>{def.project}</span>
-                    <span className={`${styles.priorityBadge} ${styles[def.priority]}`}>{def.priority}</span>
-                  </div>
-                  <span className={`${styles.statusBadge} ${styles[def.status.replace(' ', '_')]}`}>{def.status}</span>
-                </div>
-                <h3 className={styles.deficiencyTitle}>{def.title}</h3>
-              </div>
-
-              {/* Before and After Comparison Wrapper */}
-              <div className={styles.comparisonWrapper}>
-                <div className={styles.imgWrapper}>
-                  <span className={styles.imgLabel}>BEFORE</span>
-                  {def.beforeDocs ? (
-                    <img src={def.beforeDocs} alt="Before" className={styles.comparisonImage} />
-                  ) : (
-                    <div className={styles.imgWrapper + ' ' + styles.noImage}>No Image</div>
-                  )}
-                </div>
-                <div className={styles.imgWrapper}>
-                  <span className={styles.imgLabel}>AFTER</span>
-                  {def.afterDocs ? (
-                    <img src={def.afterDocs} alt="After" className={styles.comparisonImage} />
-                  ) : (
-                    <div className={styles.imgWrapper + ' ' + styles.noImage}>Pending</div>
-                  )}
-                </div>
-              </div>
-
-              <div className={styles.cardDetails}>
-                <div className={styles.detailItem}>
-                  <Building size={14} />
-                  <span>Area: <strong>{def.area}</strong></span>
-                </div>
-                <div className={styles.detailItem}>
-                  <User size={14} />
-                  <span>Trade: {def.category}</span>
-                </div>
-                <div className={styles.detailItem}>
-                  <Users size={14} />
-                  <span>Assigned To: {def.assignedTo || 'Unassigned'}</span>
-                </div>
-                <div className={styles.detailItem}>
-                  <Calendar size={14} />
-                  <span>Due: {def.dueDate ? new Date(def.dueDate).toLocaleDateString() : 'No Deadline'}</span>
-                </div>
-                {def.remarks && (
-                  <div className={styles.remarksBox} title={def.remarks}>
-                    {def.remarks}
-                  </div>
-                )}
-              </div>
-
-              <div className={styles.cardFooter}>
-                <button className={styles.actionBtn} onClick={() => handleEdit(def)} title="Edit Report">
-                  <Edit2 size={15} />
-                </button>
-                <button className={`${styles.actionBtn} ${styles.deleteBtn}`} onClick={() => confirmDelete(def)} title="Delete Record">
-                  <Trash2 size={15} />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className={styles.tableContainer}>
+      ) : (<div className={styles.tableContainer}>
           <table className={styles.deficiencyTable}>
             <thead>
               <tr>

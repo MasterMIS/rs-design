@@ -404,9 +404,9 @@
 }
 
 .controlBtn {
-  background-color: var(--bg-main);
-  border: 1px solid var(--border-color);
-  color: var(--text-light);
+  background-color: var(--primary-light);
+  border: 1px solid transparent;
+  color: var(--primary);
   padding: 6px;
   border-radius: 6px;
   cursor: pointer;
@@ -421,10 +421,14 @@
   border-color: var(--primary);
 }
 
-.controlBtn.delete:hover {
+.controlBtn.delete {
+  background-color: rgba(239, 68, 68, 0.1);
   color: var(--danger);
-  border-color: var(--danger);
-  background-color: rgba(241, 85, 108, 0.05);
+}
+
+.controlBtn.delete:hover {
+  background-color: var(--danger);
+  color: white;
 }
 
 /* Tabular view styling */
@@ -563,18 +567,19 @@
 }
 
 .formInput, .formSelect, .formTextarea {
-  padding: 10px;
-  border-radius: 8px;
-  border: 1px solid var(--border-color);
-  background-color: var(--bg-main);
-  color: var(--text-main);
-  font-size: 0.85rem;
-  transition: all 0.2s;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 2px solid #cbd5e1;
+  background-color: transparent;
+  color: var(--text-heading);
+  font-size: 0.95rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
   width: 100%;
 }
 
 .formInput:focus, .formSelect:focus, .formTextarea:focus {
-  border-color: var(--primary);
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
   outline: none;
 }
 
@@ -638,7 +643,8 @@
 
 .stagingGrid {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  flex-wrap: wrap;
   gap: 8px;
   width: 100%;
 }
@@ -652,13 +658,14 @@
   padding: 8px 12px;
   border-radius: 8px;
   gap: 12px;
+  flex: 0 1 auto;
 }
 
 .stagedFileLeft {
   display: flex;
   align-items: center;
   gap: 6px;
-  max-width: 40%;
+  max-width: 150px;
   overflow: hidden;
   flex-shrink: 0;
 }

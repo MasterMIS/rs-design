@@ -42,7 +42,6 @@ export default function MOMPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
   const [expandedProjects, setExpandedProjects] = useState<Record<string, boolean>>({});
 
   // Search and Filter States
@@ -57,7 +56,8 @@ export default function MOMPage() {
   const [momToDelete, setMomToDelete] = useState<MOM | null>(null);
 
   // File Upload State
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [uploadMode, setUploadMode] = useState<'images' | 'pdf'>('images');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Form Fields State
@@ -81,18 +81,7 @@ export default function MOMPage() {
     fetchMOMList();
     fetchProjects();
 
-    const saved = localStorage.getItem('mom_view_mode') as 'card' | 'table';
-    if (saved === 'card' || saved === 'table') {
-      setTimeout(() => {
-        setViewMode(saved);
-      }, 0);
-    }
-  }, []);
-
-  const handleViewModeChange = (mode: 'card' | 'table') => {
-    setViewMode(mode);
-    localStorage.setItem('mom_view_mode', mode);
-  };
+    }, []);
 
   async function fetchMOMList() {
     try {
@@ -138,7 +127,7 @@ export default function MOMPage() {
 
   const handleCreateNew = () => {
     setEditingMOM(null);
-    setSelectedFile(null);
+    setSelectedFiles([]);
     setFormFields({
       project: projects[0]?.basicInfo?.name || '',
       purpose: '',
@@ -157,7 +146,8 @@ export default function MOMPage() {
 
   const handleEdit = (mom: MOM) => {
     setEditingMOM(mom);
-    setSelectedFile(null);
+    setUploadMode('images');
+    setSelectedFiles([]);
     setFormFields({
       project: mom.project,
       purpose: mom.purpose,
@@ -183,14 +173,14 @@ export default function MOMPage() {
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0]);
+    if (e.target.files) {
+      const filesArr = Array.from(e.target.files);
+      setSelectedFiles(prev => [...prev, ...filesArr]);
     }
   };
 
-  const removeSelectedFile = () => {
-    setSelectedFile(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
+  const removeSelectedFile = (index: number) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -338,103 +328,6 @@ export default function MOMPage() {
         </div>
       </div>
 
-      {/* Summary Statistics Counters */}
-      <div className={styles.statsGrid}>
-        <div className={`${styles.statCard} ${styles.total}`}>
-          <div className={styles.statIcon}>
-            <ClipboardList size={18} />
-          </div>
-          <div className={styles.statInfo}>
-            <h3>{totalCount}</h3>
-            <p>Total Syncs</p>
-          </div>
-        </div>
-        <div className={`${styles.statCard} ${styles.draft}`}>
-          <div className={styles.statIcon}>
-            <AlertCircle size={18} />
-          </div>
-          <div className={styles.statInfo}>
-            <h3>{draftCount}</h3>
-            <p>Draft MOMs</p>
-          </div>
-        </div>
-        <div className={`${styles.statCard} ${styles.distributed}`}>
-          <div className={styles.statIcon}>
-            <CheckCircle size={18} />
-          </div>
-          <div className={styles.statInfo}>
-            <h3>{distributedCount}</h3>
-            <p>Distributed</p>
-          </div>
-        </div>
-        <div className={`${styles.statCard} ${styles.pending}`}>
-          <div className={styles.statIcon}>
-            <CalendarCheck size={18} />
-          </div>
-          <div className={styles.statInfo}>
-            <h3>{pendingNextCount}</h3>
-            <p>Follow-ups</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Filter toolbar */}
-      <div className={styles.filtersBar}>
-        <div className={styles.searchWrapper}>
-          <Search size={18} className={styles.searchIcon} />
-          <input
-            type="text"
-            placeholder="Search meeting purpose, attendees, action owners, location..."
-            className={styles.searchInput}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
-
-        <div className={styles.filterControls}>
-          <select
-            className={styles.filterSelect}
-            value={filterProject}
-            onChange={(e) => setFilterProject(e.target.value)}
-          >
-            <option value="">All Projects</option>
-            {uniqueProjectsList.map(proj => (
-              <option key={proj} value={proj}>{proj}</option>
-            ))}
-          </select>
-
-          <select
-            className={styles.filterSelect}
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-          >
-            <option value="">All Statuses</option>
-            {statuses.map(status => (
-              <option key={status} value={status}>{status}</option>
-            ))}
-          </select>
-
-          <div className={styles.viewToggleGroup}>
-            <button
-              type="button"
-              className={`${styles.viewToggleBtn} ${viewMode === 'card' ? styles.activeView : ''}`}
-              onClick={() => handleViewModeChange('card')}
-              title="Grouped Cards"
-            >
-              <LayoutGrid size={18} />
-            </button>
-            <button
-              type="button"
-              className={`${styles.viewToggleBtn} ${viewMode === 'table' ? styles.activeView : ''}`}
-              onClick={() => handleViewModeChange('table')}
-              title="Compact Table"
-            >
-              <List size={18} />
-            </button>
-          </div>
-        </div>
-      </div>
-
       {/* Main Display Grid */}
       {loading ? (
         <div style={{ display: 'flex', justifyContent: 'center', padding: '100px 0', color: 'var(--text-light)' }}>
@@ -444,115 +337,7 @@ export default function MOMPage() {
         <div style={{ display: 'flex', justifyContent: 'center', padding: '100px 0', color: 'var(--text-light)' }}>
           <p>No meeting logs found matching filters.</p>
         </div>
-      ) : viewMode === 'card' ? (
-        <div className={styles.projectGroupSection}>
-          {Object.keys(groupedData).map(projectKey => {
-            const projectMOMs = groupedData[projectKey];
-            const isOpen = expandedProjects[projectKey] !== false;
-
-            return (
-              <div key={projectKey} className={styles.projectGroupSection}>
-                {/* Project Heading Row */}
-                <div className={styles.projectGroupHeader} style={{ cursor: 'pointer' }} onClick={() => toggleProject(projectKey)}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    {isOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-                    <h3>{projectKey} ({projectMOMs.length})</h3>
-                  </div>
-                </div>
-
-                {isOpen && (
-                  <div className={styles.momGrid}>
-                    {projectMOMs.map(mom => (
-                      <div key={mom.id} className={styles.momCard}>
-                        <div className={styles.cardHeader}>
-                          <span className={styles.cardPurpose}>{mom.purpose}</span>
-                          <span className={`${styles.statusBadge} ${styles[mom.status.toLowerCase()]}`}>
-                            {mom.status}
-                          </span>
-                        </div>
-
-                        <div className={styles.cardMeta}>
-                          <span className={styles.metaItem}>
-                            <Calendar size={13} />
-                            {mom.meetingDate ? new Date(mom.meetingDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
-                          </span>
-                          {mom.location && (
-                            <span className={styles.metaItem}>
-                              <MapPin size={13} />
-                              {mom.location}
-                            </span>
-                          )}
-                        </div>
-
-                        <div className={styles.cardBody}>
-                          {mom.ourAttendees && (
-                            <div className={styles.sectionBlock}>
-                              <strong>Our Side Team</strong>
-                              <p>{mom.ourAttendees}</p>
-                            </div>
-                          )}
-                          {mom.clientAttendees && (
-                            <div className={styles.sectionBlock}>
-                              <strong>Client & Partners</strong>
-                              <p>{mom.clientAttendees}</p>
-                            </div>
-                          )}
-                          {mom.keyDecisions && (
-                            <div className={styles.sectionBlock}>
-                              <strong>Key Agreements / Decisions</strong>
-                              <p>{mom.keyDecisions}</p>
-                            </div>
-                          )}
-                          {mom.actionItems && (
-                            <div className={styles.sectionBlock} style={{ borderLeft: '3px solid var(--primary)' }}>
-                              <strong>Action Plan & Responsibilities</strong>
-                              <p>{mom.actionItems}</p>
-                            </div>
-                          )}
-                          {mom.nextMeetingDate && (
-                            <div className={styles.metaItem} style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-light)', marginTop: '4px' }}>
-                              <CalendarCheck size={14} style={{ color: '#f39c12' }} />
-                              <span>Next Review: {new Date(mom.nextMeetingDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-                            </div>
-                          )}
-                          {mom.remarks && (
-                            <div style={{ fontSize: '0.75rem', color: 'var(--text-light)', fontStyle: 'italic', marginTop: '4px' }}>
-                              Remarks: {mom.remarks}
-                            </div>
-                          )}
-                        </div>
-
-                        <div className={styles.cardActions}>
-                          <div className={styles.actionLeft}>
-                            {mom.documents ? (
-                              <a href={mom.documents} target="_blank" rel="noopener noreferrer" className={styles.docLink} title="Open Document Attachment">
-                                <Link2 size={13} />
-                                <span>View MOM Doc</span>
-                              </a>
-                            ) : (
-                              <span className={styles.noDocText}>No Document Attached</span>
-                            )}
-                          </div>
-
-                          <div className={styles.actionRight}>
-                            <button className={styles.controlBtn} onClick={() => handleEdit(mom)} title="Edit MOM Log">
-                              <Edit2 size={13} />
-                            </button>
-                            <button className={`${styles.controlBtn} ${styles.delete}`} onClick={() => confirmDelete(mom)} title="Delete MOM Log">
-                              <Trash2 size={13} />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        <div className={styles.tableContainer}>
+      ) : (<div className={styles.tableContainer}>
           <table className={styles.momTable}>
             <thead>
               <tr>
@@ -771,26 +556,50 @@ export default function MOMPage() {
           </div>
 
           {/* Drag & Drop File Upload Box */}
-          <div className={styles.formGroup}>
-            <label><FileUp size={14} /> MOM Documents / Reference PDF</label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', position: 'relative', marginTop: '12px', gridColumn: '1 / -1' }}>
+            <label style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-heading)', display: 'flex', alignItems: 'center', gap: '6px' }}><FileUp size={14} /> Documents & Attachments</label>
+            
+            <div style={{ display: 'flex', gap: '16px', fontSize: '0.8rem', color: 'var(--text-main)', marginBottom: '4px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                <input type="radio" name="uploadMode" checked={uploadMode === 'images'} onChange={() => { setUploadMode('images'); setSelectedFiles([]); }} />
+                Images (Auto-convert to PDF)
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                <input type="radio" name="uploadMode" checked={uploadMode === 'pdf'} onChange={() => { setUploadMode('pdf'); setSelectedFiles([]); }} />
+                PDF Document (Single File)
+              </label>
+            </div>
+
             <div className={styles.uploadBox} onClick={() => fileInputRef.current?.click()}>
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleFileChange}
-                accept=".pdf,.doc,.docx,.xls,.xlsx,image/*"
-              />
-              {selectedFile ? (
-                <div className={styles.previewWrapper}>
-                  <span className={styles.fileMeta}>
-                    <ClipboardList size={16} />
-                    {selectedFile.name} ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
-                  </span>
-                  <button type="button" className={styles.removeFileBtn} onClick={(e) => { e.stopPropagation(); removeSelectedFile(); }}>
-                    Remove Document
-                  </button>
+              <label>
+                <UploadCloud size={24} style={{ color: 'var(--primary)' }} />
+                <span>Click to browse or drag and drop files</span>
+              </label>
+              <input type="file" multiple={uploadMode === 'images'} accept={uploadMode === 'images' ? 'image/*' : 'application/pdf'} ref={fileInputRef} onChange={handleFileChange} />
+            </div>
+
+            {selectedFiles.length > 0 && (
+              <div className={styles.uploadedStagedList}>
+                <strong>Staged Files</strong>
+                <div className={styles.stagingGrid}>
+                  {selectedFiles.map((file, i) => (
+                    <div key={`new-${i}`} className={styles.stagedFileItem}>
+                      <div className={styles.stagedFileLeft} title={file.name}>
+                        {uploadMode === 'images' ? (
+                          <img src={URL.createObjectURL(file)} alt="Preview" style={{ width: '40px', height: '40px', objectFit: 'cover', borderRadius: '4px' }} />
+                        ) : (
+                          <FileIcon size={14} style={{ color: 'var(--success)' }} />
+                        )}
+                        <span className={styles.stagedFileName}>{file.name}</span>
+                      </div>
+                      <button type="button" className={styles.removeStagedBtn} onClick={(e) => { e.stopPropagation(); removeSelectedFile(i); }}><X size={16} /></button>
+                    </div>
+                  ))}
                 </div>
-              ) : editingMOM && editingMOM.documents ? (
+              </div>
+            )}
+
+            {editingMOM && editingMOM.documents && selectedFiles.length === 0 && (
                 <div className={styles.previewWrapper}>
                   <span className={styles.fileMeta} style={{ backgroundColor: 'rgba(39, 206, 138, 0.1)', color: 'var(--success)' }}>
                     <Link2 size={16} />
@@ -798,14 +607,7 @@ export default function MOMPage() {
                   </span>
                   <p style={{ fontSize: '0.75rem', color: 'var(--text-light)' }}>Click to upload a new file and overwrite the existing document.</p>
                 </div>
-              ) : (
-                <label>
-                  <FileUp size={24} style={{ color: 'var(--text-light)', marginBottom: '4px' }} />
-                  <span>Click to select or upload a meeting minutes file (PDF, Doc, Image)</span>
-                  <span style={{ fontSize: '0.7rem', opacity: 0.8 }}>File will be saved to secure Google Drive folder</span>
-                </label>
-              )}
-            </div>
+            )}
           </div>
 
           <div className={styles.formGroup}>

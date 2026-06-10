@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { 
   LayoutDashboard, 
   Users,
@@ -16,10 +16,11 @@ import {
   MousePointerClick,
   HardHat,
   FileBadge,
-  ClipboardCheck
+  ClipboardCheck,
+  ArrowLeft
 } from 'lucide-react';
 import styles from './Sidebar.module.css';
-import Logo from './Logo';
+import { useProject } from '@/context/ProjectContext';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -28,20 +29,31 @@ interface SidebarProps {
 
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { activeProject, clearActiveProject } = useProject();
+
+  const handleBackToProjects = () => {
+    clearActiveProject();
+    router.push('/projects');
+    onClose();
+  };
 
   return (
     <div className={`${styles.sidebar} ${isOpen ? styles.open : ''}`}>
-      <div className={styles.logoContainer}>
-        <Link href="/" className={styles.logoLink} onClick={onClose}>
-          <div className={styles.logoIcon}>
-            <Logo size={42} />
-          </div>
-          <span className={styles.logoText}>RSDesign</span>
-        </Link>
-        <button className={styles.closeButton} onClick={onClose}>
-          <X size={20} />
+      <div className={styles.projectHeader}>
+        <button className={styles.backButton} onClick={handleBackToProjects}>
+          <ArrowLeft size={18} />
+          <span>Back to Projects</span>
         </button>
+        {activeProject && (
+          <div className={styles.activeProjectName}>
+            {activeProject.name}
+          </div>
+        )}
       </div>
+      <button className={styles.closeButtonMobile} onClick={onClose}>
+        <X size={20} />
+      </button>
 
       <div className={styles.navSection}>
         <nav>
@@ -63,16 +75,12 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 }
 
 const navItems = [
-  { name: 'Dashboard', icon: LayoutDashboard, path: '/' },
-  { name: 'Projects', icon: Briefcase, path: '/projects' },
   { name: 'Site Visits', icon: HardHat, path: '/site-visits' },
   { name: 'Requirements', icon: ClipboardList, path: '/requirements' },
   { name: 'Checklists', icon: CheckSquare, path: '/checklists' },
   { name: 'Selections', icon: MousePointerClick, path: '/selections' },
-  { name: 'Vendors', icon: Contact, path: '/vendors' },
   { name: 'Quotations', icon: FileBadge, path: '/quotations' },
   { name: 'Audits', icon: ClipboardCheck, path: '/audits' },
-  { name: 'Users', icon: Users, path: '/users' },
   { name: 'Deficiencies', icon: AlertTriangle, path: '/deficiencies' },
   { name: 'Directory', icon: Contact, path: '/directory' },
   { name: 'MOM', icon: ClipboardList, path: '/mom' },
