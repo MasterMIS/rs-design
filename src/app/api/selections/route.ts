@@ -14,13 +14,13 @@ const FOLDER_ID = CONFIG.SELECTION.FOLDER_ID;
 
 export async function GET() {
   try {
-    const data = await getSheetsData(SHEET_ID, `${SHEET_NAME}!A2:L1000`);
+    const data = await getSheetsData(SHEET_ID, `${SHEET_NAME}!A2:J1000`);
 
     if (!data || data.length === 0) return NextResponse.json([]);
 
     const selections = data.map((row: string[], index: number) => {
       let files = [];
-      const rawFiles = row[10] || '';
+      const rawFiles = row[8] || '';
       
       if (rawFiles.trim().startsWith('[')) {
         try {
@@ -47,11 +47,9 @@ export async function GET() {
         areaName: row[4] || '',
         productName: row[5] || '',
         vendor: row[6] || '',
-        status: row[7] || 'Proposed',
-        estimatedCost: row[8] || '',
-        assignedTo: row[9] || '',
+        assignedTo: row[7] || '',
         files: normalizedFiles,
-        remarks: row[11] || '',
+        remarks: row[9] || '',
         id: row[2] || `SEL-ROW-${index + 2}`,
       };
     });
@@ -80,8 +78,6 @@ export async function POST(request: NextRequest) {
     const areaName = formData.get('areaName') as string;
     const productName = formData.get('productName') as string;
     const vendor = formData.get('vendor') as string;
-    const status = (formData.get('status') as string) || 'Proposed';
-    const estimatedCost = formData.get('estimatedCost') as string;
     const assignedTo = formData.get('assignedTo') as string;
     const remarks = formData.get('remarks') as string;
 
@@ -118,7 +114,7 @@ export async function POST(request: NextRequest) {
             uploadedFiles.push({
               title: fileTitles[i] || file.name,
               name: file.name,
-              url: `https://lh3.googleusercontent.com/d/${driveFile.id}`
+              url: `https://drive.google.com/file/d/${driveFile.id}/view`
             });
           }
         }
@@ -129,6 +125,7 @@ export async function POST(request: NextRequest) {
     const filesJson = JSON.stringify(uploadedFiles);
     const selectionNo = generateSelectionNo();
 
+    // A:J — Timestamp, Project, SelectionNo, SelectArea, AreaName, ProductName, Vendor, AssignedTo, Files, Remarks
     const newRow = [
       timestamp,
       project,
@@ -137,8 +134,6 @@ export async function POST(request: NextRequest) {
       areaName || '',
       productName || '',
       vendor || '',
-      status,
-      estimatedCost || '',
       assignedTo || '',
       filesJson,
       remarks || ''
@@ -170,8 +165,6 @@ export async function PUT(request: NextRequest) {
     const areaName = formData.get('areaName') as string;
     const productName = formData.get('productName') as string;
     const vendor = formData.get('vendor') as string;
-    const status = formData.get('status') as string;
-    const estimatedCost = formData.get('estimatedCost') as string;
     const assignedTo = formData.get('assignedTo') as string;
     const remarks = formData.get('remarks') as string;
 
@@ -216,7 +209,7 @@ export async function PUT(request: NextRequest) {
             finalFilesList.push({
               title: newFileTitles[i] || file.name,
               name: file.name,
-              url: `https://lh3.googleusercontent.com/d/${driveFile.id}`
+              url: `https://drive.google.com/file/d/${driveFile.id}/view`
             });
           }
         }
@@ -225,6 +218,7 @@ export async function PUT(request: NextRequest) {
 
     const filesJson = JSON.stringify(finalFilesList);
 
+    // A:J — Timestamp, Project, SelectionNo, SelectArea, AreaName, ProductName, Vendor, AssignedTo, Files, Remarks
     const updatedRow = [
       timestamp || new Date().toISOString(),
       project,
@@ -233,14 +227,12 @@ export async function PUT(request: NextRequest) {
       areaName || '',
       productName || '',
       vendor || '',
-      status || 'Proposed',
-      estimatedCost || '',
       assignedTo || '',
       filesJson,
       remarks || ''
     ];
 
-    await updateSheetRow(SHEET_ID, `${SHEET_NAME}!A${rowIndex}:L${rowIndex}`, [updatedRow]);
+    await updateSheetRow(SHEET_ID, `${SHEET_NAME}!A${rowIndex}:J${rowIndex}`, [updatedRow]);
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {

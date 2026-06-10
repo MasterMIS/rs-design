@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
             uploadedFiles.push({
               title: fileTitles[i] || file.name,
               name: file.name,
-              url: `https://lh3.googleusercontent.com/d/${driveFile.id}`
+              url: `https://drive.google.com/file/d/${driveFile.id}/view`
             });
           }
         }
@@ -213,7 +213,7 @@ export async function PUT(request: NextRequest) {
             finalFilesList.push({
               title: newFileTitles[i] || file.name,
               name: file.name,
-              url: `https://lh3.googleusercontent.com/d/${driveFile.id}`
+              url: `https://drive.google.com/file/d/${driveFile.id}/view`
             });
           }
         }

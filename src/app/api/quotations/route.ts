@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
         const buffer = Buffer.from(await file.arrayBuffer());
         const result = await uploadFileToDrive(buffer, file.name, file.type || 'application/octet-stream', FOLDER_ID);
         if (result.id) {
-          currentFile = { name: file.name, url: `https://lh3.googleusercontent.com/d/${result.id}` };
+          currentFile = { name: file.name, url: `https://drive.google.com/file/d/${result.id}/view` };
           break; // Only one file per quotation version
         }
       }
@@ -162,7 +162,7 @@ export async function PUT(request: NextRequest) {
           const buffer = Buffer.from(await file.arrayBuffer());
           const result = await uploadFileToDrive(buffer, file.name, file.type || 'application/octet-stream', FOLDER_ID);
           if (result.id) {
-            uploadedFile = { name: file.name, url: `https://lh3.googleusercontent.com/d/${result.id}` };
+            uploadedFile = { name: file.name, url: `https://drive.google.com/file/d/${result.id}/view` };
             break;
           }
         }

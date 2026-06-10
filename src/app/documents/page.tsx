@@ -10,6 +10,9 @@ import {
 } from 'lucide-react';
 import styles from './documents.module.css';
 import Modal from '@/components/Modal';
+import { useProject } from '@/context/ProjectContext';
+import Link from 'next/link';
+import jsPDF from 'jspdf';
 
 interface AttachedFile {
   title: string;
@@ -47,6 +50,7 @@ interface StagedFileObject {
 }
 
 export default function DocumentsPage() {
+  const { activeProject } = useProject();
   const [documents, setDocuments] = useState<DocumentEntry[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
@@ -249,13 +253,48 @@ export default function DocumentsPage() {
       submitData.append('status', formFields.status);
       submitData.append('remarks', formFields.remarks);
 
+      // If all staged files are images and uploadMode is 'images', merge into single PDF
+      let finalStagedFiles = stagedFiles.map(s => s.file);
+      let finalStagedTitles = stagedFiles.map(item => item.title || item.file.name);
+
+      if (uploadMode === 'images' && stagedFiles.length > 0) {
+        const allImages = stagedFiles.every(s => s.file.type.startsWith('image/'));
+        if (allImages) {
+          const pdf = new jsPDF();
+          for (let i = 0; i < stagedFiles.length; i++) {
+            const file = stagedFiles[i].file;
+            const imgUrl = URL.createObjectURL(file);
+            const img = new Image();
+            img.src = imgUrl;
+            await new Promise((resolve) => { img.onload = () => resolve(true); img.onerror = () => resolve(false); });
+            if (!img.width) { URL.revokeObjectURL(imgUrl); continue; }
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            const pdfHeight = pdf.internal.pageSize.getHeight();
+            const imgRatio = img.width / img.height;
+            const pdfRatio = pdfWidth / pdfHeight;
+            let finalWidth = pdfWidth;
+            let finalHeight = pdfHeight;
+            if (imgRatio > pdfRatio) { finalHeight = pdfWidth / imgRatio; } else { finalWidth = pdfHeight * imgRatio; }
+            const x = (pdfWidth - finalWidth) / 2;
+            const y = (pdfHeight - finalHeight) / 2;
+            if (i > 0) { pdf.addPage(); pdf.setPage(i + 1); }
+            const format = file.type === 'image/png' ? 'PNG' : 'JPEG';
+            pdf.addImage(img, format, x, y, finalWidth, finalHeight, `img_${i}`);
+            URL.revokeObjectURL(imgUrl);
+          }
+          const pdfBlob = pdf.output('blob');
+          finalStagedFiles = [new File([pdfBlob], `Document_${Date.now()}.pdf`, { type: 'application/pdf' })];
+          finalStagedTitles = ['Document (Combined PDF)'];
+        }
+      }
+
       // Append staged files
-      stagedFiles.forEach(item => {
-        submitData.append('files', item.file);
+      finalStagedFiles.forEach(f => {
+        submitData.append('files', f);
       });
 
       // Compile staged file titles array
-      const stagedTitles = stagedFiles.map(item => item.title || item.file.name);
+      const stagedTitles = finalStagedTitles;
 
       if (editingDoc) {
         submitData.append('timestamp', editingDoc.timestamp);
@@ -366,7 +405,26 @@ export default function DocumentsPage() {
       <div className={styles.header}>
         <div className={styles.titleSection}>
           <h2>Document Management System (DMS)</h2>
-          <p>Store, track revisions, and securely upload contracts, permits, invoices, and design drawings.</p>
+          <div className="breadcrumbNav">
+            <Link href="/">Dashboard</Link>
+            <span className="separator">&gt;</span>
+            <Link href="/projects">Project Portfolio</Link>
+            {activeProject && (
+              <>
+                <span className="separator">&gt;</span>
+                <button
+                  className="project-breadcrumb"
+                  style={{ cursor: 'pointer', border: 'none', fontFamily: 'inherit' }}
+                  onClick={() => {
+                    localStorage.setItem('pending_view_project_id', activeProject.id);
+                    window.location.href = '/projects';
+                  }}
+                >{activeProject.name}</button>
+              </>
+            )}
+            <span className="separator">&gt;</span>
+            <span className="current">Documents</span>
+          </div>
         </div>
         <div className={styles.headerActions}>
           <button className={styles.addButton} onClick={handleCreateNew}>

@@ -6,7 +6,7 @@ import {
   Plus, Search, Edit2, Trash2, LayoutGrid, List,
   Calendar, Building, Tag, CheckCircle, FileText,
   Clock, AlertCircle, PlayCircle, X, Paperclip, MousePointerClick,
-  UploadCloud, File as FileIcon, XCircle, ShoppingCart, IndianRupee
+  UploadCloud, File as FileIcon
 } from 'lucide-react';
 import styles from './selections.module.css';
 import Modal from '@/components/Modal';
@@ -29,8 +29,6 @@ interface Selection {
   areaName: string;
   productName: string;
   vendor: string;
-  status: 'Proposed' | 'Approved' | 'Rejected' | 'Ordered';
-  estimatedCost: string;
   assignedTo: string;
   files: FileAttachment[];
   remarks: string;
@@ -54,9 +52,7 @@ export default function SelectionsPage() {
 
   // Search and Filter States
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterProject, setFilterProject] = useState('');
   const [filterArea, setFilterArea] = useState('');
-  const [filterStatus, setFilterStatus] = useState('');
 
   // Modals States
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -71,8 +67,6 @@ export default function SelectionsPage() {
     areaName: '',
     productName: '',
     vendor: '',
-    status: 'Proposed',
-    estimatedCost: '',
     assignedTo: '',
     remarks: '',
   });
@@ -82,15 +76,32 @@ export default function SelectionsPage() {
   const [uploadMode, setUploadMode] = useState<'images' | 'pdf'>('images');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const areas = ['Living Room', 'Master Bedroom', 'Guest Bedroom', 'Kitchen', 'Bathroom', 'Dining Area', 'Balcony', 'Outdoor', 'Other'];
-  const statuses = ['Proposed', 'Approved', 'Rejected', 'Ordered'];
+  // Dynamic dropdown options from Dropdown sheet
+  const [selectAreaOptions, setSelectAreaOptions] = useState<string[]>([]);
+  const [areaMap, setAreaMap] = useState<Record<string, string[]>>({});
+
+  // Derived: area names filtered by currently selected select area
+  const filteredAreaNames = (formFields.selectArea && areaMap[formFields.selectArea]) || [];
 
   useEffect(() => {
     fetchSelections();
     fetchProjects();
     fetchUsers();
-
+    fetchDropdowns();
   }, []);
+
+  async function fetchDropdowns() {
+    try {
+      const res = await fetch('/api/selections/dropdowns');
+      if (res.ok) {
+        const data = await res.json();
+        setSelectAreaOptions(data.selectAreas || []);
+        setAreaMap(data.areaMap || {});
+      }
+    } catch (err) {
+      console.error('Error fetching dropdown options:', err);
+    }
+  }
 
   async function fetchUsers() {
     try {
@@ -135,12 +146,10 @@ export default function SelectionsPage() {
     setEditingSel(null);
     setFormFields({
       project: activeProject ? activeProject.name : (projects[0]?.basicInfo?.name || ''),
-      selectArea: areas[0] || 'Living Room',
+      selectArea: selectAreaOptions[0] || '',
       areaName: '',
       productName: '',
       vendor: '',
-      status: 'Proposed',
-      estimatedCost: '',
       assignedTo: '',
       remarks: '',
     });
@@ -158,8 +167,6 @@ export default function SelectionsPage() {
       areaName: sel.areaName,
       productName: sel.productName,
       vendor: sel.vendor,
-      status: sel.status,
-      estimatedCost: sel.estimatedCost,
       assignedTo: sel.assignedTo,
       remarks: sel.remarks,
     });
@@ -171,7 +178,12 @@ export default function SelectionsPage() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setFormFields(prev => ({ ...prev, [name]: value }));
+    // When Select Area changes, reset the Specific Area Name
+    if (name === 'selectArea') {
+      setFormFields(prev => ({ ...prev, selectArea: value, areaName: '' }));
+    } else {
+      setFormFields(prev => ({ ...prev, [name]: value }));
+    }
   };
 
   // File Handlers
@@ -205,8 +217,6 @@ export default function SelectionsPage() {
       formData.append('areaName', formFields.areaName);
       formData.append('productName', formFields.productName);
       formData.append('vendor', formFields.vendor);
-      formData.append('status', formFields.status);
-      formData.append('estimatedCost', formFields.estimatedCost);
       formData.append('assignedTo', formFields.assignedTo);
       formData.append('remarks', formFields.remarks);
 
@@ -337,15 +347,11 @@ export default function SelectionsPage() {
       sel.areaName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       sel.remarks.toLowerCase().includes(searchQuery.toLowerCase());
 
-    const matchesProject = filterProject === '' || sel.project === filterProject;
     const matchesArea = filterArea === '' || sel.selectArea === filterArea;
-    const matchesStatus = filterStatus === '' || sel.status === filterStatus;
 
-    return matchesSearch && matchesProject && matchesArea && matchesStatus;
+    return matchesSearch && matchesArea;
   });
 
-  const uniqueProjectsList = Array.from(new Set(selections.map(s => s.project))).filter(Boolean);
-  const uniqueAreasList = Array.from(new Set(selections.map(s => s.selectArea))).filter(Boolean);
 
   const groupedData: Record<string, Selection[]> = {};
   filteredSels.forEach(sel => {
@@ -355,9 +361,6 @@ export default function SelectionsPage() {
     groupedData[sel.project].push(sel);
   });
 
-  const proposedCount = selections.filter(s => s.status === 'Proposed').length;
-  const approvedCount = selections.filter(s => s.status === 'Approved').length;
-  const orderedCount = selections.filter(s => s.status === 'Ordered').length;
 
   return (
     <div className={styles.container}>
@@ -371,7 +374,14 @@ export default function SelectionsPage() {
             {activeProject && (
               <>
                 <span className="separator">&gt;</span>
-                <span className="project-breadcrumb">{activeProject.name}</span>
+                <button
+                  className="project-breadcrumb"
+                  style={{ cursor: 'pointer', border: 'none', fontFamily: 'inherit' }}
+                  onClick={() => {
+                    localStorage.setItem('pending_view_project_id', activeProject.id);
+                    window.location.href = '/projects';
+                  }}
+                >{activeProject.name}</button>
               </>
             )}
             <span className="separator">&gt;</span>
@@ -391,19 +401,10 @@ export default function SelectionsPage() {
               />
             </div>
             <div className={styles.filterControls}>
-              <select className={styles.filterSelect} value={filterProject} onChange={(e) => setFilterProject(e.target.value)}>
-                <option value="">All Projects</option>
-                {uniqueProjectsList.map(proj => <option key={proj} value={proj}>{proj}</option>)}
-              </select>
               <select className={styles.filterSelect} value={filterArea} onChange={(e) => setFilterArea(e.target.value)}>
                 <option value="">All Areas</option>
-                {uniqueAreasList.map(area => <option key={area} value={area}>{area}</option>)}
+                {selectAreaOptions.map(area => <option key={area} value={area}>{area}</option>)}
               </select>
-              <select className={styles.filterSelect} value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
-                <option value="">All Statuses</option>
-                {statuses.map(st => <option key={st} value={st}>{st}</option>)}
-              </select>
-
             </div>
           </div>
           <button className={styles.addButton} onClick={handleCreateNew}>
@@ -431,8 +432,6 @@ export default function SelectionsPage() {
                 <th>Project</th>
                 <th>Product & Area</th>
                 <th>Vendor</th>
-                <th>Status</th>
-                <th>Cost</th>
                 <th>Selected By</th>
                 <th>Files</th>
               </tr>
@@ -455,8 +454,6 @@ export default function SelectionsPage() {
                     </div>
                   </td>
                   <td>{sel.vendor || '—'}</td>
-                  <td><span className={`${styles.statusBadge} ${styles[sel.status]}`}>{sel.status}</span></td>
-                  <td>{sel.estimatedCost ? `₹${sel.estimatedCost}` : '—'}</td>
                   <td>{sel.assignedTo || '—'}</td>
                   <td>
                     <div className={styles.tableFilesCell}>
@@ -509,12 +506,16 @@ export default function SelectionsPage() {
             <div className={styles.formGroup}>
               <label><LayoutGrid size={14} /> Select Area</label>
               <select name="selectArea" value={formFields.selectArea} onChange={handleInputChange} className={styles.formSelect}>
-                {areas.map(a => <option key={a} value={a}>{a}</option>)}
+                <option value="">— Select Area —</option>
+                {selectAreaOptions.map(a => <option key={a} value={a}>{a}</option>)}
               </select>
             </div>
             <div className={styles.formGroup}>
               <label><Tag size={14} /> Specific Area Name</label>
-              <input type="text" name="areaName" value={formFields.areaName} onChange={handleInputChange} className={styles.formInput} placeholder=" " />
+              <select name="areaName" value={formFields.areaName} onChange={handleInputChange} className={styles.formSelect} disabled={!formFields.selectArea || filteredAreaNames.length === 0}>
+                <option value="">{!formFields.selectArea ? '— Select Area first —' : filteredAreaNames.length === 0 ? '— No options —' : '— Select Area Name —'}</option>
+                {filteredAreaNames.map(n => <option key={n} value={n}>{n}</option>)}
+              </select>
             </div>
           </div>
 
@@ -522,19 +523,6 @@ export default function SelectionsPage() {
             <div className={styles.formGroup}>
               <label><Building size={14} /> Vendor / Supplier</label>
               <input type="text" name="vendor" value={formFields.vendor} onChange={handleInputChange} className={styles.formInput} placeholder=" " />
-            </div>
-            <div className={styles.formGroup}>
-              <label><AlertCircle size={14} /> Status</label>
-              <select name="status" value={formFields.status} onChange={handleInputChange} className={styles.formSelect}>
-                {statuses.map(st => <option key={st} value={st}>{st}</option>)}
-              </select>
-            </div>
-          </div>
-
-          <div className={styles.formRow}>
-            <div className={styles.formGroup}>
-              <label><IndianRupee size={14} /> Estimated Cost</label>
-              <input type="text" name="estimatedCost" value={formFields.estimatedCost} onChange={handleInputChange} className={styles.formInput} placeholder=" " />
             </div>
             <div className={styles.formGroup}>
               <label><Tag size={14} /> Selected By</label>

@@ -10,6 +10,9 @@ import {
 } from 'lucide-react';
 import styles from './deficiencies.module.css';
 import Modal from '@/components/Modal';
+import { useProject } from '@/context/ProjectContext';
+import Link from 'next/link';
+
 
 interface Deficiency {
   rowIndex: number;
@@ -40,6 +43,7 @@ interface Project {
 }
 
 export default function DeficienciesPage() {
+  const { activeProject } = useProject();
   const [deficiencies, setDeficiencies] = useState<Deficiency[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
@@ -358,7 +362,26 @@ export default function DeficienciesPage() {
       <div className={styles.header}>
         <div className={styles.titleSection}>
           <h2>Deficiency Reports</h2>
-          <p>Snag list tracking and before-after rectification audits.</p>
+          <div className="breadcrumbNav">
+            <Link href="/">Dashboard</Link>
+            <span className="separator">&gt;</span>
+            <Link href="/projects">Project Portfolio</Link>
+            {activeProject && (
+              <>
+                <span className="separator">&gt;</span>
+                <button
+                  className="project-breadcrumb"
+                  style={{ cursor: 'pointer', border: 'none', fontFamily: 'inherit' }}
+                  onClick={() => {
+                    localStorage.setItem('pending_view_project_id', activeProject.id);
+                    window.location.href = '/projects';
+                  }}
+                >{activeProject.name}</button>
+              </>
+            )}
+            <span className="separator">&gt;</span>
+            <span className="current">Deficiencies</span>
+          </div>
         </div>
         <div className={styles.headerActions}>
           <button className={styles.addButton} onClick={handleCreateNew}>

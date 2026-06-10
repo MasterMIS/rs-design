@@ -44,21 +44,22 @@ export default function ProjectsPage() {
   const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
   
   // Dropdowns
-  const projectTypes = ['Residential', 'Corporate Office', 'Retail Store', 'Villa', 'Apartment', 'Showroom', 'Factory', 'Warehouse'];
-  const projectCategories = ['Full Interior', 'Renovation', 'Furniture Only', 'Consultancy', 'Architectural Design'];
+  const projectTypes = ['Flat', 'Corporate Office', 'Retail Store', 'Bunglow', 'Apartment', 'Showroom', 'Factory', 'Warehouse', 'Hotels', 'Club House', 'Restaurent', 'Building'];
+  const projectCategories = ['Full Interior', 'Renovation', 'Furniture Only', 'Consultancy', 'Architectural Design', 'Interior Cunsultancy', 'PMC', 'Turnky', 'Architecture', 'Contractual', 'Furniture Supply'];
   const projectStatuses = ['In Progress', 'On Hold', 'Completed', 'Cancelled', 'Quotation'];
   const clientTypes = ['Owner', 'Co-owner', 'Architect', 'Consultant', 'Contractor', 'Accounts', 'Purchase Team', 'Site Coordinator', 'Decision Maker', 'Vendor Reference'];
-  const siteTypes = ['Residential', 'Corporate Office', 'Retail Store', 'Warehouse', 'Factory', 'Villa', 'Apartment', 'Showroom'];
+  const siteTypes = [...projectTypes];
+  const memberRoles = ['Project Manager', 'Designer', 'Supervisor', 'Sales', '2D Designer', '3D Designer', 'Architect', 'MEP', 'PC', 'CRM', 'Project Head', 'Supervisor 1', 'Supervisor 2', 'Tech'];
 
   // Form State
   const [formData, setFormData] = useState({
     basicInfo: {
-      name: '', code: '', type: 'Residential', category: 'Full Interior', status: 'In Progress', 
+      name: '', code: '', type: 'Flat', category: 'Full Interior', status: 'In Progress', 
       priority: 'Medium', description: '', startDate: '', expectedEndDate: '', actualEndDate: '', 
       estimatedBudget: '', finalBudget: '', referenceSource: '', leadSource: '', notes: ''
     },
     clients: [{ type: 'Owner', name: '', company: '', mobile: '', altMobile: '', email: '', designation: '', gstNo: '', address: '', isPrimary: 'No', remarks: '' }],
-    sites: [{ name: 'Main Site', type: 'Residential', address: '', city: '', state: '', pincode: '', googleLocation: '', area: '', floors: '', status: 'Active', startDate: '', endDate: '', possessionDate: '', supervisor: '', workingHours: '', accessNotes: '' }],
+    sites: [{ name: 'Main Site', type: 'Flat', address: '', city: '', state: '', pincode: '', googleLocation: '', area: '', floors: '', status: 'Active', startDate: '', endDate: '', possessionDate: '', supervisor: '', workingHours: '', accessNotes: '' }],
     team: [{ role: 'Project Manager', name: '', employeeId: '', responsibility: '', assignedDate: '', isActive: 'Yes' }]
   });
 
@@ -83,6 +84,13 @@ export default function ProjectsPage() {
       const res = await fetch('/api/projects');
       const data = await res.json();
       setProjects(data);
+      // Auto-open project detail if navigating back from a module page
+      const pendingId = localStorage.getItem('pending_view_project_id');
+      if (pendingId) {
+        localStorage.removeItem('pending_view_project_id');
+        const found = data.find((p: Project) => p.id === pendingId);
+        if (found) setViewingProject(found);
+      }
     } catch (err) {
       console.error('Fetch error:', err);
     } finally {
@@ -165,9 +173,9 @@ export default function ProjectsPage() {
 
   const resetForm = () => {
     setFormData({
-      basicInfo: { name: '', code: '', type: 'Residential', category: 'Full Interior', status: 'In Progress', priority: 'Medium', description: '', startDate: '', expectedEndDate: '', actualEndDate: '', estimatedBudget: '', finalBudget: '', referenceSource: '', leadSource: '', notes: '' },
+      basicInfo: { name: '', code: '', type: 'Flat', category: 'Full Interior', status: 'In Progress', priority: 'Medium', description: '', startDate: '', expectedEndDate: '', actualEndDate: '', estimatedBudget: '', finalBudget: '', referenceSource: '', leadSource: '', notes: '' },
       clients: [{ type: 'Owner', name: '', company: '', mobile: '', altMobile: '', email: '', designation: '', gstNo: '', address: '', isPrimary: 'No', remarks: '' }],
-      sites: [{ name: 'Main Site', type: 'Residential', address: '', city: '', state: '', pincode: '', googleLocation: '', area: '', floors: '', status: 'Active', startDate: '', endDate: '', possessionDate: '', supervisor: '', workingHours: '', accessNotes: '' }],
+      sites: [{ name: 'Main Site', type: 'Flat', address: '', city: '', state: '', pincode: '', googleLocation: '', area: '', floors: '', status: 'Active', startDate: '', endDate: '', possessionDate: '', supervisor: '', workingHours: '', accessNotes: '' }],
       team: [{ role: 'Project Manager', name: '', employeeId: '', responsibility: '', assignedDate: '', isActive: 'Yes' }]
     });
     setActiveTab('basic');
@@ -175,7 +183,7 @@ export default function ProjectsPage() {
 
   const addRow = (section: 'clients' | 'sites' | 'team') => {
     const newRow = section === 'clients' ? { type: 'Owner', name: '', company: '', mobile: '', altMobile: '', email: '', designation: '', gstNo: '', address: '', isPrimary: 'No', remarks: '' } :
-                   section === 'sites' ? { name: '', type: 'Residential', address: '', city: '', state: '', pincode: '', googleLocation: '', area: '', floors: '', status: 'Active', startDate: '', endDate: '', possessionDate: '', supervisor: '', workingHours: '', accessNotes: '' } :
+                   section === 'sites' ? { name: '', type: 'Flat', address: '', city: '', state: '', pincode: '', googleLocation: '', area: '', floors: '', status: 'Active', startDate: '', endDate: '', possessionDate: '', supervisor: '', workingHours: '', accessNotes: '' } :
                    { role: '', name: '', employeeId: '', responsibility: '', assignedDate: '', isActive: 'Yes' };
     setFormData({ ...formData, [section]: [...formData[section], newRow] });
   };
@@ -322,64 +330,64 @@ export default function ProjectsPage() {
             <div className={styles.cardHeaderSmall}><LayoutGrid size={18} /> Jump to Module</div>
             <div className={styles.modulesGrid}>
               <button className={styles.moduleTile} onClick={() => navigateToModule('/site-visits')}>
-                <div className={styles.moduleIconWrapper} style={{ backgroundColor: 'rgba(59, 175, 218, 0.1)', color: 'var(--primary)' }}>
-                  <MapPin size={24} />
+                <div className={styles.moduleIconWrapper} style={{ background: 'linear-gradient(135deg, #38bdf8, #0284c7)', color: '#fff', boxShadow: '0 8px 20px rgba(2, 132, 199, 0.3)' }}>
+                  <MapPin size={28} strokeWidth={2.5} />
                 </div>
-                <span>Site Visits</span>
+                <span style={{ fontWeight: 700, color: 'var(--text-heading)', fontSize: '0.95rem', letterSpacing: '0.3px' }}>Site Visits</span>
               </button>
               <button className={styles.moduleTile} onClick={() => navigateToModule('/requirements')}>
-                <div className={styles.moduleIconWrapper} style={{ backgroundColor: 'rgba(246, 173, 85, 0.1)', color: '#f6ad55' }}>
-                  <Briefcase size={24} />
+                <div className={styles.moduleIconWrapper} style={{ background: 'linear-gradient(135deg, #fbbf24, #d97706)', color: '#fff', boxShadow: '0 8px 20px rgba(217, 119, 6, 0.3)' }}>
+                  <Briefcase size={28} strokeWidth={2.5} />
                 </div>
-                <span>Requirements</span>
+                <span style={{ fontWeight: 700, color: 'var(--text-heading)', fontSize: '0.95rem', letterSpacing: '0.3px' }}>Requirements</span>
               </button>
               <button className={styles.moduleTile} onClick={() => navigateToModule('/selections')}>
-                <div className={styles.moduleIconWrapper} style={{ backgroundColor: 'rgba(110, 206, 178, 0.1)', color: '#6eceb2' }}>
-                  <Layers size={24} />
+                <div className={styles.moduleIconWrapper} style={{ background: 'linear-gradient(135deg, #34d399, #059669)', color: '#fff', boxShadow: '0 8px 20px rgba(5, 150, 105, 0.3)' }}>
+                  <Layers size={28} strokeWidth={2.5} />
                 </div>
-                <span>Selections</span>
+                <span style={{ fontWeight: 700, color: 'var(--text-heading)', fontSize: '0.95rem', letterSpacing: '0.3px' }}>Selections</span>
               </button>
               <button className={styles.moduleTile} onClick={() => navigateToModule('/documents')}>
-                <div className={styles.moduleIconWrapper} style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', color: 'var(--danger)' }}>
-                  <FileText size={24} />
+                <div className={styles.moduleIconWrapper} style={{ background: 'linear-gradient(135deg, #fb7185, #e11d48)', color: '#fff', boxShadow: '0 8px 20px rgba(225, 29, 72, 0.3)' }}>
+                  <FileText size={28} strokeWidth={2.5} />
                 </div>
-                <span>Documents</span>
+                <span style={{ fontWeight: 700, color: 'var(--text-heading)', fontSize: '0.95rem', letterSpacing: '0.3px' }}>Documents</span>
               </button>
               <button className={styles.moduleTile} onClick={() => navigateToModule('/mom')}>
-                <div className={styles.moduleIconWrapper} style={{ backgroundColor: 'rgba(159, 122, 234, 0.1)', color: '#9f7aea' }}>
-                  <Calendar size={24} />
+                <div className={styles.moduleIconWrapper} style={{ background: 'linear-gradient(135deg, #c084fc, #7e22ce)', color: '#fff', boxShadow: '0 8px 20px rgba(126, 34, 206, 0.3)' }}>
+                  <Calendar size={28} strokeWidth={2.5} />
                 </div>
-                <span>Meetings (MoM)</span>
+                <span style={{ fontWeight: 700, color: 'var(--text-heading)', fontSize: '0.95rem', letterSpacing: '0.3px' }}>Meetings (MoM)</span>
               </button>
               <button className={styles.moduleTile} onClick={() => navigateToModule('/directory')}>
-                <div className={styles.moduleIconWrapper} style={{ backgroundColor: 'rgba(56, 161, 105, 0.1)', color: '#38a169' }}>
-                  <Contact size={24} />
+                <div className={styles.moduleIconWrapper} style={{ background: 'linear-gradient(135deg, #2dd4bf, #0f766e)', color: '#fff', boxShadow: '0 8px 20px rgba(15, 118, 110, 0.3)' }}>
+                  <Contact size={28} strokeWidth={2.5} />
                 </div>
-                <span>Directory</span>
+                <span style={{ fontWeight: 700, color: 'var(--text-heading)', fontSize: '0.95rem', letterSpacing: '0.3px' }}>Directory</span>
               </button>
               <button className={styles.moduleTile} onClick={() => navigateToModule('/quotations')}>
-                <div className={styles.moduleIconWrapper} style={{ backgroundColor: 'rgba(236, 72, 153, 0.1)', color: '#ec4899' }}>
-                  <DollarSign size={24} />
+                <div className={styles.moduleIconWrapper} style={{ background: 'linear-gradient(135deg, #f472b6, #be185d)', color: '#fff', boxShadow: '0 8px 20px rgba(190, 24, 93, 0.3)' }}>
+                  <DollarSign size={28} strokeWidth={2.5} />
                 </div>
-                <span>Quotations</span>
+                <span style={{ fontWeight: 700, color: 'var(--text-heading)', fontSize: '0.95rem', letterSpacing: '0.3px' }}>Quotations</span>
               </button>
               <button className={styles.moduleTile} onClick={() => navigateToModule('/audits')}>
-                <div className={styles.moduleIconWrapper} style={{ backgroundColor: 'rgba(16, 185, 129, 0.1)', color: '#10b981' }}>
-                  <ShieldCheck size={24} />
+                <div className={styles.moduleIconWrapper} style={{ background: 'linear-gradient(135deg, #a3e635, #4d7c0f)', color: '#fff', boxShadow: '0 8px 20px rgba(77, 124, 15, 0.3)' }}>
+                  <ShieldCheck size={28} strokeWidth={2.5} />
                 </div>
-                <span>Audits & Inspections</span>
+                <span style={{ fontWeight: 700, color: 'var(--text-heading)', fontSize: '0.95rem', letterSpacing: '0.3px' }}>Audits & Inspections</span>
               </button>
               <button className={styles.moduleTile} onClick={() => navigateToModule('/checklists')}>
-                <div className={styles.moduleIconWrapper} style={{ backgroundColor: 'rgba(99, 102, 241, 0.1)', color: '#6366f1' }}>
-                  <CheckCircle size={24} />
+                <div className={styles.moduleIconWrapper} style={{ background: 'linear-gradient(135deg, #818cf8, #4338ca)', color: '#fff', boxShadow: '0 8px 20px rgba(67, 56, 202, 0.3)' }}>
+                  <CheckCircle size={28} strokeWidth={2.5} />
                 </div>
-                <span>Checklists</span>
+                <span style={{ fontWeight: 700, color: 'var(--text-heading)', fontSize: '0.95rem', letterSpacing: '0.3px' }}>Checklists</span>
               </button>
               <button className={styles.moduleTile} onClick={() => navigateToModule('/deficiencies')}>
-                <div className={styles.moduleIconWrapper} style={{ backgroundColor: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b' }}>
-                  <AlertTriangle size={24} />
+                <div className={styles.moduleIconWrapper} style={{ background: 'linear-gradient(135deg, #f87171, #b91c1c)', color: '#fff', boxShadow: '0 8px 20px rgba(185, 28, 28, 0.3)' }}>
+                  <AlertTriangle size={28} strokeWidth={2.5} />
                 </div>
-                <span>Snags / Deficiencies</span>
+                <span style={{ fontWeight: 700, color: 'var(--text-heading)', fontSize: '0.95rem', letterSpacing: '0.3px' }}>Snags / Deficiencies</span>
               </button>
             </div>
           </div>
@@ -426,10 +434,6 @@ export default function ProjectsPage() {
                     <input type="text" required value={formData.basicInfo.name} onChange={(e) => setFormData({...formData, basicInfo: {...formData.basicInfo, name: e.target.value}})} />
                   </div>
                   <div className={styles.formGroup}>
-                    <label><Tag size={14} className={styles.labelIcon} /> Project Code</label>
-                    <input type="text" value={formData.basicInfo.code} onChange={(e) => setFormData({...formData, basicInfo: {...formData.basicInfo, code: e.target.value}})} />
-                  </div>
-                  <div className={styles.formGroup}>
                     <label><Layers3 size={14} className={styles.labelIcon} /> Project Type</label>
                     <select value={formData.basicInfo.type} onChange={(e) => setFormData({...formData, basicInfo: {...formData.basicInfo, type: e.target.value}})}>
                       {projectTypes.map(t => <option key={t}>{t}</option>)}
@@ -447,16 +451,9 @@ export default function ProjectsPage() {
                       {projectStatuses.map(s => <option key={s}>{s}</option>)}
                     </select>
                   </div>
-                  <div className={styles.formGroup}>
-                    <label><AlertTriangle size={14} className={styles.labelIcon} /> Priority</label>
-                    <select value={formData.basicInfo.priority} onChange={(e) => setFormData({...formData, basicInfo: {...formData.basicInfo, priority: e.target.value}})}>
-                      <option>High</option><option>Medium</option><option>Low</option>
-                    </select>
-                  </div>
                   <div className={styles.formGroup}><label><Calendar size={14} className={styles.labelIcon} /> Start Date</label><input type="date" value={formData.basicInfo.startDate} onChange={(e) => setFormData({...formData, basicInfo: {...formData.basicInfo, startDate: e.target.value}})} /></div>
                   <div className={styles.formGroup}><label><Calendar size={14} className={styles.labelIcon} /> Expected Completion</label><input type="date" value={formData.basicInfo.expectedEndDate} onChange={(e) => setFormData({...formData, basicInfo: {...formData.basicInfo, expectedEndDate: e.target.value}})} /></div>
                   <div className={styles.formGroup}><label><DollarSign size={14} className={styles.labelIcon} /> Estimated Budget</label><input type="number" value={formData.basicInfo.estimatedBudget} onChange={(e) => setFormData({...formData, basicInfo: {...formData.basicInfo, estimatedBudget: e.target.value}})} /></div>
-                  <div className={styles.formGroup}><label><DollarSign size={14} className={styles.labelIcon} /> Final Budget</label><input type="number" value={formData.basicInfo.finalBudget} onChange={(e) => setFormData({...formData, basicInfo: {...formData.basicInfo, finalBudget: e.target.value}})} /></div>
                   <div className={`${styles.formGroup} ${styles.fullWidth}`}><label><FileText size={14} className={styles.labelIcon} /> Description</label><textarea value={formData.basicInfo.description} onChange={(e) => setFormData({...formData, basicInfo: {...formData.basicInfo, description: e.target.value}})} /></div>
                 </div>
               </div>
@@ -473,7 +470,30 @@ export default function ProjectsPage() {
                       <div className={styles.formGroup}><label><Building size={14} className={styles.labelIcon} /> Company</label><input type="text" value={client.company} onChange={(e) => updateSection('clients', idx, 'company', e.target.value)} /></div>
                       <div className={styles.formGroup}><label><Phone size={14} className={styles.labelIcon} /> Mobile</label><input type="tel" value={client.mobile} onChange={(e) => updateSection('clients', idx, 'mobile', e.target.value)} /></div>
                       <div className={styles.formGroup}><label><Mail size={14} className={styles.labelIcon} /> Email</label><input type="email" value={client.email} onChange={(e) => updateSection('clients', idx, 'email', e.target.value)} /></div>
-                      <div className={styles.formGroup}><label><CheckCircle size={14} className={styles.labelIcon} /> Primary?</label><select value={client.isPrimary} onChange={(e) => updateSection('clients', idx, 'isPrimary', e.target.value)}><option>Yes</option><option>No</option></select></div>
+                      <div className={styles.formGroup} data-has-value="true">
+                        <label><CheckCircle size={14} className={styles.labelIcon} /> Primary?</label>
+                        <div style={{ padding: '9px 14px', border: '2px solid #cbd5e1', borderRadius: '10px', display: 'flex', alignItems: 'center' }}>
+                          <div style={{ display: 'flex', alignItems: 'center' }}>
+                            <div 
+                              style={{ 
+                                width: '46px', height: '24px', backgroundColor: client.isPrimary === 'Yes' ? 'var(--primary)' : '#cbd5e1', 
+                                borderRadius: '12px', position: 'relative', cursor: 'pointer', transition: 'background-color 0.2s' 
+                              }} 
+                              onClick={() => updateSection('clients', idx, 'isPrimary', client.isPrimary === 'Yes' ? 'No' : 'Yes')}
+                            >
+                              <div style={{
+                                width: '20px', height: '20px', backgroundColor: 'white', borderRadius: '50%',
+                                position: 'absolute', top: '2px', left: client.isPrimary === 'Yes' ? '24px' : '2px',
+                                transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.3)'
+                              }} />
+                            </div>
+                            <span style={{ marginLeft: '12px', fontSize: '14px', fontWeight: 500, color: client.isPrimary === 'Yes' ? 'var(--primary)' : '#64748b' }}>
+                              {client.isPrimary === 'Yes' ? 'Yes' : 'No'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className={`${styles.formGroup} ${styles.fullWidth}`}><label><MapPin size={14} className={styles.labelIcon} /> Address</label><textarea value={client.address} onChange={(e) => updateSection('clients', idx, 'address', e.target.value)} /></div>
                     </div>
                   </div>
                 ))}
@@ -506,7 +526,7 @@ export default function ProjectsPage() {
                   <div key={idx} className={styles.rowItem}>
                     <div className={styles.rowHeader}><h4>Member {idx + 1}</h4>{formData.team.length > 1 && <button type="button" onClick={() => removeRow('team', idx)} className={styles.removeBtn}><Trash2 size={16} /></button>}</div>
                     <div className={styles.gridForm}>
-                      <div className={styles.formGroup}><label><ShieldCheck size={14} className={styles.labelIcon} /> Role</label><select value={member.role} onChange={(e) => updateSection('team', idx, 'role', e.target.value)}><option>Project Manager</option><option>Designer</option><option>Supervisor</option><option>Sales</option></select></div>
+                      <div className={styles.formGroup}><label><ShieldCheck size={14} className={styles.labelIcon} /> Role</label><select value={member.role} onChange={(e) => updateSection('team', idx, 'role', e.target.value)}>{memberRoles.map(r => <option key={r}>{r}</option>)}</select></div>
                       <div className={styles.formGroup}><label><User size={14} className={styles.labelIcon} /> Name</label><input type="text" value={member.name} onChange={(e) => updateSection('team', idx, 'name', e.target.value)} /></div>
                       <div className={styles.formGroup}><label><Calendar size={14} className={styles.labelIcon} /> Assigned Date</label><input type="date" value={member.assignedDate} onChange={(e) => updateSection('team', idx, 'assignedDate', e.target.value)} /></div>
                     </div>
@@ -764,10 +784,6 @@ export default function ProjectsPage() {
                   <input type="text" required value={formData.basicInfo.name} onChange={(e) => setFormData({...formData, basicInfo: {...formData.basicInfo, name: e.target.value}})} />
                 </div>
                 <div className={styles.formGroup}>
-                  <label><Tag size={14} className={styles.labelIcon} /> Project Code</label>
-                  <input type="text" value={formData.basicInfo.code} onChange={(e) => setFormData({...formData, basicInfo: {...formData.basicInfo, code: e.target.value}})} />
-                </div>
-                <div className={styles.formGroup}>
                   <label><Layers3 size={14} className={styles.labelIcon} /> Project Type</label>
                   <select value={formData.basicInfo.type} onChange={(e) => setFormData({...formData, basicInfo: {...formData.basicInfo, type: e.target.value}})}>
                     {projectTypes.map(t => <option key={t}>{t}</option>)}
@@ -785,16 +801,9 @@ export default function ProjectsPage() {
                     {projectStatuses.map(s => <option key={s}>{s}</option>)}
                   </select>
                 </div>
-                <div className={styles.formGroup}>
-                  <label><AlertTriangle size={14} className={styles.labelIcon} /> Priority</label>
-                  <select value={formData.basicInfo.priority} onChange={(e) => setFormData({...formData, basicInfo: {...formData.basicInfo, priority: e.target.value}})}>
-                    <option>High</option><option>Medium</option><option>Low</option>
-                  </select>
-                </div>
                 <div className={styles.formGroup}><label><Calendar size={14} className={styles.labelIcon} /> Start Date</label><input type="date" value={formData.basicInfo.startDate} onChange={(e) => setFormData({...formData, basicInfo: {...formData.basicInfo, startDate: e.target.value}})} /></div>
                 <div className={styles.formGroup}><label><Calendar size={14} className={styles.labelIcon} /> Expected Completion</label><input type="date" value={formData.basicInfo.expectedEndDate} onChange={(e) => setFormData({...formData, basicInfo: {...formData.basicInfo, expectedEndDate: e.target.value}})} /></div>
                 <div className={styles.formGroup}><label><DollarSign size={14} className={styles.labelIcon} /> Estimated Budget</label><input type="number" value={formData.basicInfo.estimatedBudget} onChange={(e) => setFormData({...formData, basicInfo: {...formData.basicInfo, estimatedBudget: e.target.value}})} /></div>
-                <div className={styles.formGroup}><label><DollarSign size={14} className={styles.labelIcon} /> Final Budget</label><input type="number" value={formData.basicInfo.finalBudget} onChange={(e) => setFormData({...formData, basicInfo: {...formData.basicInfo, finalBudget: e.target.value}})} /></div>
                 <div className={`${styles.formGroup} ${styles.fullWidth}`}><label><FileText size={14} className={styles.labelIcon} /> Description</label><textarea value={formData.basicInfo.description} onChange={(e) => setFormData({...formData, basicInfo: {...formData.basicInfo, description: e.target.value}})} /></div>
               </div>
             </div>
@@ -811,7 +820,30 @@ export default function ProjectsPage() {
                     <div className={styles.formGroup}><label><Building size={14} className={styles.labelIcon} /> Company</label><input type="text" value={client.company} onChange={(e) => updateSection('clients', idx, 'company', e.target.value)} /></div>
                     <div className={styles.formGroup}><label><Phone size={14} className={styles.labelIcon} /> Mobile</label><input type="tel" value={client.mobile} onChange={(e) => updateSection('clients', idx, 'mobile', e.target.value)} /></div>
                     <div className={styles.formGroup}><label><Mail size={14} className={styles.labelIcon} /> Email</label><input type="email" value={client.email} onChange={(e) => updateSection('clients', idx, 'email', e.target.value)} /></div>
-                    <div className={styles.formGroup}><label><CheckCircle size={14} className={styles.labelIcon} /> Primary?</label><select value={client.isPrimary} onChange={(e) => updateSection('clients', idx, 'isPrimary', e.target.value)}><option>Yes</option><option>No</option></select></div>
+                    <div className={styles.formGroup} data-has-value="true">
+                      <label><CheckCircle size={14} className={styles.labelIcon} /> Primary?</label>
+                      <div style={{ padding: '9px 14px', border: '2px solid #cbd5e1', borderRadius: '10px', display: 'flex', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center' }}>
+                          <div 
+                            style={{ 
+                              width: '46px', height: '24px', backgroundColor: client.isPrimary === 'Yes' ? 'var(--primary)' : '#cbd5e1', 
+                              borderRadius: '12px', position: 'relative', cursor: 'pointer', transition: 'background-color 0.2s' 
+                            }} 
+                            onClick={() => updateSection('clients', idx, 'isPrimary', client.isPrimary === 'Yes' ? 'No' : 'Yes')}
+                          >
+                            <div style={{
+                              width: '20px', height: '20px', backgroundColor: 'white', borderRadius: '50%',
+                              position: 'absolute', top: '2px', left: client.isPrimary === 'Yes' ? '24px' : '2px',
+                              transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.3)'
+                            }} />
+                          </div>
+                          <span style={{ marginLeft: '12px', fontSize: '14px', fontWeight: 500, color: client.isPrimary === 'Yes' ? 'var(--primary)' : '#64748b' }}>
+                            {client.isPrimary === 'Yes' ? 'Yes' : 'No'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className={`${styles.formGroup} ${styles.fullWidth}`}><label><MapPin size={14} className={styles.labelIcon} /> Address</label><textarea value={client.address} onChange={(e) => updateSection('clients', idx, 'address', e.target.value)} /></div>
                   </div>
                 </div>
               ))}
@@ -844,7 +876,7 @@ export default function ProjectsPage() {
                 <div key={idx} className={styles.rowItem}>
                   <div className={styles.rowHeader}><h4>Member {idx + 1}</h4>{formData.team.length > 1 && <button type="button" onClick={() => removeRow('team', idx)} className={styles.removeBtn}><Trash2 size={16} /></button>}</div>
                   <div className={styles.gridForm}>
-                    <div className={styles.formGroup}><label><ShieldCheck size={14} className={styles.labelIcon} /> Role</label><select value={member.role} onChange={(e) => updateSection('team', idx, 'role', e.target.value)}><option>Project Manager</option><option>Designer</option><option>Supervisor</option><option>Sales</option></select></div>
+                    <div className={styles.formGroup}><label><ShieldCheck size={14} className={styles.labelIcon} /> Role</label><select value={member.role} onChange={(e) => updateSection('team', idx, 'role', e.target.value)}>{memberRoles.map(r => <option key={r}>{r}</option>)}</select></div>
                     <div className={styles.formGroup}><label><User size={14} className={styles.labelIcon} /> Name</label><input type="text" value={member.name} onChange={(e) => updateSection('team', idx, 'name', e.target.value)} /></div>
                     <div className={styles.formGroup}><label><Calendar size={14} className={styles.labelIcon} /> Assigned Date</label><input type="date" value={member.assignedDate} onChange={(e) => updateSection('team', idx, 'assignedDate', e.target.value)} /></div>
                   </div>

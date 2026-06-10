@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
         file.type, 
         FOLDER_ID
       );
-      documentsUrl = driveFile.id ? `https://lh3.googleusercontent.com/d/${driveFile.id}` : '';
+      documentsUrl = driveFile.id ? `https://drive.google.com/file/d/${driveFile.id}/view` : '';
     }
 
     const momId = `MOM-${Date.now()}`;
@@ -145,7 +145,7 @@ export async function PUT(request: NextRequest) {
         file.type, 
         FOLDER_ID
       );
-      documentsUrl = driveFile.id ? `https://lh3.googleusercontent.com/d/${driveFile.id}` : '';
+      documentsUrl = driveFile.id ? `https://drive.google.com/file/d/${driveFile.id}/view` : '';
     }
 
     const updatedRow = [

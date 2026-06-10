@@ -49,8 +49,7 @@ export default function RequirementsPage() {
   const [users, setUsers] = useState<{name: string}[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [uploadMode, setUploadMode] = useState<'images' | 'pdf'>('images');
-  
+
   // Search and Filter States
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
@@ -68,8 +67,8 @@ export default function RequirementsPage() {
     remarks: '',
   });
 
+  const [uploadMode, setUploadMode] = useState<'images' | 'pdf'>('images');
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [newFileTitles, setNewFileTitles] = useState<string[]>([]);
   const [existingFiles, setExistingFiles] = useState<FileAttachment[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -130,7 +129,6 @@ export default function RequirementsPage() {
       remarks: '',
     });
     setSelectedFiles([]);
-    setNewFileTitles([]);
     setExistingFiles([]);
     setUploadMode('images');
     setIsModalOpen(true);
@@ -145,7 +143,6 @@ export default function RequirementsPage() {
       remarks: req.remarks,
     });
     setSelectedFiles([]);
-    setNewFileTitles([]);
     setExistingFiles(req.files || []);
     setUploadMode('images');
     setIsModalOpen(true);
@@ -161,23 +158,15 @@ export default function RequirementsPage() {
     if (e.target.files) {
       const filesArr = Array.from(e.target.files);
       setSelectedFiles(prev => [...prev, ...filesArr]);
-      setNewFileTitles(prev => [...prev, ...filesArr.map(f => f.name)]);
     }
   };
 
   const handleRemoveNewFile = (index: number) => {
     setSelectedFiles(prev => prev.filter((_, i) => i !== index));
-    setNewFileTitles(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleRemoveExistingFile = (index: number) => {
     setExistingFiles(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const handleNewFileTitleChange = (index: number, newTitle: string) => {
-    const updated = [...newFileTitles];
-    updated[index] = newTitle;
-    setNewFileTitles(updated);
   };
 
   const handleExistingFileTitleChange = (index: number, newTitle: string) => {
@@ -202,7 +191,7 @@ export default function RequirementsPage() {
       formData.append('remarks', formFields.remarks);
 
       let finalFiles = selectedFiles;
-      let finalFileTitles = selectedFiles.map((_, i) => newFileTitles[i] || 'Attachment');
+      let finalFileTitles = selectedFiles.map(f => f.name);
 
       if (uploadMode === 'images' && selectedFiles.length > 0) {
         const pdf = new jsPDF();
@@ -357,7 +346,14 @@ export default function RequirementsPage() {
             {activeProject && (
               <>
                 <span className="separator">&gt;</span>
-                <span className="project-breadcrumb">{activeProject.name}</span>
+                <button
+                  className="project-breadcrumb"
+                  style={{ cursor: 'pointer', border: 'none', fontFamily: 'inherit' }}
+                  onClick={() => {
+                    localStorage.setItem('pending_view_project_id', activeProject.id);
+                    window.location.href = '/projects';
+                  }}
+                >{activeProject.name}</button>
               </>
             )}
             <span className="separator">&gt;</span>
@@ -496,18 +492,21 @@ export default function RequirementsPage() {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', position: 'relative', marginTop: '12px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <label style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-heading)', display: 'flex', alignItems: 'center', gap: '6px' }}><Paperclip size={14} /> Documents & Attachments</label>
-              <div style={{ display: 'flex', gap: '8px', background: 'var(--bg-main)', padding: '4px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                <button type="button" style={{ padding: '6px 12px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 600, border: 'none', cursor: 'pointer', background: uploadMode === 'images' ? 'var(--primary)' : 'transparent', color: uploadMode === 'images' ? 'white' : 'var(--text-light)', transition: 'all 0.2s' }} onClick={() => setUploadMode('images')}>📸 Images to PDF</button>
-                <button type="button" style={{ padding: '6px 12px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 600, border: 'none', cursor: 'pointer', background: uploadMode === 'pdf' ? 'var(--primary)' : 'transparent', color: uploadMode === 'pdf' ? 'white' : 'var(--text-light)', transition: 'all 0.2s' }} onClick={() => setUploadMode('pdf')}>📄 Upload PDF Directly</button>
-              </div>
+            <label style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-heading)', display: 'flex', alignItems: 'center', gap: '6px' }}><Paperclip size={14} /> Documents & Attachments</label>
+            
+            <div style={{ display: 'flex', gap: '16px', marginBottom: '8px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', cursor: 'pointer' }}>
+                <input type="radio" name="uploadMode" checked={uploadMode === 'images'} onChange={() => { setUploadMode('images'); setSelectedFiles([]); }} /> Images (Auto-convert to PDF)
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', cursor: 'pointer' }}>
+                <input type="radio" name="uploadMode" checked={uploadMode === 'pdf'} onChange={() => { setUploadMode('pdf'); setSelectedFiles([]); }} /> PDF Document
+              </label>
             </div>
 
             <div className={styles.uploadBox} onClick={() => fileInputRef.current?.click()}>
               <label>
                 <UploadCloud size={24} style={{ color: 'var(--primary)' }} />
-                <span>{uploadMode === 'images' ? 'Click or drag images to merge into a single PDF' : 'Click or drag a PDF document'}</span>
+                <span>Click to browse or drag and drop files</span>
               </label>
               <input type="file" multiple={uploadMode === 'images'} accept={uploadMode === 'images' ? "image/*" : ".pdf"} ref={fileInputRef} onChange={handleFileSelect} />
             </div>
@@ -520,19 +519,22 @@ export default function RequirementsPage() {
                     <div key={`exist-${i}`} className={styles.stagedFileItem}>
                       <div className={styles.stagedFileLeft} title={file.name}>
                         <FileIcon size={14} style={{ color: 'var(--text-light)' }} />
-                        <span className={styles.stagedFileName}>{file.name}</span>
+                        <span className={styles.stagedFileName}>{file.title || file.name}</span>
                       </div>
-                      <input type="text" className={styles.stagedTitleInput} value={file.title} onChange={(e) => handleExistingFileTitleChange(i, e.target.value)} placeholder="File Title" />
                       <button type="button" className={styles.removeStagedBtn} onClick={() => handleRemoveExistingFile(i)}><X size={16} /></button>
                     </div>
                   ))}
                   {selectedFiles.map((file, i) => (
                     <div key={`new-${i}`} className={styles.stagedFileItem}>
                       <div className={styles.stagedFileLeft} title={file.name}>
-                        <FileIcon size={14} style={{ color: 'var(--success)' }} />
+                        {uploadMode === 'images' ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={URL.createObjectURL(file)} alt="preview" style={{ width: '32px', height: '32px', objectFit: 'cover', borderRadius: '4px' }} />
+                        ) : (
+                          <FileIcon size={14} style={{ color: 'var(--success)' }} />
+                        )}
                         <span className={styles.stagedFileName}>{file.name}</span>
                       </div>
-                      <input type="text" className={styles.stagedTitleInput} value={newFileTitles[i]} onChange={(e) => handleNewFileTitleChange(i, e.target.value)} placeholder="File Title" />
                       <button type="button" className={styles.removeStagedBtn} onClick={() => handleRemoveNewFile(i)}><X size={16} /></button>
                     </div>
                   ))}

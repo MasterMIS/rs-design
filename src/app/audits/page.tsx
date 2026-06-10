@@ -8,6 +8,9 @@ import {
 } from 'lucide-react';
 import styles from './audits.module.css';
 import Modal from '@/components/Modal';
+import { useProject } from '@/context/ProjectContext';
+import Link from 'next/link';
+import jsPDF from 'jspdf';
 
 interface Audit {
   id: string;
@@ -26,6 +29,7 @@ interface Audit {
 }
 
 export default function AuditsPage() {
+  const { activeProject } = useProject();
   const [audits, setAudits] = useState<Audit[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
   
@@ -129,8 +133,40 @@ export default function AuditsPage() {
       setSubmitting(true);
       const fd = new FormData();
       Object.entries(formData).forEach(([k, v]) => fd.append(k, v));
-      
-      files.forEach(f => fd.append('newFiles', f));
+
+      let finalFiles = files;
+      if (files.length > 0) {
+        // Check if all selected files are images - if so, merge into one PDF
+        const allImages = files.every(f => f.type.startsWith('image/'));
+        if (allImages) {
+          const pdf = new jsPDF();
+          for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            const imgUrl = URL.createObjectURL(file);
+            const img = new Image();
+            img.src = imgUrl;
+            await new Promise((resolve) => { img.onload = () => resolve(true); img.onerror = () => resolve(false); });
+            if (!img.width) { URL.revokeObjectURL(imgUrl); continue; }
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            const pdfHeight = pdf.internal.pageSize.getHeight();
+            const imgRatio = img.width / img.height;
+            const pdfRatio = pdfWidth / pdfHeight;
+            let finalWidth = pdfWidth;
+            let finalHeight = pdfHeight;
+            if (imgRatio > pdfRatio) { finalHeight = pdfWidth / imgRatio; } else { finalWidth = pdfHeight * imgRatio; }
+            const x = (pdfWidth - finalWidth) / 2;
+            const y = (pdfHeight - finalHeight) / 2;
+            if (i > 0) { pdf.addPage(); pdf.setPage(i + 1); }
+            const format = file.type === 'image/png' ? 'PNG' : 'JPEG';
+            pdf.addImage(img, format, x, y, finalWidth, finalHeight, `img_${i}`);
+            URL.revokeObjectURL(imgUrl);
+          }
+          const pdfBlob = pdf.output('blob');
+          finalFiles = [new File([pdfBlob], `Audit_Docs_${Date.now()}.pdf`, { type: 'application/pdf' })];
+        }
+      }
+
+      finalFiles.forEach(f => fd.append('newFiles', f));
       
       let res;
       if (editingAudit) {
@@ -201,7 +237,26 @@ export default function AuditsPage() {
       <div className={styles.header}>
         <div className={styles.titleSection}>
           <h2>Audit Management</h2>
-          <p>Track site quality, financials, and compliance audits across projects.</p>
+          <div className="breadcrumbNav">
+            <Link href="/">Dashboard</Link>
+            <span className="separator">&gt;</span>
+            <Link href="/projects">Project Portfolio</Link>
+            {activeProject && (
+              <>
+                <span className="separator">&gt;</span>
+                <button
+                  className="project-breadcrumb"
+                  style={{ cursor: 'pointer', border: 'none', fontFamily: 'inherit' }}
+                  onClick={() => {
+                    localStorage.setItem('pending_view_project_id', activeProject.id);
+                    window.location.href = '/projects';
+                  }}
+                >{activeProject.name}</button>
+              </>
+            )}
+            <span className="separator">&gt;</span>
+            <span className="current">Audits & Inspections</span>
+          </div>
         </div>
         <div className={styles.headerActions}>
           <button className={styles.addButton} onClick={handleCreate}>

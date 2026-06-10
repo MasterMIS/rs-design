@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
         const buffer = Buffer.from(await file.arrayBuffer());
         const result = await uploadFileToDrive(buffer, file.name, file.type || 'application/octet-stream', FOLDER_ID);
         if (result.id) {
-          uploadedDocs.push({ name: file.name, url: `https://lh3.googleusercontent.com/d/${result.id}` });
+          uploadedDocs.push({ name: file.name, url: `https://drive.google.com/file/d/${result.id}/view` });
         }
       }
     }
@@ -125,7 +125,7 @@ export async function PUT(request: NextRequest) {
         const buffer = Buffer.from(await file.arrayBuffer());
         const result = await uploadFileToDrive(buffer, file.name, file.type || 'application/octet-stream', FOLDER_ID);
         if (result.id) {
-          existingDocs.push({ name: file.name, url: `https://lh3.googleusercontent.com/d/${result.id}` });
+          existingDocs.push({ name: file.name, url: `https://drive.google.com/file/d/${result.id}/view` });
         }
       }
     }

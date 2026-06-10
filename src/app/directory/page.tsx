@@ -10,6 +10,8 @@ import {
 } from 'lucide-react';
 import styles from './directory.module.css';
 import Modal from '@/components/Modal';
+import { useProject } from '@/context/ProjectContext';
+import Link from 'next/link';
 
 interface Contact {
   rowIndex: number;
@@ -39,6 +41,7 @@ interface Project {
 }
 
 export default function DirectoryPage() {
+  const { activeProject } = useProject();
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
@@ -351,7 +354,26 @@ export default function DirectoryPage() {
       <div className={styles.header}>
         <div className={styles.titleSection}>
           <h2>Project Directory</h2>
-          <p>Coordinate stakeholders, client teams, and appointed contractors for active sites.</p>
+          <div className="breadcrumbNav">
+            <Link href="/">Dashboard</Link>
+            <span className="separator">&gt;</span>
+            <Link href="/projects">Project Portfolio</Link>
+            {activeProject && (
+              <>
+                <span className="separator">&gt;</span>
+                <button
+                  className="project-breadcrumb"
+                  style={{ cursor: 'pointer', border: 'none', fontFamily: 'inherit' }}
+                  onClick={() => {
+                    localStorage.setItem('pending_view_project_id', activeProject.id);
+                    window.location.href = '/projects';
+                  }}
+                >{activeProject.name}</button>
+              </>
+            )}
+            <span className="separator">&gt;</span>
+            <span className="current">Directory</span>
+          </div>
         </div>
         <div className={styles.headerActions}>
           <button className={styles.addButton} onClick={handleCreateNew}>

@@ -383,7 +383,14 @@ export default function SiteVisitsPage() {
             {activeProject && (
               <>
                 <span className="separator">&gt;</span>
-                <span className="project-breadcrumb">{activeProject.name}</span>
+                <button
+                  className="project-breadcrumb"
+                  style={{ cursor: 'pointer', border: 'none', fontFamily: 'inherit' }}
+                  onClick={() => {
+                    localStorage.setItem('pending_view_project_id', activeProject.id);
+                    window.location.href = '/projects';
+                  }}
+                >{activeProject.name}</button>
               </>
             )}
             <span className="separator">&gt;</span>

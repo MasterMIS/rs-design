@@ -7,6 +7,8 @@ import {
 } from 'lucide-react';
 import styles from './checklists.module.css';
 import Modal from '@/components/Modal';
+import { useProject } from '@/context/ProjectContext';
+import Link from 'next/link';
 
 interface TemplateItem {
   id: string;
@@ -35,6 +37,7 @@ interface Project {
 }
 
 export default function ChecklistsPage() {
+  const { activeProject } = useProject();
   const [checklists, setChecklists] = useState<Checklist[]>([]);
   const [templateItems, setTemplateItems] = useState<TemplateItem[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -376,7 +379,26 @@ export default function ChecklistsPage() {
       <div className={styles.header}>
         <div className={styles.titleSection}>
           <h2>Project Checklists</h2>
-          <p>Standardize processes and track progress via checklists.</p>
+          <div className="breadcrumbNav">
+            <Link href="/">Dashboard</Link>
+            <span className="separator">&gt;</span>
+            <Link href="/projects">Project Portfolio</Link>
+            {activeProject && (
+              <>
+                <span className="separator">&gt;</span>
+                <button
+                  className="project-breadcrumb"
+                  style={{ cursor: 'pointer', border: 'none', fontFamily: 'inherit' }}
+                  onClick={() => {
+                    localStorage.setItem('pending_view_project_id', activeProject.id);
+                    window.location.href = '/projects';
+                  }}
+                >{activeProject.name}</button>
+              </>
+            )}
+            <span className="separator">&gt;</span>
+            <span className="current">Checklists</span>
+          </div>
         </div>
         <div className={styles.headerActions}>
           <button className={styles.secondaryButton} onClick={() => setActiveTab(activeTab === 'checklists' ? 'templates' : 'checklists')}>

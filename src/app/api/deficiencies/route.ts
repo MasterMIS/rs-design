@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
         beforeImage.type, 
         FOLDER_ID
       );
-      beforeDocsUrl = driveFile.id ? `https://lh3.googleusercontent.com/d/${driveFile.id}` : '';
+      beforeDocsUrl = driveFile.id ? `https://drive.google.com/file/d/${driveFile.id}/view` : '';
     }
 
     const deficiencyId = `DEF-${Date.now()}`;
@@ -137,7 +137,7 @@ export async function PUT(request: NextRequest) {
         beforeImage.type, 
         FOLDER_ID
       );
-      beforeDocsUrl = driveFile.id ? `https://lh3.googleusercontent.com/d/${driveFile.id}` : '';
+      beforeDocsUrl = driveFile.id ? `https://drive.google.com/file/d/${driveFile.id}/view` : '';
     }
 
     let afterDocsUrl = afterDocs;
@@ -149,7 +149,7 @@ export async function PUT(request: NextRequest) {
         afterImage.type, 
         FOLDER_ID
       );
-      afterDocsUrl = driveFile.id ? `https://lh3.googleusercontent.com/d/${driveFile.id}` : '';
+      afterDocsUrl = driveFile.id ? `https://drive.google.com/file/d/${driveFile.id}/view` : '';
     }
 
     const updatedRow = [

@@ -5,10 +5,14 @@ import {
   Plus, Search, Calendar, MapPin, Trash2, Edit2, LayoutGrid, List,
   Building, User, Users, MessageCircle, AlertCircle, CheckCircle,
   ChevronDown, ChevronUp, RefreshCw, ClipboardList, CalendarCheck,
-  CheckSquare, FileUp, Link2, Loader2, UserCheck, FileText
+  CheckSquare, FileUp, Link2, Loader2, UserCheck, FileText,
+  UploadCloud, File as FileIcon, X
 } from 'lucide-react';
 import styles from './mom.module.css';
 import Modal from '@/components/Modal';
+import { useProject } from '@/context/ProjectContext';
+import Link from 'next/link';
+import jsPDF from 'jspdf';
 
 interface MOM {
   rowIndex: number;
@@ -38,6 +42,7 @@ interface Project {
 }
 
 export default function MOMPage() {
+  const { activeProject } = useProject();
   const [momList, setMomList] = useState<MOM[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
@@ -205,9 +210,44 @@ export default function MOMPage() {
       submitData.append('status', formFields.status);
       submitData.append('remarks', formFields.remarks);
 
-      if (selectedFile) {
-        submitData.append('file', selectedFile);
+      let fileToUpload: File | null = null;
+
+      if (selectedFiles.length > 0) {
+        const allImages = selectedFiles.every(f => f.type.startsWith('image/'));
+        if (allImages && uploadMode === 'images') {
+          const pdf = new jsPDF();
+          for (let i = 0; i < selectedFiles.length; i++) {
+            const file = selectedFiles[i];
+            const imgUrl = URL.createObjectURL(file);
+            const img = new Image();
+            img.src = imgUrl;
+            await new Promise((resolve) => { img.onload = () => resolve(true); img.onerror = () => resolve(false); });
+            if (!img.width) { URL.revokeObjectURL(imgUrl); continue; }
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            const pdfHeight = pdf.internal.pageSize.getHeight();
+            const imgRatio = img.width / img.height;
+            const pdfRatio = pdfWidth / pdfHeight;
+            let finalWidth = pdfWidth;
+            let finalHeight = pdfHeight;
+            if (imgRatio > pdfRatio) { finalHeight = pdfWidth / imgRatio; } else { finalWidth = pdfHeight * imgRatio; }
+            const x = (pdfWidth - finalWidth) / 2;
+            const y = (pdfHeight - finalHeight) / 2;
+            if (i > 0) { pdf.addPage(); pdf.setPage(i + 1); }
+            const format = file.type === 'image/png' ? 'PNG' : 'JPEG';
+            pdf.addImage(img, format, x, y, finalWidth, finalHeight, `img_${i}`);
+            URL.revokeObjectURL(imgUrl);
+          }
+          const pdfBlob = pdf.output('blob');
+          fileToUpload = new File([pdfBlob], `MOM_${Date.now()}.pdf`, { type: 'application/pdf' });
+        } else {
+          fileToUpload = selectedFiles[0];
+        }
       }
+
+      if (fileToUpload) {
+        submitData.append('file', fileToUpload);
+      }
+
 
       if (editingMOM) {
         submitData.append('timestamp', editingMOM.timestamp);
@@ -318,7 +358,26 @@ export default function MOMPage() {
       <div className={styles.header}>
         <div className={styles.titleSection}>
           <h2>Minutes of Meeting (MOM)</h2>
-          <p>Track project meeting details, split stakeholder attendance, action plans, and decisions.</p>
+          <div className="breadcrumbNav">
+            <Link href="/">Dashboard</Link>
+            <span className="separator">&gt;</span>
+            <Link href="/projects">Project Portfolio</Link>
+            {activeProject && (
+              <>
+                <span className="separator">&gt;</span>
+                <button
+                  className="project-breadcrumb"
+                  style={{ cursor: 'pointer', border: 'none', fontFamily: 'inherit' }}
+                  onClick={() => {
+                    localStorage.setItem('pending_view_project_id', activeProject.id);
+                    window.location.href = '/projects';
+                  }}
+                >{activeProject.name}</button>
+              </>
+            )}
+            <span className="separator">&gt;</span>
+            <span className="current">Meetings (MoM)</span>
+          </div>
         </div>
         <div className={styles.headerActions}>
           <button className={styles.addButton} onClick={handleCreateNew}>
