@@ -2,9 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  Plus, Search, Edit2, Trash2, Calendar, FileText,
-  MapPin, CheckCircle, AlertCircle, Building, UploadCloud, File as FileIcon, X,
-  User, Users, ClipboardCheck, AlertTriangle, XCircle, Tag, MessageSquare
+  Plus, Edit2, Trash2, FileText, FileUp, File as FileIcon, X, AlertCircle, Link2, Trash
 } from 'lucide-react';
 import styles from './audits.module.css';
 import Modal from '@/components/Modal';
@@ -21,23 +19,16 @@ interface Audit {
   auditType: string;
   auditorName: string;
   presentInMeeting: string;
-  status: string;
-  keyFindings: string;
-  actionItems: string;
   remarks: string;
-  documents: { name: string; url: string }[];
+  documents: { name: string; url: string; title?: string }[];
 }
 
 export default function AuditsPage() {
   const { activeProject } = useProject();
   const [audits, setAudits] = useState<Audit[]>([]);
-  const [projects, setProjects] = useState<any[]>([]);
   
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterProject, setFilterProject] = useState('');
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -47,23 +38,19 @@ export default function AuditsPage() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [files, setFiles] = useState<File[]>([]);
-  const [existingDocs, setExistingDocs] = useState<{ name: string; url: string }[]>([]);
+  const [existingDocs, setExistingDocs] = useState<{ name: string; url: string; title?: string }[]>([]);
+  const [uploadMode, setUploadMode] = useState<'images' | 'pdf'>('images');
 
   const [formData, setFormData] = useState({
-    project: '',
     auditDate: '',
-    auditType: 'Site Quality Audit',
+    auditType: 'Civil',
     auditorName: '',
     presentInMeeting: '',
-    status: 'Pass',
-    keyFindings: '',
-    actionItems: '',
     remarks: '',
   });
 
   useEffect(() => {
     fetchAudits();
-    fetchProjects();
   }, []);
 
   async function fetchAudits() {
@@ -80,28 +67,20 @@ export default function AuditsPage() {
     }
   }
 
-  async function fetchProjects() {
-    try {
-      const res = await fetch('/api/projects');
-      if (res.ok) {
-        setProjects(await res.json());
-      }
-    } catch (err) { console.error(err); }
-  }
-
   const handleCreate = () => {
+    if (!activeProject) {
+      alert("Please select a project first.");
+      return;
+    }
     setEditingAudit(null);
     setFormData({
-      project: projects.length > 0 ? projects[0].basicInfo.name : '',
       auditDate: new Date().toISOString().split('T')[0],
-      auditType: 'Site Quality Audit',
+      auditType: 'Civil',
       auditorName: '',
       presentInMeeting: '',
-      status: 'Pass',
-      keyFindings: '',
-      actionItems: '',
-      remarks: ''
+      remarks: '',
     });
+    setUploadMode('images');
     setFiles([]);
     setExistingDocs([]);
     setIsModalOpen(true);
@@ -110,16 +89,13 @@ export default function AuditsPage() {
   const handleEdit = (a: Audit) => {
     setEditingAudit(a);
     setFormData({
-      project: a.project,
       auditDate: a.auditDate,
       auditType: a.auditType,
       auditorName: a.auditorName,
       presentInMeeting: a.presentInMeeting,
-      status: a.status,
-      keyFindings: a.keyFindings,
-      actionItems: a.actionItems,
-      remarks: a.remarks
+      remarks: a.remarks,
     });
+    setUploadMode('images');
     setFiles([]);
     setExistingDocs(a.documents || []);
     setIsModalOpen(true);
@@ -127,43 +103,41 @@ export default function AuditsPage() {
 
   const submitForm = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.project || !formData.auditorName) return;
+    if (!formData.auditType || !activeProject) return;
 
     try {
       setSubmitting(true);
       const fd = new FormData();
+      fd.append('project', activeProject.name);
+      
       Object.entries(formData).forEach(([k, v]) => fd.append(k, v));
-
+      
       let finalFiles = files;
-      if (files.length > 0) {
-        // Check if all selected files are images - if so, merge into one PDF
-        const allImages = files.every(f => f.type.startsWith('image/'));
-        if (allImages) {
-          const pdf = new jsPDF();
-          for (let i = 0; i < files.length; i++) {
-            const file = files[i];
-            const imgUrl = URL.createObjectURL(file);
-            const img = new Image();
-            img.src = imgUrl;
-            await new Promise((resolve) => { img.onload = () => resolve(true); img.onerror = () => resolve(false); });
-            if (!img.width) { URL.revokeObjectURL(imgUrl); continue; }
-            const pdfWidth = pdf.internal.pageSize.getWidth();
-            const pdfHeight = pdf.internal.pageSize.getHeight();
-            const imgRatio = img.width / img.height;
-            const pdfRatio = pdfWidth / pdfHeight;
-            let finalWidth = pdfWidth;
-            let finalHeight = pdfHeight;
-            if (imgRatio > pdfRatio) { finalHeight = pdfWidth / imgRatio; } else { finalWidth = pdfHeight * imgRatio; }
-            const x = (pdfWidth - finalWidth) / 2;
-            const y = (pdfHeight - finalHeight) / 2;
-            if (i > 0) { pdf.addPage(); pdf.setPage(i + 1); }
-            const format = file.type === 'image/png' ? 'PNG' : 'JPEG';
-            pdf.addImage(img, format, x, y, finalWidth, finalHeight, `img_${i}`);
-            URL.revokeObjectURL(imgUrl);
-          }
-          const pdfBlob = pdf.output('blob');
-          finalFiles = [new File([pdfBlob], `Audit_Docs_${Date.now()}.pdf`, { type: 'application/pdf' })];
+      if (uploadMode === 'images' && files.length > 0 && files.every(f => f.type.startsWith('image/'))) {
+        const pdf = new jsPDF();
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          const imgUrl = URL.createObjectURL(file);
+          const img = new Image();
+          img.src = imgUrl;
+          await new Promise((resolve) => { img.onload = () => resolve(true); img.onerror = () => resolve(false); });
+          if (!img.width) { URL.revokeObjectURL(imgUrl); continue; }
+          const pdfWidth = pdf.internal.pageSize.getWidth();
+          const pdfHeight = pdf.internal.pageSize.getHeight();
+          const imgRatio = img.width / img.height;
+          const pdfRatio = pdfWidth / pdfHeight;
+          let finalWidth = pdfWidth;
+          let finalHeight = pdfHeight;
+          if (imgRatio > pdfRatio) { finalHeight = pdfWidth / imgRatio; } else { finalWidth = pdfHeight * imgRatio; }
+          const x = (pdfWidth - finalWidth) / 2;
+          const y = (pdfHeight - finalHeight) / 2;
+          if (i > 0) { pdf.addPage(); pdf.setPage(i + 1); }
+          const format = file.type === 'image/png' ? 'PNG' : 'JPEG';
+          pdf.addImage(img, format, x, y, finalWidth, finalHeight, `img_${i}`);
+          URL.revokeObjectURL(imgUrl);
         }
+        const pdfBlob = pdf.output('blob');
+        finalFiles = [new File([pdfBlob], `Audit_${Date.now()}.pdf`, { type: 'application/pdf' })];
       }
 
       finalFiles.forEach(f => fd.append('newFiles', f));
@@ -218,25 +192,13 @@ export default function AuditsPage() {
     }
   };
 
-  const getStatusColor = (status: string) => {
-    if (status === 'Pass') return 'var(--success)';
-    if (status === 'Fail') return 'var(--danger)';
-    if (status === 'Needs Improvement') return '#f39c12';
-    return 'var(--text-light)';
-  };
-
-  const filteredAudits = audits.filter(a => {
-    const searchStr = `${a.project} ${a.auditorName} ${a.auditType} ${a.id}`.toLowerCase();
-    const matchesSearch = searchStr.includes(searchQuery.toLowerCase());
-    const matchesProj = filterProject === '' || a.project === filterProject;
-    return matchesSearch && matchesProj;
-  });
+  const projectAudits = audits.filter(a => !activeProject || a.project === activeProject.name);
 
   return (
     <div className={styles.container}>
       <div className={styles.header}>
         <div className={styles.titleSection}>
-          <h2>Audit Management</h2>
+          <h2>Audits & Inspections</h2>
           <div className="breadcrumbNav">
             <Link href="/">Dashboard</Link>
             <span className="separator">&gt;</span>
@@ -255,198 +217,156 @@ export default function AuditsPage() {
               </>
             )}
             <span className="separator">&gt;</span>
-            <span className="current">Audits & Inspections</span>
+            <span className="current">Audits</span>
           </div>
         </div>
         <div className={styles.headerActions}>
           <button className={styles.addButton} onClick={handleCreate}>
-            <Plus size={18} /> Log Audit
+            <Plus size={18} /> Add Audit Log
           </button>
-        </div>
-      </div>
-
-      <div className={styles.filtersBar}>
-        <div className={styles.searchWrapper}>
-          <Search size={18} className={styles.searchIcon} />
-          <input
-            type="text"
-            placeholder="Search audits..."
-            className={styles.searchInput}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
-        <div className={styles.filterControls}>
-          <select className={styles.filterSelect} value={filterProject} onChange={(e) => setFilterProject(e.target.value)}>
-            <option value="">All Projects</option>
-            {projects.map(p => <option key={p.id} value={p.basicInfo.name}>{p.basicInfo.name}</option>)}
-          </select>
         </div>
       </div>
 
       {loading ? (
         <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-light)' }}>Loading audits...</div>
+      ) : projectAudits.length === 0 ? (
+        <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-light)' }}>
+          {activeProject ? `No audits found for ${activeProject.name}.` : 'Select a project to view its audits.'}
+        </div>
       ) : (
-        <div className={styles.memberGrid}>
-          {filteredAudits.map(a => (
-            <div key={a.id} className={styles.memberCard}>
-              <div className={styles.memberTop}>
-                <div className={styles.memberPrimary}>
-                  <div className={styles.memberName} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <ClipboardCheck size={16} color="var(--primary)" /> {a.auditType}
-                  </div>
-                  <div className={styles.memberDesignation}>{a.project}</div>
-                </div>
-                <div className={styles.recordControls}>
-                  <button className={styles.controlBtn} title="Edit Audit" onClick={() => handleEdit(a)}><Edit2 size={14} /></button>
-                  <button className={`${styles.controlBtn} ${styles.delete}`} onClick={() => { setAuditToDelete(a); setIsDeleteModalOpen(true); }}><Trash2 size={14} /></button>
-                </div>
-              </div>
-              
-              <div style={{ marginBottom: '12px', fontSize: '0.8rem', fontWeight: 600, color: getStatusColor(a.status), display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 8px', borderRadius: '4px', backgroundColor: `${getStatusColor(a.status)}20` }}>
-                {a.status === 'Pass' && <CheckCircle size={14} />}
-                {a.status === 'Fail' && <XCircle size={14} />}
-                {a.status === 'Needs Improvement' && <AlertTriangle size={14} />}
-                {a.status}
-              </div>
-
-              <div className={styles.memberDetails}>
-                <div className={styles.detailRow}>
-                  <Calendar size={12} style={{ width: '70px' }} />
-                  <div className={styles.detailValue}>{a.auditDate || '-'}</div>
-                </div>
-                <div className={styles.detailRow}>
-                  <User size={12} style={{ width: '70px' }} />
-                  <div className={styles.detailValue}>{a.auditorName || '-'}</div>
-                </div>
-                {a.presentInMeeting && (
-                  <div className={styles.detailRow}>
-                    <Users size={12} style={{ width: '70px' }} />
-                    <div className={styles.detailValue} style={{ fontSize: '0.75rem' }}>{a.presentInMeeting}</div>
-                  </div>
-                )}
-              </div>
-
-              {a.keyFindings && (
-                 <div style={{ marginTop: '12px', fontSize: '0.75rem', color: 'var(--text-light)' }}>
-                   <strong>Key Findings:</strong> {a.keyFindings.length > 60 ? a.keyFindings.substring(0, 60) + '...' : a.keyFindings}
-                 </div>
-              )}
-
-              {a.documents && a.documents.length > 0 && (
-                <div style={{ marginTop: 'auto', paddingTop: '12px', borderTop: '1px dashed var(--border-color)' }}>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 600, marginBottom: '6px' }}>Attached Evidence:</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    {a.documents.map((doc, idx) => (
-                      <a key={idx} href={doc.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--primary)', textDecoration: 'none' }}>
-                        <FileIcon size={12} /> {doc.name}
-                      </a>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
-          {filteredAudits.length === 0 && <p style={{ color: 'var(--text-light)', gridColumn: '1 / -1' }}>No audits found.</p>}
+        <div className={styles.tableContainer}>
+          <table className={styles.directoryTable}>
+            <thead>
+              <tr>
+                <th>Actions</th>
+                <th>Created At</th>
+                <th>Audit Date</th>
+                <th>Audit Type</th>
+                <th>Auditor Name</th>
+                <th>Present In Meeting</th>
+                <th>Remarks</th>
+                <th>Documents</th>
+                <th>ID</th>
+              </tr>
+            </thead>
+            <tbody>
+              {projectAudits.map((a) => (
+                <tr key={a.id}>
+                  <td>
+                    <div className={styles.tableActions}>
+                      <button className={styles.controlBtn} onClick={() => handleEdit(a)} title="Edit Audit">
+                        <Edit2 size={13} />
+                      </button>
+                      <button className={`${styles.controlBtn} ${styles.delete}`} onClick={() => { setAuditToDelete(a); setIsDeleteModalOpen(true); }} title="Delete Audit">
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  </td>
+                  <td>{new Date(a.createdAt).toLocaleString()}</td>
+                  <td>{a.auditDate}</td>
+                  <td>
+                    <span className={styles.tableRepName}>{a.auditType}</span>
+                  </td>
+                  <td>{a.auditorName}</td>
+                  <td>{a.presentInMeeting}</td>
+                  <td style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {a.remarks}
+                  </td>
+                  <td>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      {a.documents && a.documents.map((doc, idx) => (
+                        <a key={idx} href={doc.url} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--primary)', textDecoration: 'none', fontSize: '0.8rem' }}>
+                          <Link2 size={12} /> {doc.title || doc.name}
+                        </a>
+                      ))}
+                    </div>
+                  </td>
+                  <td style={{ fontSize: '0.8rem', color: 'var(--text-light)' }}>{a.id}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
       {/* Form Modal */}
-      <Modal isOpen={isModalOpen} onClose={() => !submitting && setIsModalOpen(false)} title={editingAudit ? 'Edit Audit Log' : 'Log New Audit'} width="700px">
+      <Modal isOpen={isModalOpen} onClose={() => !submitting && setIsModalOpen(false)} title={editingAudit ? 'Edit Audit Log' : 'Add Audit Log'} width="700px">
         <form onSubmit={submitForm} className={styles.formGrid}>
-          
-          <h4 style={{ margin: '0 0 8px 0', color: 'var(--primary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '4px' }}>Audit Details</h4>
           
           <div className={styles.formRow}>
             <div className={styles.formGroup}>
-              <label><Tag size={14} /> Project</label>
-              <select value={formData.project} onChange={e => setFormData({...formData, project: e.target.value})} className={styles.formSelect} required disabled={!!editingAudit}>
-                {projects.map(p => <option key={p.id} value={p.basicInfo.name}>{p.basicInfo.name}</option>)}
-              </select>
+              <label>Project</label>
+              <input type="text" value={activeProject?.name || ''} className={styles.formInput} disabled required />
             </div>
             <div className={styles.formGroup}>
-              <label><Calendar size={14} /> Audit Date</label>
+              <label>Audit Date *</label>
               <input type="date" value={formData.auditDate} onChange={e => setFormData({...formData, auditDate: e.target.value})} className={styles.formInput} required />
             </div>
           </div>
 
           <div className={styles.formRow}>
             <div className={styles.formGroup}>
-              <label><ClipboardCheck size={14} /> Audit Type</label>
+              <label>Audit Type *</label>
               <select value={formData.auditType} onChange={e => setFormData({...formData, auditType: e.target.value})} className={styles.formSelect} required>
-                <option value="Site Quality Audit">Site Quality Audit</option>
-                <option value="Financial Audit">Financial Audit</option>
-                <option value="Safety & Compliance">Safety & Compliance</option>
-                <option value="Process Audit">Process Audit</option>
-                <option value="Other">Other</option>
+        <option value="Civil">Civil</option>
+        <option value="Electrical">Electrical</option>
+        <option value="Plumbing">Plumbing</option>
+        <option value="Tiles and marble">Tiles and marble</option>
+        <option value="AC">AC</option>
+        <option value="Paint and polish">Paint and polish</option>
+        <option value="Carpentry">Carpentry</option>
+        <option value="Hardware">Hardware</option>
+        <option value="False ceiling and furnishing">False ceiling and furnishing</option>
               </select>
             </div>
             <div className={styles.formGroup}>
-              <label><AlertCircle size={14} /> Overall Status</label>
-              <select value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})} className={styles.formSelect} required>
-                <option value="Pass">Pass</option>
-                <option value="Fail">Fail</option>
-                <option value="Needs Improvement">Needs Improvement</option>
-                <option value="Pending Review">Pending Review</option>
-              </select>
+              <label>Auditor Name</label>
+              <input type="text" value={formData.auditorName} onChange={e => setFormData({...formData, auditorName: e.target.value})} className={styles.formInput} />
             </div>
           </div>
 
           <div className={styles.formRow}>
-            <div className={styles.formGroup}>
-              <label><User size={14} /> Auditor Name</label>
-              <input type="text" value={formData.auditorName} onChange={e => setFormData({...formData, auditorName: e.target.value})} className={styles.formInput} required />
+            <div className={styles.formGroup} style={{ gridColumn: '1 / -1' }}>
+              <label>Present In Meeting</label>
+              <input type="text" value={formData.presentInMeeting} onChange={e => setFormData({...formData, presentInMeeting: e.target.value})} className={styles.formInput} />
             </div>
-            <div className={styles.formGroup}>
-              <label><Users size={14} /> Present In Meeting</label>
-              <input type="text" value={formData.presentInMeeting} onChange={e => setFormData({...formData, presentInMeeting: e.target.value})} className={styles.formInput} placeholder="e.g. Rahul, John" />
-            </div>
-          </div>
-
-          <h4 style={{ margin: '16px 0 8px 0', color: 'var(--primary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '4px' }}>Findings & Evidence</h4>
-
-          <div className={styles.formRow}>
-            <div className={styles.formGroup}>
-              <label><AlertTriangle size={14} /> Key Findings</label>
-              <textarea value={formData.keyFindings} onChange={e => setFormData({...formData, keyFindings: e.target.value})} className={styles.formTextarea} style={{ minHeight: '80px' }} />
-            </div>
-            <div className={styles.formGroup}>
-              <label><CheckCircle size={14} /> Action Items</label>
-              <textarea value={formData.actionItems} onChange={e => setFormData({...formData, actionItems: e.target.value})} className={styles.formTextarea} style={{ minHeight: '80px' }} placeholder="What needs to be fixed?" />
-            </div>
-          </div>
-          
-          <div className={styles.formGroup} style={{ gridColumn: '1 / -1' }}>
-            <label><MessageSquare size={14} /> Remarks / General Notes</label>
-            <textarea value={formData.remarks} onChange={e => setFormData({...formData, remarks: e.target.value})} className={styles.formTextarea} />
           </div>
 
           <div className={styles.formGroup} style={{ gridColumn: '1 / -1' }}>
-            <label><UploadCloud size={14} /> Upload Documents / Evidence</label>
+            <label><FileUp size={14} /> Upload Documents</label>
+            
+            <div style={{ display: 'flex', gap: '16px', fontSize: '0.8rem', color: 'var(--text-main)', marginBottom: '8px', marginTop: '12px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                <input type="radio" name="uploadMode" checked={uploadMode === 'images'} onChange={() => { setUploadMode('images'); setFiles([]); }} />
+                Images (Auto-convert to PDF)
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                <input type="radio" name="uploadMode" checked={uploadMode === 'pdf'} onChange={() => { setUploadMode('pdf'); setFiles([]); }} />
+                PDF Documents
+              </label>
+            </div>
+
             <div className={styles.uploadBox} onClick={() => fileInputRef.current?.click()}>
               <label>
-                <UploadCloud size={24} style={{ color: 'var(--primary)' }} />
-                <span>Click to browse or drag and drop files</span>
+                <FileUp size={24} style={{ color: 'var(--text-light)', marginBottom: '4px' }} />
+                <span>Click to select or upload multiple files</span>
+                <span style={{ fontSize: '0.7rem', opacity: 0.8 }}>File will be saved to secure Google Drive folder</span>
               </label>
-              <input type="file" ref={fileInputRef} onChange={e => setFiles(Array.from(e.target.files || []))} style={{ display: 'none' }} accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png" multiple />
+              <input type="file" ref={fileInputRef} onChange={e => setFiles(prev => [...prev, ...(Array.from(e.target.files || []) as File[])])} style={{ display: 'none' }} accept={uploadMode === 'images' ? 'image/*' : '.pdf,.doc,.docx,.xls,.xlsx,.dwg,.dxf,.zip,image/*'} multiple />
             </div>
             
-            {(existingDocs.length > 0 || files.length > 0) && (
+            {files.length > 0 && (
               <div className={styles.uploadedStagedList}>
+                <strong>New Files to Upload ({files.length}):</strong>
                 <div className={styles.stagingGrid}>
-                  {existingDocs.map((doc, i) => (
-                    <div key={`ext-${i}`} className={styles.stagedFileItem}>
-                      <div className={styles.stagedFileLeft} title={doc.name}>
-                        <FileIcon size={14} style={{ color: 'var(--primary)' }} />
-                        <span className={styles.stagedFileName}>{doc.name}</span>
-                      </div>
-                      <button type="button" className={styles.removeStagedBtn} onClick={() => setExistingDocs(existingDocs.filter((_, idx) => idx !== i))}><X size={16} /></button>
-                    </div>
-                  ))}
                   {files.map((file, i) => (
-                    <div key={`new-${i}`} className={styles.stagedFileItem}>
+                    <div key={i} className={styles.stagedFileItem}>
                       <div className={styles.stagedFileLeft} title={file.name}>
-                        <FileIcon size={14} style={{ color: 'var(--success)' }} />
+                        {uploadMode === 'images' ? (
+                          <img src={URL.createObjectURL(file)} alt="Preview" style={{ width: '40px', height: '40px', objectFit: 'cover', borderRadius: '4px' }} />
+                        ) : (
+                          <FileIcon size={14} style={{ color: 'var(--success)', flexShrink: 0 }} />
+                        )}
                         <span className={styles.stagedFileName}>{file.name}</span>
                       </div>
                       <button type="button" className={styles.removeStagedBtn} onClick={() => setFiles(files.filter((_, idx) => idx !== i))}><X size={16} /></button>
@@ -455,6 +375,32 @@ export default function AuditsPage() {
                 </div>
               </div>
             )}
+
+            {editingAudit && existingDocs.length > 0 && (
+              <div className={styles.uploadedStagedList} style={{ marginTop: '12px' }}>
+                <strong>Currently Saved Attachments:</strong>
+                <div className={styles.stagingGrid}>
+                  {existingDocs.map((doc, idx) => (
+                    <div key={idx} className={styles.stagedFileItem} style={{ borderColor: 'rgba(39, 206, 138, 0.3)' }}>
+                      <div className={styles.stagedFileLeft}>
+                        <Link2 size={14} style={{ color: 'var(--success)', flexShrink: 0 }} />
+                        <a href={doc.url} target="_blank" rel="noopener noreferrer" className={styles.stagedFileName} style={{ color: 'var(--success)', textDecoration: 'none', maxWidth: '200px' }} title={doc.name}>
+                          {doc.title || doc.name}
+                        </a>
+                      </div>
+                      <button type="button" className={styles.removeStagedBtn} onClick={() => setExistingDocs(existingDocs.filter((_, i) => i !== idx))} title="Remove attachment">
+                        <Trash size={13} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+          
+          <div className={styles.formGroup} style={{ gridColumn: '1 / -1' }}>
+            <label>Remarks</label>
+            <textarea value={formData.remarks} onChange={e => setFormData({...formData, remarks: e.target.value})} className={styles.formTextarea} />
           </div>
 
           <div className={styles.formActions}>

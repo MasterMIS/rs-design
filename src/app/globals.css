@@ -116,6 +116,7 @@ div[class*="formGroup"] > label {
   background-color: transparent;
   padding: 0 4px;
   margin: 0;
+  z-index: 10;
 }
 
 div[class*="formGroup"]:has(input:focus, textarea:focus, select:focus) > label,

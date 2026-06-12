@@ -10,19 +10,9 @@ import { CONFIG } from '@/lib/config';
 const SHEET_ID = CONFIG.DIRECTORY.SHEET_ID;
 const SHEET_NAME = CONFIG.DIRECTORY.SHEET_NAME;
 
-// Helper to sanitize contact numbers and format WhatsApp direct chat links
-function generateWhatsAppLink(phone: string): string {
-  if (!phone) return '';
-  const clean = phone.replace(/[^0-9]/g, '');
-  if (!clean) return '';
-  // Default to pre-pending '91' for India country code if length is exactly 10 digits
-  const formatted = clean.length === 10 ? `91${clean}` : clean;
-  return `https://wa.me/${formatted}`;
-}
-
 export async function GET() {
   try {
-    const data = await getSheetsData(SHEET_ID, `${SHEET_NAME}!A2:N1000`);
+    const data = await getSheetsData(SHEET_ID, `${SHEET_NAME}!A2:K1000`);
 
     if (!data || data.length === 0) return NextResponse.json([]);
 
@@ -38,10 +28,7 @@ export async function GET() {
       category: row[7] || '',
       address: row[8] || '',
       appointmentStatus: row[9] || 'Shortlisted',
-      designation: row[10] || '',
-      escalationLevel: row[11] || 'L1',
-      whatsAppLink: row[12] || '',
-      id: row[13] || `DIR-ROW-${index + 2}`,
+      id: row[10] || `DIR-ROW-${index + 2}`,
     }));
 
     return NextResponse.json(directory);
@@ -55,48 +42,38 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { 
-      project, 
-      selectTeam, 
-      nameOfPerson, 
-      contactNo, 
-      emailId, 
-      companyName, 
-      category, 
-      address, 
-      appointmentStatus, 
-      designation, 
-      escalationLevel 
-    } = body;
+    const entries = Array.isArray(body) ? body : [body];
 
-    if (!project || !selectTeam || !nameOfPerson) {
-      return NextResponse.json({ error: 'Missing required parameters' }, { status: 400 });
+    if (entries.length === 0) {
+      return NextResponse.json({ error: 'No entries provided' }, { status: 400 });
     }
 
-    const directoryId = `DIR-${Date.now()}`;
-    const timestamp = new Date().toISOString();
-    const whatsAppLink = generateWhatsAppLink(contactNo || '');
+    const newRows = entries.map((entry, index) => {
+      if (!entry.project || !entry.selectTeam || !entry.nameOfPerson) {
+        throw new Error(`Missing required parameters at row ${index + 1}`);
+      }
 
-    const newRow = [
-      timestamp,
-      project,
-      selectTeam,
-      nameOfPerson,
-      contactNo || '',
-      emailId || '',
-      companyName || '',
-      category || '',
-      address || '',
-      appointmentStatus || 'Shortlisted',
-      designation || '',
-      escalationLevel || 'L1',
-      whatsAppLink,
-      directoryId
-    ];
+      const directoryId = `DIR-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+      const timestamp = new Date().toISOString();
 
-    await appendSheetsData(SHEET_ID, `${SHEET_NAME}!A2`, [newRow]);
+      return [
+        timestamp,
+        entry.project,
+        entry.selectTeam,
+        entry.nameOfPerson,
+        entry.contactNo || '',
+        entry.emailId || '',
+        entry.companyName || '',
+        entry.category || '',
+        entry.address || '',
+        entry.appointmentStatus || 'Yes',
+        directoryId
+      ];
+    });
 
-    return NextResponse.json({ success: true, id: directoryId });
+    await appendSheetsData(SHEET_ID, `${SHEET_NAME}!A2`, newRows);
+
+    return NextResponse.json({ success: true, count: newRows.length });
   } catch (error: unknown) {
     const err = error as Error;
     console.error('API Error (POST Directory):', err);
@@ -124,16 +101,12 @@ export async function PUT(request: NextRequest) {
       category, 
       address, 
       appointmentStatus, 
-      designation, 
-      escalationLevel,
       id
     } = body;
 
     if (!project || !selectTeam || !nameOfPerson || !id) {
       return NextResponse.json({ error: 'Missing required parameters' }, { status: 400 });
     }
-
-    const whatsAppLink = generateWhatsAppLink(contactNo || '');
 
     const updatedRow = [
       timestamp || new Date().toISOString(),
@@ -146,13 +119,10 @@ export async function PUT(request: NextRequest) {
       category || '',
       address || '',
       appointmentStatus || 'Shortlisted',
-      designation || '',
-      escalationLevel || 'L1',
-      whatsAppLink,
       id
     ];
 
-    await updateSheetRow(SHEET_ID, `${SHEET_NAME}!A${rowIndex}:N${rowIndex}`, [updatedRow]);
+    await updateSheetRow(SHEET_ID, `${SHEET_NAME}!A${rowIndex}:K${rowIndex}`, [updatedRow]);
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {

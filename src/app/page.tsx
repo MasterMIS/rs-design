@@ -23,6 +23,7 @@ import {
   Area
 } from 'recharts';
 import styles from './page.module.css';
+import { useAuth } from '@/context/AuthContext';
 
 const stats = [
   { title: 'ORDERS', value: '1,587', change: '+11%', trend: 'up', icon: ShoppingBag, color: '#1abc9c' },
@@ -42,16 +43,26 @@ const data = [
 ];
 
 export default function Dashboard() {
+  const { user } = useAuth();
+
   return (
     <div className={styles.dashboard}>
       <div className={styles.pageHeader}>
         <div>
           <h2 className={styles.pageTitle}>Dashboard</h2>
         </div>
-        <Link href="/projects" className={styles.portfolioBtn}>
-          <BriefcaseBusiness size={18} />
-          Go to Project Portfolio
-        </Link>
+        <div className={styles.actionButtons}>
+          {user?.role === 'Admin' && (
+            <Link href="/users" className={styles.usersBtn}>
+              <UsersIcon size={18} />
+              Users
+            </Link>
+          )}
+          <Link href="/projects" className={styles.portfolioBtn}>
+            <BriefcaseBusiness size={18} />
+            Go to Project Portfolio
+          </Link>
+        </div>
       </div>
 
       <div className={styles.statsGrid}>

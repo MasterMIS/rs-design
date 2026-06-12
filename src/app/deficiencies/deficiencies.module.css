@@ -377,29 +377,32 @@
   padding-top: 8px;
 }
 
-.actionBtn {
-  background-color: var(--bg-main);
-  border: 1px solid var(--border-color);
-  color: var(--text-light);
+.controlBtn {
+  background-color: var(--primary-light);
+  border: 1px solid transparent;
+  color: var(--primary);
   padding: 6px;
   border-radius: 6px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s ease;
+  transition: all 0.2s;
 }
 
-.actionBtn:hover {
+.controlBtn:hover {
   color: var(--primary);
   border-color: var(--primary);
-  background-color: var(--primary-light);
 }
 
-.actionBtn.deleteBtn:hover {
+.controlBtn.delete {
+  background-color: rgba(239, 68, 68, 0.1);
   color: var(--danger);
-  border-color: var(--danger);
-  background-color: rgba(241, 85, 108, 0.1);
+}
+
+.controlBtn.delete:hover {
+  background-color: var(--danger);
+  color: white;
 }
 
 /* Responsive Table View Styling */
@@ -414,14 +417,14 @@
   animation: fadeIn 0.3s ease-out;
 }
 
-.deficiencyTable {
+.directoryTable {
   width: 100%;
   border-collapse: collapse;
   text-align: left;
   min-width: 1100px;
 }
 
-.deficiencyTable th {
+.directoryTable th {
   padding: 16px 20px;
   font-weight: 700;
   font-size: 0.85rem;
@@ -431,11 +434,11 @@
   background-color: rgba(214, 226, 243, 0.2);
 }
 
-[data-theme='dark'] .deficiencyTable th {
+[data-theme='dark'] .directoryTable th {
   background-color: rgba(49, 57, 68, 0.35);
 }
 
-.deficiencyTable td {
+.directoryTable td {
   padding: 14px 20px;
   border-bottom: 1px solid var(--border-color);
   color: var(--text-main);
@@ -444,11 +447,11 @@
   transition: background-color 0.2s ease;
 }
 
-.deficiencyTable tr:last-child td {
+.directoryTable tr:last-child td {
   border-bottom: none;
 }
 
-.deficiencyTable tr:hover td {
+.directoryTable tr:hover td {
   background-color: rgba(59, 175, 218, 0.02);
 }
 
@@ -595,33 +598,89 @@
   display: none;
 }
 
-.uploadPreview {
-  width: 100%;
-  height: 90px;
-  object-fit: cover;
-  border-radius: 8px;
-  border: 1px solid var(--border-color);
-}
-
-.previewWrapper {
-  width: 100%;
+.uploadedStagedList {
   display: flex;
   flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+  width: 100%;
+}
+
+.uploadedStagedList strong {
+  font-size: 0.75rem;
+  color: var(--text-heading);
+  align-self: flex-start;
+}
+
+.stagingGrid {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+}
+
+.stagedFileItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: var(--bg-main);
+  border: 1px solid var(--border-color);
+  padding: 8px 12px;
+  border-radius: 8px;
+  gap: 12px;
+  flex: 0 1 auto;
+}
+
+.stagedFileLeft {
+  display: flex;
   align-items: center;
   gap: 6px;
+  max-width: 150px;
+  overflow: hidden;
+  flex-shrink: 0;
 }
 
-.removeFileBtn {
+.stagedFileName {
   font-size: 0.75rem;
-  color: var(--danger);
+  font-weight: 700;
+  color: var(--primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stagedTitleInput {
+  flex: 1;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-card);
+  color: var(--text-main);
+  font-size: 0.75rem;
+  transition: all 0.2s;
+}
+
+.stagedTitleInput:focus {
+  border-color: var(--primary);
+  outline: none;
+}
+
+.removeStagedBtn {
   background: none;
   border: none;
+  color: var(--danger);
   cursor: pointer;
-  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  transition: all 0.2s;
+  flex-shrink: 0;
 }
 
-.removeFileBtn:hover {
-  text-decoration: underline;
+.removeStagedBtn:hover {
+  transform: scale(1.15);
 }
 
 .formActions {

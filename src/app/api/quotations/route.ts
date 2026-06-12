@@ -14,7 +14,7 @@ const parseJSON = (str: string, fallback: any) => {
 
 export async function GET() {
   try {
-    const data = await getSheetsData(SHEET_ID, `${SHEET_NAME}!A2:M1000`);
+    const data = await getSheetsData(SHEET_ID, `${SHEET_NAME}!A2:K1000`);
 
     if (!data || data.length === 0) return NextResponse.json([]);
 
@@ -23,17 +23,15 @@ export async function GET() {
       id: row[0] || '',
       createdAt: row[1] || '',
       project: row[2] || '',
-      title: row[3] || '',
-      vendor: row[4] || '',
-      amount: row[5] || '',
-      version: row[6] || 'v1',
-      status: row[7] || 'Pending Internal',
-      internalApproval: parseJSON(row[8], { status: 'Pending', by: '', at: '' }),
-      clientApproval: parseJSON(row[9], { status: 'Pending', by: '', at: '' }),
-      remarks: row[10] || '',
-      history: parseJSON(row[11], []),
-      currentFile: parseJSON(row[12], null),
-    })).filter((q: any) => q.id || q.title);
+      nameOfPerson: row[3] || '',
+      nameOfQuotation: row[4] || '',
+      documentUrl: row[5] || '',
+      remarks: row[6] || '',
+      statusRSDesign: row[7] || 'Pending',
+      timestampRSDesign: row[8] || '',
+      statusClient: row[9] || 'Pending',
+      timestampClient: row[10] || '',
+    })).filter((q: any) => q.id || q.nameOfQuotation);
 
     return NextResponse.json(quotations);
   } catch (error: unknown) {
@@ -48,53 +46,44 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const id = `QUO-${Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`;
     const createdAt = new Date().toISOString();
+    const now = createdAt;
     
     const project = formData.get('project')?.toString() || '';
-    const title = formData.get('title')?.toString() || '';
-    const vendor = formData.get('vendor')?.toString() || '';
-    const amount = formData.get('amount')?.toString() || '';
+    const nameOfPerson = formData.get('nameOfPerson')?.toString() || '';
+    const nameOfQuotation = formData.get('nameOfQuotation')?.toString() || '';
     const remarks = formData.get('remarks')?.toString() || '';
-    const byUser = formData.get('byUser')?.toString() || 'System';
+    const statusRSDesign = formData.get('statusRSDesign')?.toString() || 'Pending';
+    const statusClient = formData.get('statusClient')?.toString() || 'Pending';
+
+    const timestampRSDesign = statusRSDesign !== 'Pending' ? now : '';
+    const timestampClient = statusClient !== 'Pending' ? now : '';
 
     const files = formData.getAll('newFiles') as File[];
-    let currentFile = null;
+    let documentUrl = '';
 
     for (const file of files) {
       if (file.size > 0) {
         const buffer = Buffer.from(await file.arrayBuffer());
         const result = await uploadFileToDrive(buffer, file.name, file.type || 'application/octet-stream', FOLDER_ID);
         if (result.id) {
-          currentFile = { name: file.name, url: `https://drive.google.com/file/d/${result.id}/view` };
-          break; // Only one file per quotation version
+          documentUrl = `https://drive.google.com/file/d/${result.id}/view`;
+          break; // Only one file
         }
       }
     }
-
-    const historyLog = [{
-      action: 'Created',
-      version: 'v1',
-      by: byUser,
-      at: createdAt,
-      file: currentFile
-    }];
-
-    const internalApproval = { status: 'Pending', by: '', at: '' };
-    const clientApproval = { status: 'Pending', by: '', at: '' };
 
     const rowData = [
       id,
       createdAt,
       project,
-      title,
-      vendor,
-      amount,
-      'v1',
-      'Pending Internal',
-      JSON.stringify(internalApproval),
-      JSON.stringify(clientApproval),
+      nameOfPerson,
+      nameOfQuotation,
+      documentUrl,
       remarks,
-      JSON.stringify(historyLog),
-      JSON.stringify(currentFile)
+      statusRSDesign,
+      timestampRSDesign,
+      statusClient,
+      timestampClient,
     ];
 
     await appendSheetsData(SHEET_ID, `${SHEET_NAME}!A2`, [rowData]);
@@ -120,64 +109,34 @@ export async function PUT(request: NextRequest) {
     const id = formData.get('id')?.toString() || '';
     const createdAt = formData.get('createdAt')?.toString() || new Date().toISOString();
     const project = formData.get('project')?.toString() || '';
-    const title = formData.get('title')?.toString() || '';
-    const vendor = formData.get('vendor')?.toString() || '';
-    const amount = formData.get('amount')?.toString() || '';
+    const nameOfPerson = formData.get('nameOfPerson')?.toString() || '';
+    const nameOfQuotation = formData.get('nameOfQuotation')?.toString() || '';
     const remarks = formData.get('remarks')?.toString() || '';
     
-    const actionType = formData.get('actionType')?.toString() || 'UPDATE'; // UPDATE, APPROVE_INTERNAL, APPROVE_CLIENT, REQUEST_REVISION, UPLOAD_REVISION
-    const byUser = formData.get('byUser')?.toString() || 'System';
-    const actionNotes = formData.get('actionNotes')?.toString() || '';
+    const newStatusRSDesign = formData.get('statusRSDesign')?.toString() || 'Pending';
+    const oldStatusRSDesign = formData.get('oldStatusRSDesign')?.toString() || 'Pending';
+    let timestampRSDesign = formData.get('timestampRSDesign')?.toString() || '';
+    
+    const newStatusClient = formData.get('statusClient')?.toString() || 'Pending';
+    const oldStatusClient = formData.get('oldStatusClient')?.toString() || 'Pending';
+    let timestampClient = formData.get('timestampClient')?.toString() || '';
 
-    // Parsed current state from form data
-    let version = formData.get('version')?.toString() || 'v1';
-    let status = formData.get('status')?.toString() || 'Pending Internal';
-    let internalApproval = parseJSON(formData.get('internalApproval')?.toString() || '', { status: 'Pending', by: '', at: '' });
-    let clientApproval = parseJSON(formData.get('clientApproval')?.toString() || '', { status: 'Pending', by: '', at: '' });
-    let historyLog = parseJSON(formData.get('history')?.toString() || '', []);
-    let currentFile = parseJSON(formData.get('currentFile')?.toString() || '', null);
+    // Update timestamps if status changed
+    const now = new Date().toISOString();
+    if (newStatusRSDesign !== oldStatusRSDesign) timestampRSDesign = now;
+    if (newStatusClient !== oldStatusClient) timestampClient = now;
 
-    const timestamp = new Date().toISOString();
+    let documentUrl = formData.get('documentUrl')?.toString() || '';
+    const files = formData.getAll('newFiles') as File[];
 
-    if (actionType === 'APPROVE_INTERNAL') {
-      internalApproval = { status: 'Approved', by: byUser, at: timestamp };
-      status = 'Pending Client';
-      historyLog.unshift({ action: 'Internal Approved', version, by: byUser, at: timestamp, notes: actionNotes });
-    } 
-    else if (actionType === 'APPROVE_CLIENT') {
-      clientApproval = { status: 'Approved', by: byUser, at: timestamp };
-      status = 'Approved';
-      historyLog.unshift({ action: 'Client Approved', version, by: byUser, at: timestamp, notes: actionNotes });
-    }
-    else if (actionType === 'REQUEST_REVISION') {
-      status = 'Needs Revision';
-      historyLog.unshift({ action: 'Revision Requested', version, by: byUser, at: timestamp, notes: actionNotes });
-    }
-    else if (actionType === 'UPLOAD_REVISION') {
-      const newFiles = formData.getAll('newFiles') as File[];
-      let uploadedFile = null;
-
-      for (const file of newFiles) {
-        if (file.size > 0) {
-          const buffer = Buffer.from(await file.arrayBuffer());
-          const result = await uploadFileToDrive(buffer, file.name, file.type || 'application/octet-stream', FOLDER_ID);
-          if (result.id) {
-            uploadedFile = { name: file.name, url: `https://drive.google.com/file/d/${result.id}/view` };
-            break;
-          }
+    for (const file of files) {
+      if (file.size > 0) {
+        const buffer = Buffer.from(await file.arrayBuffer());
+        const result = await uploadFileToDrive(buffer, file.name, file.type || 'application/octet-stream', FOLDER_ID);
+        if (result.id) {
+          documentUrl = `https://drive.google.com/file/d/${result.id}/view`;
+          break;
         }
-      }
-
-      if (uploadedFile) {
-        currentFile = uploadedFile;
-        // Bump version logic (v1 -> v2)
-        const currentVNum = parseInt(version.replace('v', '')) || 1;
-        version = `v${currentVNum + 1}`;
-        status = 'Pending Internal';
-        internalApproval = { status: 'Pending', by: '', at: '' };
-        clientApproval = { status: 'Pending', by: '', at: '' };
-
-        historyLog.unshift({ action: `Revision Uploaded (${version})`, version, by: byUser, at: timestamp, notes: actionNotes, file: uploadedFile });
       }
     }
 
@@ -185,19 +144,17 @@ export async function PUT(request: NextRequest) {
       id,
       createdAt,
       project,
-      title,
-      vendor,
-      amount,
-      version,
-      status,
-      JSON.stringify(internalApproval),
-      JSON.stringify(clientApproval),
+      nameOfPerson,
+      nameOfQuotation,
+      documentUrl,
       remarks,
-      JSON.stringify(historyLog),
-      JSON.stringify(currentFile)
+      newStatusRSDesign,
+      timestampRSDesign,
+      newStatusClient,
+      timestampClient
     ];
 
-    await updateSheetRow(SHEET_ID, `${SHEET_NAME}!A${rowIndex}:M${rowIndex}`, [updatedRow]);
+    await updateSheetRow(SHEET_ID, `${SHEET_NAME}!A${rowIndex}:K${rowIndex}`, [updatedRow]);
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {

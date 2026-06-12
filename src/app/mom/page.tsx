@@ -20,13 +20,7 @@ interface MOM {
   project: string;
   purpose: string;
   meetingDate: string;
-  ourAttendees: string;
-  clientAttendees: string;
   location: string;
-  keyDecisions: string;
-  actionItems: string;
-  nextMeetingDate: string;
-  status: 'Draft' | 'Approved' | 'Distributed' | 'Closed';
   documents: string;
   remarks: string;
   id: string;
@@ -70,13 +64,7 @@ export default function MOMPage() {
     project: '',
     purpose: '',
     meetingDate: '',
-    ourAttendees: '',
-    clientAttendees: '',
     location: '',
-    keyDecisions: '',
-    actionItems: '',
-    nextMeetingDate: '',
-    status: 'Draft' as 'Draft' | 'Approved' | 'Distributed' | 'Closed',
     remarks: '',
   });
 
@@ -134,16 +122,10 @@ export default function MOMPage() {
     setEditingMOM(null);
     setSelectedFiles([]);
     setFormFields({
-      project: projects[0]?.basicInfo?.name || '',
+      project: activeProject ? activeProject.name : (projects[0]?.basicInfo?.name || ''),
       purpose: '',
       meetingDate: new Date().toISOString().split('T')[0],
-      ourAttendees: '',
-      clientAttendees: '',
       location: '',
-      keyDecisions: '',
-      actionItems: '',
-      nextMeetingDate: '',
-      status: 'Draft',
       remarks: '',
     });
     setIsModalOpen(true);
@@ -157,13 +139,7 @@ export default function MOMPage() {
       project: mom.project,
       purpose: mom.purpose,
       meetingDate: mom.meetingDate,
-      ourAttendees: mom.ourAttendees,
-      clientAttendees: mom.clientAttendees,
       location: mom.location,
-      keyDecisions: mom.keyDecisions,
-      actionItems: mom.actionItems,
-      nextMeetingDate: mom.nextMeetingDate,
-      status: mom.status,
       remarks: mom.remarks,
     });
     setIsModalOpen(true);
@@ -201,13 +177,7 @@ export default function MOMPage() {
       submitData.append('project', formFields.project);
       submitData.append('purpose', formFields.purpose);
       submitData.append('meetingDate', formFields.meetingDate);
-      submitData.append('ourAttendees', formFields.ourAttendees);
-      submitData.append('clientAttendees', formFields.clientAttendees);
       submitData.append('location', formFields.location);
-      submitData.append('keyDecisions', formFields.keyDecisions);
-      submitData.append('actionItems', formFields.actionItems);
-      submitData.append('nextMeetingDate', formFields.nextMeetingDate);
-      submitData.append('status', formFields.status);
       submitData.append('remarks', formFields.remarks);
 
       let fileToUpload: File | null = null;
@@ -317,21 +287,15 @@ export default function MOMPage() {
     }
   };
 
-  // Filter Logic
   const filteredMOMList = momList.filter(mom => {
     const matchesSearch =
       mom.purpose.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      mom.ourAttendees.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      mom.clientAttendees.toLowerCase().includes(searchQuery.toLowerCase()) ||
       mom.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      mom.keyDecisions.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      mom.actionItems.toLowerCase().includes(searchQuery.toLowerCase()) ||
       mom.remarks.toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesProject = filterProject === '' || mom.project === filterProject;
-    const matchesStatus = filterStatus === '' || mom.status === filterStatus;
 
-    return matchesSearch && matchesProject && matchesStatus;
+    return matchesSearch && matchesProject;
   });
 
   // Unique project lists for filters
@@ -348,9 +312,6 @@ export default function MOMPage() {
 
   // Counters
   const totalCount = momList.length;
-  const draftCount = momList.filter(m => m.status === 'Draft').length;
-  const distributedCount = momList.filter(m => m.status === 'Distributed' || m.status === 'Approved').length;
-  const pendingNextCount = momList.filter(m => m.nextMeetingDate && new Date(m.nextMeetingDate) >= new Date()).length;
 
   return (
     <div className={styles.container}>
@@ -406,9 +367,6 @@ export default function MOMPage() {
                 <th>Meeting Date</th>
                 <th>Location</th>
                 <th>MOM Document</th>
-                <th>Status</th>
-                <th>Action Items / Decisions</th>
-                <th>Attendees</th>
               </tr>
             </thead>
             <tbody>
@@ -447,28 +405,6 @@ export default function MOMPage() {
                       <span className={styles.noDocText}>No Doc</span>
                     )}
                   </td>
-                  <td>
-                    <span className={`${styles.statusBadge} ${styles[mom.status.toLowerCase()]}`}>
-                      {mom.status}
-                    </span>
-                  </td>
-                  <td style={{ maxWidth: '300px', whiteSpace: 'normal', fontSize: '0.8rem' }}>
-                    {mom.actionItems ? (
-                      <div>
-                        <strong>Actions:</strong>
-                        <div style={{ whiteSpace: 'pre-line', marginTop: '2px', color: 'var(--text-main)' }}>{mom.actionItems}</div>
-                      </div>
-                    ) : mom.keyDecisions ? (
-                      <div>
-                        <strong>Decisions:</strong>
-                        <div style={{ whiteSpace: 'pre-line', marginTop: '2px', color: 'var(--text-main)' }}>{mom.keyDecisions}</div>
-                      </div>
-                    ) : '—'}
-                  </td>
-                  <td style={{ fontSize: '0.8rem', color: 'var(--text-light)' }}>
-                    {mom.ourAttendees && <div><strong>Our side:</strong> {mom.ourAttendees}</div>}
-                    {mom.clientAttendees && <div style={{ marginTop: '2px' }}><strong>Client side:</strong> {mom.clientAttendees}</div>}
-                  </td>
                 </tr>
               ))}
             </tbody>
@@ -487,21 +423,13 @@ export default function MOMPage() {
           <div className={styles.formRow}>
             <div className={styles.formGroup}>
               <label><Building size={14} /> Associated Project *</label>
-              <select
+              <input
+                type="text"
                 name="project"
                 value={formFields.project}
-                onChange={handleInputChange}
-                className={styles.formSelect}
-                required
-              >
-                {projects.length > 0 ? (
-                  projects.map(p => (
-                    <option key={p.id} value={p.basicInfo.name}>{p.basicInfo.name}</option>
-                  ))
-                ) : (
-                  <option value="">No Active Projects</option>
-                )}
-              </select>
+                className={styles.formInput}
+                disabled
+              />
             </div>
             <div className={styles.formGroup}>
               <label><FileText size={14} /> Purpose of Meeting *</label>
@@ -511,7 +439,6 @@ export default function MOMPage() {
                 value={formFields.purpose}
                 onChange={handleInputChange}
                 className={styles.formInput}
-                placeholder="e.g. Design Coordination, Vendor Review Meeting"
                 required
               />
             </div>
@@ -537,80 +464,7 @@ export default function MOMPage() {
                 value={formFields.location}
                 onChange={handleInputChange}
                 className={styles.formInput}
-                placeholder="e.g. Site Cabin, Main Office, Google Meet"
               />
-            </div>
-          </div>
-
-          <div className={styles.formRow}>
-            <div className={styles.formGroup}>
-              <label><Users size={14} /> Our Side Attendees (PMC / RSDesign)</label>
-              <textarea
-                name="ourAttendees"
-                value={formFields.ourAttendees}
-                onChange={handleInputChange}
-                className={styles.formTextarea}
-                placeholder="List internal team representatives present..."
-              />
-            </div>
-            <div className={styles.formGroup}>
-              <label><UserCheck size={14} /> Client & Partners Attendees</label>
-              <textarea
-                name="clientAttendees"
-                value={formFields.clientAttendees}
-                onChange={handleInputChange}
-                className={styles.formTextarea}
-                placeholder="List clients, external consultants, or contractors..."
-              />
-            </div>
-          </div>
-
-          <div className={styles.formRow}>
-            <div className={styles.formGroup}>
-              <label><CheckSquare size={14} /> Key Decisions / Agreements</label>
-              <textarea
-                name="keyDecisions"
-                value={formFields.keyDecisions}
-                onChange={handleInputChange}
-                className={styles.formTextarea}
-                placeholder="Note key items agreed upon..."
-              />
-            </div>
-            <div className={styles.formGroup}>
-              <label><ClipboardList size={14} /> Action Plan & Task Responsibilities</label>
-              <textarea
-                name="actionItems"
-                value={formFields.actionItems}
-                onChange={handleInputChange}
-                className={styles.formTextarea}
-                placeholder="List actions, who owns them, and due dates..."
-              />
-            </div>
-          </div>
-
-          <div className={styles.formRow}>
-            <div className={styles.formGroup}>
-              <label><CalendarCheck size={14} /> Next Meeting / Review Date</label>
-              <input
-                type="date"
-                name="nextMeetingDate"
-                value={formFields.nextMeetingDate}
-                onChange={handleInputChange}
-                className={styles.formInput}
-              />
-            </div>
-            <div className={styles.formGroup}>
-              <label><AlertCircle size={14} /> Meeting Status</label>
-              <select
-                name="status"
-                value={formFields.status}
-                onChange={handleInputChange}
-                className={styles.formSelect}
-              >
-                {statuses.map(s => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
             </div>
           </div>
 
@@ -669,16 +523,15 @@ export default function MOMPage() {
             )}
           </div>
 
-          <div className={styles.formGroup}>
-            <label><MessageCircle size={14} /> Remarks & Notes</label>
-            <textarea
-              name="remarks"
-              value={formFields.remarks}
-              onChange={handleInputChange}
-              className={styles.formTextarea}
-              placeholder="Enter additional remarks or general meeting observations..."
-            />
-          </div>
+            <div className={styles.formGroup}>
+              <label><MessageCircle size={14} /> Remarks & Notes</label>
+              <textarea
+                name="remarks"
+                value={formFields.remarks}
+                onChange={handleInputChange}
+                className={styles.formTextarea}
+              />
+            </div>
 
           <div className={styles.formActions}>
             <button type="submit" disabled={submitting} className={styles.submitBtn}>

@@ -13,7 +13,7 @@ const parseJSON = (str: string, fallback: any) => {
 
 export async function GET() {
   try {
-    const data = await getSheetsData(SHEET_ID, `${SHEET_NAME}!A2:L1000`);
+    const data = await getSheetsData(SHEET_ID, `${SHEET_NAME}!A2:I1000`);
     if (!data || data.length === 0) return NextResponse.json([]);
 
     const audits = data.map((row: string[], index: number) => ({
@@ -25,11 +25,8 @@ export async function GET() {
       auditType: row[4] || '',
       auditorName: row[5] || '',
       presentInMeeting: row[6] || '',
-      status: row[7] || '',
-      keyFindings: row[8] || '',
-      actionItems: row[9] || '',
-      remarks: row[10] || '',
-      documents: parseJSON(row[11], []),
+      remarks: row[7] || '',
+      documents: parseJSON(row[8], []),
     })).filter((a: any) => a.id || a.project);
 
     return NextResponse.json(audits);
@@ -51,21 +48,26 @@ export async function POST(request: NextRequest) {
     const auditType = formData.get('auditType')?.toString() || '';
     const auditorName = formData.get('auditorName')?.toString() || '';
     const presentInMeeting = formData.get('presentInMeeting')?.toString() || '';
-    const status = formData.get('status')?.toString() || '';
-    const keyFindings = formData.get('keyFindings')?.toString() || '';
-    const actionItems = formData.get('actionItems')?.toString() || '';
     const remarks = formData.get('remarks')?.toString() || '';
 
     const newFiles = formData.getAll('newFiles') as File[];
-    const uploadedDocs: { name: string; url: string }[] = [];
+    const uploadedDocs: { name: string; url: string; title?: string }[] = [];
+    const fileTitlesStr = formData.get('fileTitles')?.toString() || '[]';
+    const fileTitles = parseJSON(fileTitlesStr, []);
 
+    let fileIndex = 0;
     for (const file of newFiles) {
       if (file.size > 0) {
         const buffer = Buffer.from(await file.arrayBuffer());
         const result = await uploadFileToDrive(buffer, file.name, file.type || 'application/octet-stream', FOLDER_ID);
         if (result.id) {
-          uploadedDocs.push({ name: file.name, url: `https://drive.google.com/file/d/${result.id}/view` });
+          uploadedDocs.push({ 
+            name: file.name, 
+            url: `https://drive.google.com/file/d/${result.id}/view`,
+            title: fileTitles[fileIndex] || file.name
+          });
         }
+        fileIndex++;
       }
     }
 
@@ -77,9 +79,6 @@ export async function POST(request: NextRequest) {
       auditType,
       auditorName,
       presentInMeeting,
-      status,
-      keyFindings,
-      actionItems,
       remarks,
       JSON.stringify(uploadedDocs)
     ];
@@ -111,22 +110,28 @@ export async function PUT(request: NextRequest) {
     const auditType = formData.get('auditType')?.toString() || '';
     const auditorName = formData.get('auditorName')?.toString() || '';
     const presentInMeeting = formData.get('presentInMeeting')?.toString() || '';
-    const status = formData.get('status')?.toString() || '';
-    const keyFindings = formData.get('keyFindings')?.toString() || '';
-    const actionItems = formData.get('actionItems')?.toString() || '';
     const remarks = formData.get('remarks')?.toString() || '';
 
     const existingDocsStr = formData.get('existingDocs')?.toString() || '[]';
     let existingDocs = parseJSON(existingDocsStr, []);
 
     const newFiles = formData.getAll('newFiles') as File[];
+    const newFileTitlesStr = formData.get('newFileTitles')?.toString() || '[]';
+    const newFileTitles = parseJSON(newFileTitlesStr, []);
+
+    let fileIndex = 0;
     for (const file of newFiles) {
       if (file.size > 0) {
         const buffer = Buffer.from(await file.arrayBuffer());
         const result = await uploadFileToDrive(buffer, file.name, file.type || 'application/octet-stream', FOLDER_ID);
         if (result.id) {
-          existingDocs.push({ name: file.name, url: `https://drive.google.com/file/d/${result.id}/view` });
+          existingDocs.push({ 
+            name: file.name, 
+            url: `https://drive.google.com/file/d/${result.id}/view`,
+            title: newFileTitles[fileIndex] || file.name
+          });
         }
+        fileIndex++;
       }
     }
 
@@ -138,14 +143,11 @@ export async function PUT(request: NextRequest) {
       auditType,
       auditorName,
       presentInMeeting,
-      status,
-      keyFindings,
-      actionItems,
       remarks,
       JSON.stringify(existingDocs)
     ];
 
-    await updateSheetRow(SHEET_ID, `${SHEET_NAME}!A${rowIndex}:L${rowIndex}`, [updatedRow]);
+    await updateSheetRow(SHEET_ID, `${SHEET_NAME}!A${rowIndex}:I${rowIndex}`, [updatedRow]);
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {

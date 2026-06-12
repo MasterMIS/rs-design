@@ -14,7 +14,7 @@ const FOLDER_ID = CONFIG.MOM.FOLDER_ID;
 
 export async function GET() {
   try {
-    const data = await getSheetsData(SHEET_ID, `${SHEET_NAME}!A2:N1000`);
+    const data = await getSheetsData(SHEET_ID, `${SHEET_NAME}!A2:H1000`);
 
     if (!data || data.length === 0) return NextResponse.json([]);
 
@@ -24,16 +24,10 @@ export async function GET() {
       project: row[1] || '',
       purpose: row[2] || '',
       meetingDate: row[3] || '',
-      ourAttendees: row[4] || '',
-      clientAttendees: row[5] || '',
-      location: row[6] || '',
-      keyDecisions: row[7] || '',
-      actionItems: row[8] || '',
-      nextMeetingDate: row[9] || '',
-      status: row[10] || 'Draft',
-      documents: row[11] || '',
-      remarks: row[12] || '',
-      id: row[13] || `MOM-ROW-${index + 2}`,
+      location: row[4] || '',
+      documents: row[5] || '',
+      remarks: row[6] || '',
+      id: row[7] || `MOM-ROW-${index + 2}`,
     }));
 
     return NextResponse.json(momList);
@@ -50,13 +44,7 @@ export async function POST(request: NextRequest) {
     const project = formData.get('project') as string;
     const purpose = formData.get('purpose') as string;
     const meetingDate = formData.get('meetingDate') as string;
-    const ourAttendees = formData.get('ourAttendees') as string;
-    const clientAttendees = formData.get('clientAttendees') as string;
     const location = formData.get('location') as string;
-    const keyDecisions = formData.get('keyDecisions') as string;
-    const actionItems = formData.get('actionItems') as string;
-    const nextMeetingDate = formData.get('nextMeetingDate') as string;
-    const status = (formData.get('status') as string) || 'Draft';
     const remarks = formData.get('remarks') as string;
     const file = formData.get('file') as File | null;
 
@@ -84,13 +72,7 @@ export async function POST(request: NextRequest) {
       project,
       purpose,
       meetingDate || '',
-      ourAttendees || '',
-      clientAttendees || '',
       location || '',
-      keyDecisions || '',
-      actionItems || '',
-      nextMeetingDate || '',
-      status,
       documentsUrl,
       remarks || '',
       momId
@@ -119,13 +101,7 @@ export async function PUT(request: NextRequest) {
     const project = formData.get('project') as string;
     const purpose = formData.get('purpose') as string;
     const meetingDate = formData.get('meetingDate') as string;
-    const ourAttendees = formData.get('ourAttendees') as string;
-    const clientAttendees = formData.get('clientAttendees') as string;
     const location = formData.get('location') as string;
-    const keyDecisions = formData.get('keyDecisions') as string;
-    const actionItems = formData.get('actionItems') as string;
-    const nextMeetingDate = formData.get('nextMeetingDate') as string;
-    const status = formData.get('status') as string;
     const documents = (formData.get('documents') as string) || '';
     const remarks = formData.get('remarks') as string;
     const id = formData.get('id') as string;
@@ -153,19 +129,13 @@ export async function PUT(request: NextRequest) {
       project,
       purpose,
       meetingDate || '',
-      ourAttendees || '',
-      clientAttendees || '',
       location || '',
-      keyDecisions || '',
-      actionItems || '',
-      nextMeetingDate || '',
-      status || 'Draft',
       documentsUrl,
       remarks || '',
       id
     ];
 
-    await updateSheetRow(SHEET_ID, `${SHEET_NAME}!A${rowIndex}:N${rowIndex}`, [updatedRow]);
+    await updateSheetRow(SHEET_ID, `${SHEET_NAME}!A${rowIndex}:H${rowIndex}`, [updatedRow]);
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {

@@ -1,367 +1,196 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  Plus, Search, Users, MapPin, Calendar, 
-  DollarSign, Filter, Trash2, Edit2, LayoutGrid, 
-  List, Eye, AlertTriangle, CheckCircle, Clock, 
-  Building, User, ArrowRight, Upload, X, RefreshCw,
-  FileText, Wrench, MessageSquare, Image
+import {
+  Plus, Edit2, Trash2, FileText, FileUp, File as FileIcon, X, AlertCircle, Link2, Trash
 } from 'lucide-react';
 import styles from './deficiencies.module.css';
 import Modal from '@/components/Modal';
 import { useProject } from '@/context/ProjectContext';
 import Link from 'next/link';
-
+import jsPDF from 'jspdf';
 
 interface Deficiency {
+  id: string;
   rowIndex: number;
   timestamp: string;
   project: string;
   reporter: string;
   area: string;
-  beforeDocs: string;
   remarks: string;
-  title: string;
-  category: string;
-  priority: 'Low' | 'Medium' | 'High';
-  status: 'Open' | 'In Progress' | 'Resolved' | 'Closed';
-  assignedTo: string;
-  dueDate: string;
-  afterDocs: string;
-  id: string;
-}
-
-interface Project {
-  id: string;
-  rowIndex: number;
-  basicInfo: {
-    name: string;
-    code?: string;
-    type?: string;
-  };
+  documents: { name: string; url: string; title?: string }[];
 }
 
 export default function DeficienciesPage() {
   const { activeProject } = useProject();
   const [deficiencies, setDeficiencies] = useState<Deficiency[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
+  
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  // Filters state
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterProject, setFilterProject] = useState('');
-  const [filterCategory, setFilterCategory] = useState('');
-  const [filterPriority, setFilterPriority] = useState('');
-  const [filterStatus, setFilterStatus] = useState('');
 
-  // Modals state
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [viewingDeficiency, setViewingDeficiency] = useState<Deficiency | null>(null);
+  
   const [editingDeficiency, setEditingDeficiency] = useState<Deficiency | null>(null);
   const [deficiencyToDelete, setDeficiencyToDelete] = useState<Deficiency | null>(null);
 
-  // File Upload states
-  const [beforeFile, setBeforeFile] = useState<File | null>(null);
-  const [beforePreview, setBeforePreview] = useState<string | null>(null);
-  const [afterFile, setAfterFile] = useState<File | null>(null);
-  const [afterPreview, setAfterPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [files, setFiles] = useState<File[]>([]);
+  const [existingDocs, setExistingDocs] = useState<{ name: string; url: string; title?: string }[]>([]);
+  const [uploadMode, setUploadMode] = useState<'images' | 'pdf'>('images');
 
-  // Form Fields state
-  const [formFields, setFormFields] = useState({
-    project: '',
+  const [formData, setFormData] = useState({
     reporter: '',
     area: '',
     remarks: '',
-    title: '',
-    category: '',
-    priority: 'Medium' as 'Low' | 'Medium' | 'High',
-    status: 'Open' as 'Open' | 'In Progress' | 'Resolved' | 'Closed',
-    assignedTo: '',
-    dueDate: '',
   });
-
-  const beforeFileInputRef = useRef<HTMLInputElement>(null);
-  const afterFileInputRef = useRef<HTMLInputElement>(null);
-
-  const categories = [
-    'Carpentry / Wardrobe / Furniture',
-    'Painting / Wallpaper / Polish',
-    'Civil / Masonry / Tiling',
-    'Electrical / Lighting / Automation',
-    'Plumbing / Sanitary Fittings',
-    'False Ceiling / POP / Gypsum',
-    'Flooring (Wooden/Stone)',
-    'HVAC / Ventilation',
-    'Metalwork / Glass / Windows',
-    'Deep Cleaning / Handover Prep'
-  ];
-
-  const priorities = ['Low', 'Medium', 'High'];
-  const statuses = ['Open', 'In Progress', 'Resolved', 'Closed'];
 
   useEffect(() => {
     fetchDeficiencies();
-    fetchProjects();
-
-    }, []);
+  }, []);
 
   async function fetchDeficiencies() {
+    setLoading(true);
     try {
-      setLoading(true);
       const res = await fetch('/api/deficiencies');
       if (res.ok) {
-        const data = await res.json();
-        setDeficiencies(data);
+        setDeficiencies(await res.json());
       }
     } catch (err) {
-      console.error('Error fetching deficiencies:', err);
+      console.error(err);
     } finally {
       setLoading(false);
     }
   }
 
-  async function fetchProjects() {
-    try {
-      const res = await fetch('/api/projects');
-      if (res.ok) {
-        const data = await res.json();
-        setProjects(data);
-      }
-    } catch (err) {
-      console.error('Error fetching projects:', err);
+  const handleCreate = () => {
+    if (!activeProject) {
+      alert("Please select a project first.");
+      return;
     }
-  }
-
-  // Pre-fill form for creation
-  const handleCreateNew = () => {
     setEditingDeficiency(null);
-    setBeforeFile(null);
-    setBeforePreview(null);
-    setAfterFile(null);
-    setAfterPreview(null);
-    setFormFields({
-      project: projects[0]?.basicInfo?.name || '',
+    setFormData({
       reporter: '',
       area: '',
       remarks: '',
-      title: '',
-      category: categories[0],
-      priority: 'Medium',
-      status: 'Open',
-      assignedTo: '',
-      dueDate: '',
     });
+    setUploadMode('images');
+    setFiles([]);
+    setExistingDocs([]);
     setIsModalOpen(true);
   };
 
-  // Pre-fill form for editing
-  const handleEdit = (deficiency: Deficiency) => {
-    setEditingDeficiency(deficiency);
-    setBeforeFile(null);
-    setBeforePreview(deficiency.beforeDocs || null);
-    setAfterFile(null);
-    setAfterPreview(deficiency.afterDocs || null);
-    setFormFields({
-      project: deficiency.project,
-      reporter: deficiency.reporter,
-      area: deficiency.area,
-      remarks: deficiency.remarks,
-      title: deficiency.title,
-      category: deficiency.category,
-      priority: deficiency.priority,
-      status: deficiency.status,
-      assignedTo: deficiency.assignedTo,
-      dueDate: deficiency.dueDate,
+  const handleEdit = (d: Deficiency) => {
+    setEditingDeficiency(d);
+    setFormData({
+      reporter: d.reporter,
+      area: d.area,
+      remarks: d.remarks,
     });
+    setUploadMode('images');
+    setFiles([]);
+    setExistingDocs(d.documents || []);
     setIsModalOpen(true);
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormFields(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-
-  // Handle Before File select
-  const handleBeforeFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setBeforeFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setBeforePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  // Handle After File select
-  const handleAfterFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setAfterFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setAfterPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const triggerBeforeFileSelect = () => beforeFileInputRef.current?.click();
-  const triggerAfterFileSelect = () => afterFileInputRef.current?.click();
-
-  const removeBeforeFile = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setBeforeFile(null);
-    setBeforePreview(null);
-    if (beforeFileInputRef.current) beforeFileInputRef.current.value = '';
-  };
-
-  const removeAfterFile = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setAfterFile(null);
-    setAfterPreview(null);
-    if (afterFileInputRef.current) afterFileInputRef.current.value = '';
-  };
-
-  // Form Submit (Create or Update)
-  const handleSubmit = async (e: React.FormEvent) => {
+  const submitForm = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formFields.title || !formFields.project || !formFields.reporter || !formFields.area) {
-      alert('Please fill out all required fields (Title, Project, Reporter, Area)');
-      return;
-    }
+    if (!formData.area || !activeProject) return;
 
     try {
       setSubmitting(true);
-      const formData = new FormData();
-      formData.append('project', formFields.project);
-      formData.append('reporter', formFields.reporter);
-      formData.append('area', formFields.area);
-      formData.append('remarks', formFields.remarks);
-      formData.append('title', formFields.title);
-      formData.append('category', formFields.category);
-      formData.append('priority', formFields.priority);
-      formData.append('status', formFields.status);
-      formData.append('assignedTo', formFields.assignedTo);
-      formData.append('dueDate', formFields.dueDate);
+      const fd = new FormData();
+      fd.append('project', activeProject.name);
+      
+      Object.entries(formData).forEach(([k, v]) => fd.append(k, v));
+      
+      let finalFiles = files;
+      if (uploadMode === 'images' && files.length > 0 && files.every(f => f.type.startsWith('image/'))) {
+        const pdf = new jsPDF();
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          const imgUrl = URL.createObjectURL(file);
+          const img = new Image();
+          img.src = imgUrl;
+          await new Promise((resolve) => { img.onload = () => resolve(true); img.onerror = () => resolve(false); });
+          if (!img.width) { URL.revokeObjectURL(imgUrl); continue; }
+          const pdfWidth = pdf.internal.pageSize.getWidth();
+          const pdfHeight = pdf.internal.pageSize.getHeight();
+          const imgRatio = img.width / img.height;
+          const pdfRatio = pdfWidth / pdfHeight;
+          let finalWidth = pdfWidth;
+          let finalHeight = pdfHeight;
+          if (imgRatio > pdfRatio) { finalHeight = pdfWidth / imgRatio; } else { finalWidth = pdfHeight * imgRatio; }
+          const x = (pdfWidth - finalWidth) / 2;
+          const y = (pdfHeight - finalHeight) / 2;
+          if (i > 0) { pdf.addPage(); pdf.setPage(i + 1); }
+          const format = file.type === 'image/png' ? 'PNG' : 'JPEG';
+          pdf.addImage(img, format, x, y, finalWidth, finalHeight, `img_${i}`);
+          URL.revokeObjectURL(imgUrl);
+        }
+        const pdfBlob = pdf.output('blob');
+        finalFiles = [new File([pdfBlob], `Deficiency_${Date.now()}.pdf`, { type: 'application/pdf' })];
+      }
 
+      finalFiles.forEach(f => fd.append('newFiles', f));
+      
+      let res;
       if (editingDeficiency) {
-        formData.append('id', editingDeficiency.id);
-        formData.append('timestamp', editingDeficiency.timestamp);
-        formData.append('beforeDocs', editingDeficiency.beforeDocs || '');
-        formData.append('afterDocs', editingDeficiency.afterDocs || '');
+        fd.append('id', editingDeficiency.id);
+        fd.append('timestamp', editingDeficiency.timestamp);
+        fd.append('existingDocs', JSON.stringify(existingDocs));
 
-        if (beforeFile) {
-          formData.append('beforeImage', beforeFile);
-        }
-        if (afterFile) {
-          formData.append('afterImage', afterFile);
-        }
-
-        const res = await fetch(`/api/deficiencies?rowIndex=${editingDeficiency.rowIndex}`, {
+        res = await fetch(`/api/deficiencies?rowIndex=${editingDeficiency.rowIndex}`, {
           method: 'PUT',
-          body: formData,
+          body: fd,
         });
-
-        if (res.ok) {
-          setIsModalOpen(false);
-          fetchDeficiencies();
-        } else {
-          const err = await res.json();
-          alert(`Failed to update deficiency report: ${err.error}`);
-        }
       } else {
-        if (beforeFile) {
-          formData.append('beforeImage', beforeFile);
-        }
-
-        const res = await fetch('/api/deficiencies', {
+        res = await fetch('/api/deficiencies', {
           method: 'POST',
-          body: formData,
+          body: fd,
         });
+      }
 
-        if (res.ok) {
-          setIsModalOpen(false);
-          fetchDeficiencies();
-        } else {
-          const err = await res.json();
-          alert(`Failed to log deficiency report: ${err.error}`);
-        }
+      if (res.ok) {
+        setIsModalOpen(false);
+        fetchDeficiencies();
+      } else {
+        const err = await res.json();
+        alert(`Error: ${err.error}`);
       }
     } catch (err) {
-      console.error('Submission error:', err);
-      alert('An unexpected error occurred during submission.');
+      console.error(err);
     } finally {
       setSubmitting(false);
     }
   };
 
-  // Confirm row deletion
-  const confirmDelete = (deficiency: Deficiency) => {
-    setDeficiencyToDelete(deficiency);
-    setIsDeleteModalOpen(true);
-  };
-
   const handleDelete = async () => {
     if (!deficiencyToDelete) return;
-
     try {
       setSubmitting(true);
       const res = await fetch(`/api/deficiencies?rowIndex=${deficiencyToDelete.rowIndex}`, {
         method: 'DELETE',
       });
-
       if (res.ok) {
         setIsDeleteModalOpen(false);
         setDeficiencyToDelete(null);
         fetchDeficiencies();
-      } else {
-        const err = await res.json();
-        alert(`Failed to delete record: ${err.error}`);
       }
     } catch (err) {
-      console.error('Delete error:', err);
+      console.error(err);
     } finally {
       setSubmitting(false);
     }
   };
 
-  // Filter Logic
-  const filteredDeficiencies = deficiencies.filter(def => {
-    const matchesSearch = 
-      def.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      def.project.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      def.reporter.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      def.area.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      def.remarks.toLowerCase().includes(searchQuery.toLowerCase());
-
-    const matchesProject = filterProject === '' || def.project === filterProject;
-    const matchesCategory = filterCategory === '' || def.category === filterCategory;
-    const matchesPriority = filterPriority === '' || def.priority === filterPriority;
-    const matchesStatus = filterStatus === '' || def.status === filterStatus;
-
-    return matchesSearch && matchesProject && matchesCategory && matchesPriority && matchesStatus;
-  });
-
-  // Summary counts
-  const totalCount = deficiencies.length;
-  const openCount = deficiencies.filter(d => d.status === 'Open').length;
-  const inProgressCount = deficiencies.filter(d => d.status === 'In Progress').length;
-  const resolvedCount = deficiencies.filter(d => d.status === 'Resolved').length;
-  const closedCount = deficiencies.filter(d => d.status === 'Closed').length;
+  const projectDeficiencies = deficiencies.filter(d => !activeProject || d.project === activeProject.name);
 
   return (
     <div className={styles.container}>
-      {/* Header bar */}
       <div className={styles.header}>
         <div className={styles.titleSection}>
-          <h2>Deficiency Reports</h2>
+          <h2>Deficiency Log</h2>
           <div className="breadcrumbNav">
             <Link href="/">Dashboard</Link>
             <span className="separator">&gt;</span>
@@ -384,88 +213,63 @@ export default function DeficienciesPage() {
           </div>
         </div>
         <div className={styles.headerActions}>
-          <button className={styles.addButton} onClick={handleCreateNew}>
-            <Plus size={18} />
-            <span>Log Deficiency</span>
+          <button className={styles.addButton} onClick={handleCreate}>
+            <Plus size={18} /> Log Deficiency
           </button>
         </div>
       </div>
 
-      {/* Summary Stats Overview */}
-      {/* Main content display */}
       {loading ? (
-        <div style={{ display: 'flex', justifyContent: 'center', padding: '100px 0', color: 'var(--text-light)' }}>
-          <p>Loading deficiency records...</p>
+        <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-light)' }}>Loading deficiencies...</div>
+      ) : projectDeficiencies.length === 0 ? (
+        <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-light)' }}>
+          {activeProject ? `No deficiencies logged for ${activeProject.name}.` : 'Select a project to view its deficiencies.'}
         </div>
-      ) : filteredDeficiencies.length === 0 ? (
-        <div style={{ display: 'flex', justifyContent: 'center', padding: '100px 0', color: 'var(--text-light)' }}>
-          <p>No deficiency snags found matching filters.</p>
-        </div>
-      ) : (<div className={styles.tableContainer}>
-          <table className={styles.deficiencyTable}>
+      ) : (
+        <div className={styles.tableContainer}>
+          <table className={styles.directoryTable}>
             <thead>
               <tr>
                 <th>Actions</th>
-                <th>Deficiency</th>
-                <th>Project</th>
-                <th>Status</th>
-                <th>Priority</th>
-                <th>Reporter / Area</th>
-                <th>Assigned Contractor</th>
-                <th>Timeline</th>
-                <th>Media</th>
+                <th>Timestamp</th>
+                <th>Logged / Reported By</th>
+                <th>Deficient Area / Room Name</th>
+                <th>Detailed Remarks & Explanations</th>
+                <th>Document</th>
+                <th>ID</th>
               </tr>
             </thead>
             <tbody>
-              {filteredDeficiencies.map((def) => (
-                <tr key={def.id}>
+              {projectDeficiencies.map((d) => (
+                <tr key={d.id}>
                   <td>
                     <div className={styles.tableActions}>
-                      <button className={styles.actionBtn} onClick={() => handleEdit(def)} title="Edit Report">
-                        <Edit2 size={14} />
+                      <button className={styles.controlBtn} onClick={() => handleEdit(d)} title="Edit Deficiency">
+                        <Edit2 size={13} />
                       </button>
-                      <button className={`${styles.actionBtn} ${styles.deleteBtn}`} onClick={() => confirmDelete(def)} title="Delete Record">
-                        <Trash2 size={14} />
+                      <button className={`${styles.controlBtn} ${styles.delete}`} onClick={() => { setDeficiencyToDelete(d); setIsDeleteModalOpen(true); }} title="Delete Deficiency">
+                        <Trash2 size={13} />
                       </button>
                     </div>
                   </td>
+                  <td>{new Date(d.timestamp).toLocaleString()}</td>
+                  <td>{d.reporter}</td>
                   <td>
-                    <div className={styles.tableTitleCell}>
-                      <span className={styles.tableDeficiencyTitle}>{def.title}</span>
-                      <span className={styles.tableDeficiencyCategory}>{def.category}</span>
-                    </div>
+                    <span className={styles.tableRepName}>{d.area}</span>
+                  </td>
+                  <td style={{ maxWidth: '250px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {d.remarks}
                   </td>
                   <td>
-                    <span className={styles.projectBadge}>{def.project}</span>
-                  </td>
-                  <td>
-                    <span className={`${styles.statusBadge} ${styles[def.status.replace(' ', '_')]}`}>{def.status}</span>
-                  </td>
-                  <td>
-                    <span className={`${styles.priorityBadge} ${styles[def.priority]}`}>{def.priority}</span>
-                  </td>
-                  <td>
-                    <div className={styles.tableTitleCell}>
-                      <span style={{ fontWeight: 600 }}>{def.area}</span>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-light)' }}>By: {def.reporter}</span>
-                    </div>
-                  </td>
-                  <td>{def.assignedTo || '—'}</td>
-                  <td>{def.dueDate ? new Date(def.dueDate).toLocaleDateString() : '—'}</td>
-                  <td>
-                    <div className={styles.tableMediaCell}>
-                      {def.beforeDocs && (
-                        <a href={def.beforeDocs} target="_blank" rel="noreferrer">
-                          <img src={def.beforeDocs} alt="Before Thumbnail" className={styles.tableThumbnail} title="Before Photo" />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      {d.documents && d.documents.map((doc, idx) => (
+                        <a key={idx} href={doc.url} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--primary)', textDecoration: 'none', fontSize: '0.8rem' }}>
+                          <Link2 size={12} /> {doc.title || doc.name}
                         </a>
-                      )}
-                      {def.afterDocs && (
-                        <a href={def.afterDocs} target="_blank" rel="noreferrer">
-                          <img src={def.afterDocs} alt="After Thumbnail" className={styles.tableThumbnail} title="After Photo" />
-                        </a>
-                      )}
+                      ))}
                     </div>
                   </td>
+                  <td style={{ fontSize: '0.8rem', color: 'var(--text-light)' }}>{d.id}</td>
                 </tr>
               ))}
             </tbody>
@@ -473,263 +277,114 @@ export default function DeficienciesPage() {
         </div>
       )}
 
-      {/* Logging & Edit Modal */}
-      <Modal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        title={editingDeficiency ? 'Update Deficiency Log' : 'Log Site Deficiency'}
-        width="800px"
-      >
-        <form onSubmit={handleSubmit} className={styles.formGrid}>
+      {/* Form Modal */}
+      <Modal isOpen={isModalOpen} onClose={() => !submitting && setIsModalOpen(false)} title={editingDeficiency ? 'Edit Deficiency Log' : 'Add Deficiency Log'} width="700px">
+        <form onSubmit={submitForm} className={styles.formGrid}>
+          
           <div className={styles.formRow}>
             <div className={styles.formGroup}>
-              <label>
-                <FileText size={16} />
-                Deficiency Title / Headline *
-              </label>
-              <input 
-                type="text" 
-                name="title" 
-                value={formFields.title} 
-                onChange={handleInputChange} 
-                className={styles.formInput} 
-                placeholder="e.g. Laminate peeling at master bed wardrobe"
-                required
-              />
+              <label>Project</label>
+              <input type="text" value={activeProject?.name || ''} className={styles.formInput} disabled required />
             </div>
             <div className={styles.formGroup}>
-              <label>
-                <Building size={16} />
-                Associated Project *
-              </label>
-              <select 
-                name="project" 
-                value={formFields.project} 
-                onChange={handleInputChange} 
-                className={styles.formSelect}
-                required
-              >
-                {projects.length > 0 ? (
-                  projects.map(p => (
-                    <option key={p.id} value={p.basicInfo.name}>{p.basicInfo.name}</option>
-                  ))
-                ) : (
-                  <option value="">No Active Projects</option>
-                )}
-              </select>
+              <label>Logged / Reported By</label>
+              <input type="text" value={formData.reporter} onChange={e => setFormData({...formData, reporter: e.target.value})} className={styles.formInput} />
             </div>
           </div>
 
           <div className={styles.formRow}>
-            <div className={styles.formGroup}>
-              <label>
-                <User size={16} />
-                Logged / Reported By *
-              </label>
-              <input 
-                type="text" 
-                name="reporter" 
-                value={formFields.reporter} 
-                onChange={handleInputChange} 
-                className={styles.formInput} 
-                placeholder="Name of inspector, designer or client"
-                required
-              />
-            </div>
-            <div className={styles.formGroup}>
-              <label>
-                <MapPin size={16} />
-                Deficient Area / Room Name *
-              </label>
-              <input 
-                type="text" 
-                name="area" 
-                value={formFields.area} 
-                onChange={handleInputChange} 
-                className={styles.formInput} 
-                placeholder="e.g. Master Bedroom, Kitchen Counter"
-                required
-              />
+            <div className={styles.formGroup} style={{ gridColumn: '1 / -1' }}>
+              <label>Deficient Area / Room Name *</label>
+              <input type="text" value={formData.area} onChange={e => setFormData({...formData, area: e.target.value})} className={styles.formInput} required />
             </div>
           </div>
 
-          <div className={styles.formRow}>
-            <div className={styles.formGroup}>
-              <label>
-                <Wrench size={16} />
-                Trade Partner / Category
+          <div className={styles.formGroup} style={{ gridColumn: '1 / -1' }}>
+            <label><FileUp size={14} /> Upload Documents</label>
+            
+            <div style={{ display: 'flex', gap: '16px', fontSize: '0.8rem', color: 'var(--text-main)', marginBottom: '8px', marginTop: '12px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                <input type="radio" name="uploadMode" checked={uploadMode === 'images'} onChange={() => { setUploadMode('images'); setFiles([]); }} />
+                Images (Auto-convert to PDF)
               </label>
-              <select 
-                name="category" 
-                value={formFields.category} 
-                onChange={handleInputChange} 
-                className={styles.formSelect}
-              >
-                {categories.map(cat => (
-                  <option key={cat} value={cat}>{cat}</option>
-                ))}
-              </select>
-            </div>
-            <div className={styles.formGroup}>
-              <label>
-                <AlertTriangle size={16} />
-                Severity / Priority
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                <input type="radio" name="uploadMode" checked={uploadMode === 'pdf'} onChange={() => { setUploadMode('pdf'); setFiles([]); }} />
+                PDF Documents
               </label>
-              <select 
-                name="priority" 
-                value={formFields.priority} 
-                onChange={handleInputChange} 
-                className={styles.formSelect}
-              >
-                {priorities.map(prio => (
-                  <option key={prio} value={prio}>{prio} Priority</option>
-                ))}
-              </select>
             </div>
-          </div>
 
-          <div className={styles.formRow}>
-            <div className={styles.formGroup}>
+            <div className={styles.uploadBox} onClick={() => fileInputRef.current?.click()}>
               <label>
-                <Users size={16} />
-                Assigned Contractor / Vendor
+                <FileUp size={24} style={{ color: 'var(--text-light)', marginBottom: '4px' }} />
+                <span>Click to select or upload multiple files</span>
+                <span style={{ fontSize: '0.7rem', opacity: 0.8 }}>File will be saved to secure Google Drive folder</span>
               </label>
-              <input 
-                type="text" 
-                name="assignedTo" 
-                value={formFields.assignedTo} 
-                onChange={handleInputChange} 
-                className={styles.formInput} 
-                placeholder="e.g. Starlight Stoneworks"
-              />
+              <input type="file" ref={fileInputRef} onChange={e => setFiles(prev => [...prev, ...(Array.from(e.target.files || []) as File[])])} style={{ display: 'none' }} accept={uploadMode === 'images' ? 'image/*' : '.pdf,.doc,.docx,.xls,.xlsx,.dwg,.dxf,.zip,image/*'} multiple />
             </div>
-            <div className={styles.formGroup}>
-              <label>
-                <Calendar size={16} />
-                Target Rectification Date
-              </label>
-              <input 
-                type="date" 
-                name="dueDate" 
-                value={formFields.dueDate} 
-                onChange={handleInputChange} 
-                className={styles.formInput} 
-              />
-            </div>
-          </div>
-
-          <div className={styles.formRow}>
-            <div className={styles.formGroup}>
-              <label>
-                <Clock size={16} />
-                Deficiency Status
-              </label>
-              <select 
-                name="status" 
-                value={formFields.status} 
-                onChange={handleInputChange} 
-                className={styles.formSelect}
-              >
-                {statuses.map(st => (
-                  <option key={st} value={st}>{st}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className={styles.formGroup}>
-            <label>
-              <MessageSquare size={16} />
-              Detailed Remarks & Explanations
-            </label>
-            <textarea 
-              name="remarks" 
-              value={formFields.remarks} 
-              onChange={handleInputChange} 
-              className={styles.formTextarea} 
-              placeholder="Provide exact details of the defect, measurements, or materials affected..."
-            />
-          </div>
-
-          {/* Before & After Attachment Uploaders */}
-          <div className={styles.uploadSection}>
-            <div className={styles.formGroup}>
-              <label>
-                <Image size={16} />
-                Before Defect Image
-              </label>
-              <div className={styles.uploadBox} onClick={triggerBeforeFileSelect}>
-                <input 
-                  type="file" 
-                  ref={beforeFileInputRef}
-                  onChange={handleBeforeFileChange}
-                  accept="image/*"
-                />
-                {beforePreview ? (
-                  <div className={styles.previewWrapper}>
-                    <img src={beforePreview} alt="Before Preview" className={styles.uploadPreview} />
-                    <button type="button" className={styles.removeFileBtn} onClick={removeBeforeFile}>Change Photo</button>
-                  </div>
-                ) : (
-                  <label>
-                    <Upload size={24} />
-                    <span>Upload Before Photo</span>
-                  </label>
-                )}
+            
+            {files.length > 0 && (
+              <div className={styles.uploadedStagedList}>
+                <strong>New Files to Upload ({files.length}):</strong>
+                <div className={styles.stagingGrid}>
+                  {files.map((file, i) => (
+                    <div key={i} className={styles.stagedFileItem}>
+                      <div className={styles.stagedFileLeft} title={file.name}>
+                        {uploadMode === 'images' ? (
+                          <img src={URL.createObjectURL(file)} alt="Preview" style={{ width: '40px', height: '40px', objectFit: 'cover', borderRadius: '4px' }} />
+                        ) : (
+                          <FileIcon size={14} style={{ color: 'var(--success)', flexShrink: 0 }} />
+                        )}
+                        <span className={styles.stagedFileName}>{file.name}</span>
+                      </div>
+                      <button type="button" className={styles.removeStagedBtn} onClick={() => setFiles(files.filter((_, idx) => idx !== i))}><X size={16} /></button>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
-            <div className={styles.formGroup}>
-              <label>
-                <Image size={16} />
-                After Fixed Proof (Optional / Resolution)
-              </label>
-              <div className={styles.uploadBox} onClick={triggerAfterFileSelect}>
-                <input 
-                  type="file" 
-                  ref={afterFileInputRef}
-                  onChange={handleAfterFileChange}
-                  accept="image/*"
-                />
-                {afterPreview ? (
-                  <div className={styles.previewWrapper}>
-                    <img src={afterPreview} alt="After Preview" className={styles.uploadPreview} />
-                    <button type="button" className={styles.removeFileBtn} onClick={removeAfterFile}>Change Photo</button>
-                  </div>
-                ) : (
-                  <label>
-                    <Upload size={24} />
-                    <span>Upload After Fixed Photo</span>
-                  </label>
-                )}
+            {editingDeficiency && existingDocs.length > 0 && (
+              <div className={styles.uploadedStagedList} style={{ marginTop: '12px' }}>
+                <strong>Currently Saved Attachments:</strong>
+                <div className={styles.stagingGrid}>
+                  {existingDocs.map((doc, idx) => (
+                    <div key={idx} className={styles.stagedFileItem} style={{ borderColor: 'rgba(39, 206, 138, 0.3)' }}>
+                      <div className={styles.stagedFileLeft}>
+                        <Link2 size={14} style={{ color: 'var(--success)', flexShrink: 0 }} />
+                        <a href={doc.url} target="_blank" rel="noopener noreferrer" className={styles.stagedFileName} style={{ color: 'var(--success)', textDecoration: 'none', maxWidth: '200px' }} title={doc.name}>
+                          {doc.title || doc.name}
+                        </a>
+                      </div>
+                      <button type="button" className={styles.removeStagedBtn} onClick={() => setExistingDocs(existingDocs.filter((_, i) => i !== idx))} title="Remove attachment">
+                        <Trash size={13} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
+          </div>
+          
+          <div className={styles.formGroup} style={{ gridColumn: '1 / -1' }}>
+            <label>Detailed Remarks & Explanations</label>
+            <textarea value={formData.remarks} onChange={e => setFormData({...formData, remarks: e.target.value})} className={styles.formTextarea} />
           </div>
 
           <div className={styles.formActions}>
-            <button type="button" className={styles.cancelBtn} onClick={() => setIsModalOpen(false)}>Cancel</button>
-            <button type="submit" className={styles.submitBtn} disabled={submitting}>
-              {submitting ? 'Uploading to Drive...' : editingDeficiency ? 'Save Changes' : 'Create Snag Log'}
-            </button>
+            <button type="button" className={styles.cancelBtn} onClick={() => setIsModalOpen(false)} disabled={submitting}>Cancel</button>
+            <button type="submit" className={styles.submitBtn} disabled={submitting}>{submitting ? 'Saving...' : 'Save Deficiency'}</button>
           </div>
         </form>
       </Modal>
 
-      {/* Delete Confirmation Modal */}
-      <Modal
-        isOpen={isDeleteModalOpen}
-        onClose={() => setIsDeleteModalOpen(false)}
-        title="Delete Defect Report Record"
-        width="450px"
-      >
+      {/* Delete Modal */}
+      <Modal isOpen={isDeleteModalOpen} onClose={() => !submitting && setIsDeleteModalOpen(false)} title="Confirm Deletion" width="400px" type="danger">
         <div className={styles.deleteConfirmBody}>
-          <p>Are you sure you want to delete this deficiency record?</p>
-          <p className={styles.warningSub}>Deficiency ID: <strong>{deficiencyToDelete?.id}</strong>. This will permanently erase the row from Google Sheets and cannot be undone.</p>
+          <AlertCircle size={48} color="var(--danger)" style={{ marginBottom: '16px' }} />
+          <p>Are you sure you want to delete this deficiency for <strong>{deficiencyToDelete?.project}</strong>?</p>
           <div className={styles.deleteActions}>
-            <button type="button" className={styles.cancelBtn} onClick={() => setIsDeleteModalOpen(false)}>Cancel</button>
-            <button type="button" className={styles.confirmDeleteBtn} onClick={handleDelete} disabled={submitting}>
-              {submitting ? 'Processing...' : 'Delete Record'}
-            </button>
+            <button className={styles.cancelBtn} onClick={() => setIsDeleteModalOpen(false)} disabled={submitting}>Cancel</button>
+            <button className={styles.confirmDeleteBtn} onClick={handleDelete} disabled={submitting}>{submitting ? 'Deleting...' : 'Delete'}</button>
           </div>
         </div>
       </Modal>

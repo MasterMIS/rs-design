@@ -616,6 +616,76 @@
   background-color: var(--bg-main);
 }
 
+/* Multi File staging list layout with inline title text inputs */
+.uploadedStagedList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+  width: 100%;
+}
+
+.uploadedStagedList strong {
+  font-size: 0.75rem;
+  color: var(--text-heading);
+  align-self: flex-start;
+}
+
+.stagingGrid {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+}
+
+.stagedFileItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: var(--bg-main);
+  border: 1px solid var(--border-color);
+  padding: 8px 12px;
+  border-radius: 8px;
+  gap: 12px;
+  flex: 0 1 auto;
+}
+
+.stagedFileLeft {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 150px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.stagedFileName {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.removeStagedBtn {
+  background: none;
+  border: none;
+  color: var(--danger);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.removeStagedBtn:hover {
+  transform: scale(1.15);
+}
+
 /* Delete modal styling */
 .deleteConfirmBody {
   text-align: center;

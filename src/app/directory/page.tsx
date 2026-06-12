@@ -24,10 +24,7 @@ interface Contact {
   companyName: string;
   category: string;
   address: string;
-  appointmentStatus: 'Appointed' | 'Shortlisted' | 'Terminated' | 'Under Discussion';
-  designation: string;
-  escalationLevel: 'L1' | 'L2' | 'L3';
-  whatsAppLink: string;
+  appointmentStatus: string;
   id: string;
 }
 
@@ -61,55 +58,49 @@ export default function DirectoryPage() {
   const [contactToDelete, setContactToDelete] = useState<Contact | null>(null);
 
   // Form Fields State
-  const [formFields, setFormFields] = useState({
+  const [formEntries, setFormEntries] = useState<any[]>([{
     project: '',
-    selectTeam: 'Client Team',
+    selectTeam: 'Clients',
     customTeamName: '',
     nameOfPerson: '',
     contactNo: '',
     emailId: '',
     companyName: '',
-    category: '',
+    category: 'CIVIL',
     address: '',
-    appointmentStatus: 'Appointed' as 'Appointed' | 'Shortlisted' | 'Terminated' | 'Under Discussion',
-    designation: '',
-    escalationLevel: 'L1' as 'L1' | 'L2' | 'L3',
-  });
+    appointmentStatus: 'Yes',
+  }]);
 
   const standardTeams = [
-    'Client Team',
-    'Architects & Designers',
-    'PMC / Consultants',
-    'Civil Contractors',
-    'Carpentry Contractors',
-    'Electrical Contractors',
-    'Plumbing Contractors',
-    'Painting Contractors',
-    'HVAC Partners',
+    'Clients',
+    'RS Design',
+    'Vendor',
+    'Engineer',
+    'Contractor',
+    '2D',
+    '3D',
+    'Architect',
+    'MEP',
+    "Client's Wife",
+    'Client Staff',
+    'Site Supervisor',
+    'Project Coordinator',
+    'CRM',
     'Custom Team (Add New...)'
   ];
 
-  const appointmentStatuses = ['Appointed', 'Shortlisted', 'Terminated', 'Under Discussion'];
-  const escalationLevels = ['L1', 'L2', 'L3'];
+  const appointmentStatuses = ['Yes', 'No'];
 
   const categories = [
-    'Architecture',
-    'Interior Design',
-    'Project Management',
-    'Civil Work',
-    'Carpentry / Furniture',
-    'Electrical',
-    'Plumbing',
-    'Painting / Wallpapering',
-    'HVAC',
-    'Lighting / Automation',
-    'Others'
+    'CIVIL', 'ELECTRICAL', 'PLUMBING', 'AC', 'TILES AND MARBLE', 'CARPENTRY',
+    'PAINT AND POLISH', 'FALSE CEILING', 'FURNISHING', 'WATER PROOFING',
+    'FIRE FIGHTING', 'WALL PAINTER', 'POLISHER', 'WINDOW', 'READYMADE FURNITURE',
+    'HEAT PUMP', 'PRESSURE PUMP', 'WATER TREATMENT', 'STP', 'SWIMMING POOL', 'IT'
   ];
 
   useEffect(() => {
     fetchDirectory();
     fetchProjects();
-
     }, []);
 
   async function fetchDirectory() {
@@ -156,9 +147,9 @@ export default function DirectoryPage() {
 
   const handleCreateNew = () => {
     setEditingContact(null);
-    setFormFields({
-      project: projects[0]?.basicInfo?.name || '',
-      selectTeam: 'Client Team',
+    setFormEntries([{
+      project: activeProject ? activeProject.name : (projects[0]?.basicInfo?.name || ''),
+      selectTeam: 'Clients',
       customTeamName: '',
       nameOfPerson: '',
       contactNo: '',
@@ -166,10 +157,8 @@ export default function DirectoryPage() {
       companyName: '',
       category: categories[0],
       address: '',
-      appointmentStatus: 'Appointed',
-      designation: '',
-      escalationLevel: 'L1',
-    });
+      appointmentStatus: 'Yes',
+    }]);
     setIsModalOpen(true);
   };
 
@@ -178,7 +167,7 @@ export default function DirectoryPage() {
 
     // Check if selectTeam is a standard one or custom
     const isStandard = standardTeams.includes(contact.selectTeam);
-    setFormFields({
+    setFormEntries([{
       project: contact.project,
       selectTeam: isStandard ? contact.selectTeam : 'Custom Team (Add New...)',
       customTeamName: isStandard ? '' : contact.selectTeam,
@@ -189,56 +178,71 @@ export default function DirectoryPage() {
       category: contact.category,
       address: contact.address,
       appointmentStatus: contact.appointmentStatus,
-      designation: contact.designation,
-      escalationLevel: contact.escalationLevel,
-    });
+    }]);
     setIsModalOpen(true);
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+  const handleEntryChange = (index: number, e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setFormFields(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    setFormEntries(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [name]: value };
+      return updated;
+    });
+  };
+
+  const addFormEntry = () => {
+    const baseProject = formEntries[0]?.project || activeProject?.name || '';
+    setFormEntries(prev => [...prev, {
+      project: baseProject,
+      selectTeam: 'Clients',
+      customTeamName: '',
+      nameOfPerson: '',
+      contactNo: '',
+      emailId: '',
+      companyName: '',
+      category: categories[0],
+      address: '',
+      appointmentStatus: 'Yes',
+    }]);
+  };
+
+  const removeFormEntry = (index: number) => {
+    setFormEntries(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formFields.project || !formFields.nameOfPerson) {
-      alert('Please fill out required fields (Project, Representative Name)');
-      return;
-    }
-
-    // Determine target team name
-    const finalTeamName = formFields.selectTeam === 'Custom Team (Add New...)'
-      ? formFields.customTeamName.trim()
-      : formFields.selectTeam;
-
-    if (!finalTeamName) {
-      alert('Please enter a team name');
-      return;
+    
+    // Validate all entries
+    for (const entry of formEntries) {
+      if (!entry.project || !entry.nameOfPerson) {
+        alert('Please fill out Project and Representative Name for all entries');
+        return;
+      }
+      if (entry.selectTeam === 'Custom Team (Add New...)' && !entry.customTeamName.trim()) {
+        alert('Please enter a custom team name');
+        return;
+      }
     }
 
     try {
       setSubmitting(true);
-      const payload = {
-        project: formFields.project,
-        selectTeam: finalTeamName,
-        nameOfPerson: formFields.nameOfPerson,
-        contactNo: formFields.contactNo,
-        emailId: formFields.emailId,
-        companyName: formFields.companyName,
-        category: formFields.category,
-        address: formFields.address,
-        appointmentStatus: formFields.appointmentStatus,
-        designation: formFields.designation,
-        escalationLevel: formFields.escalationLevel,
-      };
 
       if (editingContact) {
+        const entry = formEntries[0];
+        const finalTeamName = entry.selectTeam === 'Custom Team (Add New...)' ? entry.customTeamName.trim() : entry.selectTeam;
+        
         const updatePayload = {
-          ...payload,
+          project: entry.project,
+          selectTeam: finalTeamName,
+          nameOfPerson: entry.nameOfPerson,
+          contactNo: entry.contactNo,
+          emailId: entry.emailId,
+          companyName: entry.companyName,
+          category: entry.category,
+          address: entry.address,
+          appointmentStatus: entry.appointmentStatus,
           timestamp: editingContact.timestamp,
           id: editingContact.id
         };
@@ -257,6 +261,18 @@ export default function DirectoryPage() {
           alert(`Failed to update directory: ${err.error}`);
         }
       } else {
+        const payload = formEntries.map(entry => ({
+          project: entry.project,
+          selectTeam: entry.selectTeam === 'Custom Team (Add New...)' ? entry.customTeamName.trim() : entry.selectTeam,
+          nameOfPerson: entry.nameOfPerson,
+          contactNo: entry.contactNo,
+          emailId: entry.emailId,
+          companyName: entry.companyName,
+          category: entry.category,
+          address: entry.address,
+          appointmentStatus: entry.appointmentStatus,
+        }));
+
         const res = await fetch('/api/directory', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -316,8 +332,7 @@ export default function DirectoryPage() {
       contact.contactNo.toLowerCase().includes(searchQuery.toLowerCase()) ||
       contact.emailId.toLowerCase().includes(searchQuery.toLowerCase()) ||
       contact.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      contact.address.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      contact.designation.toLowerCase().includes(searchQuery.toLowerCase());
+      contact.address.toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesProject = filterProject === '' || contact.project === filterProject;
     const matchesTeam = filterTeam === '' || contact.selectTeam === filterTeam;
@@ -344,8 +359,8 @@ export default function DirectoryPage() {
 
   // Counters
   const totalCount = contacts.length;
-  const appointedCount = contacts.filter(c => c.appointmentStatus === 'Appointed').length;
-  const discussionCount = contacts.filter(c => c.appointmentStatus === 'Under Discussion').length;
+  const appointedCount = contacts.filter(c => c.appointmentStatus === 'Yes').length;
+  const discussionCount = contacts.filter(c => c.appointmentStatus === 'No').length;
   const uniqueTeamsCount = Array.from(new Set(contacts.map(c => c.selectTeam))).length;
 
   return (
@@ -402,7 +417,6 @@ export default function DirectoryPage() {
                 <th>Assigned Team</th>
                 <th>Trade Specialty</th>
                 <th>Status</th>
-                <th>Priority Contact</th>
                 <th>Company</th>
                 <th>Contact Info</th>
               </tr>
@@ -423,9 +437,6 @@ export default function DirectoryPage() {
                   <td>
                     <div className={styles.tableTitleCell}>
                       <span className={styles.tableRepName}>{member.nameOfPerson}</span>
-                      {member.designation && (
-                        <span className={styles.tableRepDetail}>{member.designation}</span>
-                      )}
                     </div>
                   </td>
                   <td>{member.project}</td>
@@ -440,27 +451,19 @@ export default function DirectoryPage() {
                       {member.appointmentStatus}
                     </span>
                   </td>
-                  <td>
-                    <span className={`${styles.escalationBadge} ${styles[member.escalationLevel]}`}>
-                      {member.escalationLevel}
-                    </span>
-                  </td>
                   <td><strong>{member.companyName || '—'}</strong></td>
                   <td>
-                    <div className={styles.tableActions}>
-                      {member.contactNo && (
-                        <a href={`tel:${member.contactNo}`} className={`${styles.trayBtn} ${styles.phone}`} title={member.contactNo}>
-                          <Phone size={12} />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
+                      {member.contactNo ? (
+                        <a href={`tel:${member.contactNo}`} style={{ color: 'var(--text-main)', textDecoration: 'none' }}>
+                          {member.contactNo}
                         </a>
+                      ) : (
+                        <span style={{ color: 'var(--text-light)' }}>-</span>
                       )}
                       {member.emailId && (
-                        <a href={`mailto:${member.emailId}`} className={`${styles.trayBtn} ${styles.email}`} title={member.emailId}>
-                          <Mail size={12} />
-                        </a>
-                      )}
-                      {member.whatsAppLink && (
-                        <a href={member.whatsAppLink} target="_blank" rel="noreferrer" className={`${styles.trayBtn} ${styles.whatsapp}`} title="WhatsApp Chat">
-                          <MessageCircle size={12} />
+                        <a href={`mailto:${member.emailId}`} style={{ color: 'var(--primary)', textDecoration: 'none' }}>
+                          {member.emailId}
                         </a>
                       )}
                     </div>
@@ -476,179 +479,162 @@ export default function DirectoryPage() {
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title={editingContact ? 'Update Stakeholder Details' : 'Add Project Representative'}
+        title={editingContact ? 'Update Stakeholder Details' : 'Add Project Representative(s)'}
         width="750px"
       >
         <form onSubmit={handleSubmit} className={styles.formGrid}>
-          <div className={styles.formRow}>
-            <div className={styles.formGroup}>
-              <label><Building size={14} /> Select Project *</label>
-              <select
-                name="project"
-                value={formFields.project}
-                onChange={handleInputChange}
-                className={styles.formSelect}
-                required
-              >
-                {projects.length > 0 ? (
-                  projects.map(p => (
-                    <option key={p.id} value={p.basicInfo.name}>{p.basicInfo.name}</option>
-                  ))
-                ) : (
-                  <option value="">No Active Projects</option>
-                )}
-              </select>
-            </div>
-            <div className={styles.formGroup}>
-              <label><Users size={14} /> Assign to Team Group *</label>
-              <select
-                name="selectTeam"
-                value={formFields.selectTeam}
-                onChange={handleInputChange}
-                className={styles.formSelect}
-                required
-              >
-                {standardTeams.map(team => (
-                  <option key={team} value={team}>{team}</option>
-                ))}
-              </select>
-            </div>
-          </div>
+          {formEntries.map((entry, index) => (
+            <div key={index} style={{ borderBottom: formEntries.length > 1 && index < formEntries.length - 1 ? '1px dashed var(--border-color)' : 'none', paddingBottom: formEntries.length > 1 && index < formEntries.length - 1 ? '15px' : '0', marginBottom: formEntries.length > 1 && index < formEntries.length - 1 ? '15px' : '0' }}>
+              {formEntries.length > 1 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                  <h4 style={{ margin: 0, color: 'var(--primary)', fontSize: '13px' }}>Entry #{index + 1}</h4>
+                  {index > 0 && (
+                    <button type="button" onClick={() => removeFormEntry(index)} style={{ background: 'rgba(231, 76, 60, 0.1)', border: 'none', color: 'var(--danger)', cursor: 'pointer', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 8px', borderRadius: '4px' }}>
+                      <Trash2 size={12} /> Remove
+                    </button>
+                  )}
+                </div>
+              )}
+              
+              <div className={styles.formRow}>
+                <div className={styles.formGroup}>
+                  <label><Building size={14} /> Select Project *</label>
+                  <input
+                    type="text"
+                    name="project"
+                    value={entry.project}
+                    className={styles.formInput}
+                    disabled
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <label><Users size={14} /> Assign to Team Group *</label>
+                  <select
+                    name="selectTeam"
+                    value={entry.selectTeam}
+                    onChange={(e) => handleEntryChange(index, e)}
+                    className={styles.formSelect}
+                    required
+                  >
+                    {standardTeams.map(team => (
+                      <option key={team} value={team}>{team}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
 
-          {/* Conditional Input for Custom Teams */}
-          {formFields.selectTeam === 'Custom Team (Add New...)' && (
-            <div className={styles.formGroup} style={{ animation: 'fadeIn 0.2s ease-out' }}>
-              <label><Users size={14} /> Enter Custom Team Name *</label>
-              <input
-                type="text"
-                name="customTeamName"
-                value={formFields.customTeamName}
-                onChange={handleInputChange}
-                className={styles.formInput}
-                placeholder="e.g. Landscaping Partners, Automation Engineers"
-                required
-              />
+              {/* Conditional Input for Custom Teams */}
+              {entry.selectTeam === 'Custom Team (Add New...)' && (
+                <div className={styles.formGroup} style={{ animation: 'fadeIn 0.2s ease-out' }}>
+                  <label><Users size={14} /> Enter Custom Team Name *</label>
+                  <input
+                    type="text"
+                    name="customTeamName"
+                    value={entry.customTeamName}
+                    onChange={(e) => handleEntryChange(index, e)}
+                    className={styles.formInput}
+                    required
+                  />
+                </div>
+              )}
+
+              <div className={styles.formGroup} style={{ gridColumn: '1 / -1' }}>
+                <label><User size={14} /> Representative Full Name *</label>
+                <input
+                  type="text"
+                  name="nameOfPerson"
+                  value={entry.nameOfPerson}
+                  onChange={(e) => handleEntryChange(index, e)}
+                  className={styles.formInput}
+                  required
+                />
+              </div>
+
+              <div className={styles.formRow}>
+                <div className={styles.formGroup}>
+                  <label><Phone size={14} /> Contact Number</label>
+                  <input
+                    type="text"
+                    name="contactNo"
+                    value={entry.contactNo}
+                    onChange={(e) => handleEntryChange(index, e)}
+                    className={styles.formInput}
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <label><Mail size={14} /> Email Address</label>
+                  <input
+                    type="email"
+                    name="emailId"
+                    value={entry.emailId}
+                    onChange={(e) => handleEntryChange(index, e)}
+                    className={styles.formInput}
+                  />
+                </div>
+              </div>
+
+              <div className={styles.formRow}>
+                <div className={styles.formGroup}>
+                  <label><Building size={14} /> Company / Firm Name</label>
+                  <input
+                    type="text"
+                    name="companyName"
+                    value={entry.companyName}
+                    onChange={(e) => handleEntryChange(index, e)}
+                    className={styles.formInput}
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <label><Wrench size={14} /> Trade Specialty / Category</label>
+                  <select
+                    name="category"
+                    value={entry.category}
+                    onChange={(e) => handleEntryChange(index, e)}
+                    className={styles.formSelect}
+                  >
+                    {categories.map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className={styles.formRow}>
+                <div className={styles.formGroup}>
+                  <label><CheckCircle size={14} /> Appointment Status</label>
+                  <select
+                    name="appointmentStatus"
+                    value={entry.appointmentStatus}
+                    onChange={(e) => handleEntryChange(index, e)}
+                    className={styles.formSelect}
+                  >
+                    {appointmentStatuses.map(status => (
+                      <option key={status} value={status}>{status}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className={styles.formGroup}>
+                <label><MapPin size={14} /> Workplace / Company Address</label>
+                <input
+                  type="text"
+                  name="address"
+                  value={entry.address}
+                  onChange={(e) => handleEntryChange(index, e)}
+                  className={styles.formInput}
+                />
+              </div>
+            </div>
+          ))}
+
+          {!editingContact && (
+            <div style={{ marginTop: '10px', marginBottom: '20px' }}>
+              <button type="button" onClick={addFormEntry} style={{ background: 'rgba(52, 152, 219, 0.1)', color: 'var(--primary)', border: '1px dashed var(--primary)', borderRadius: '6px', padding: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', width: '100%', fontSize: '13px', fontWeight: '600' }}>
+                <Plus size={14} /> Add Another Representative
+              </button>
             </div>
           )}
-
-          <div className={styles.formRow}>
-            <div className={styles.formGroup}>
-              <label><User size={14} /> Representative Full Name *</label>
-              <input
-                type="text"
-                name="nameOfPerson"
-                value={formFields.nameOfPerson}
-                onChange={handleInputChange}
-                className={styles.formInput}
-                placeholder="FullName"
-                required
-              />
-            </div>
-            <div className={styles.formGroup}>
-              <label><Briefcase size={14} /> Professional Designation</label>
-              <input
-                type="text"
-                name="designation"
-                value={formFields.designation}
-                onChange={handleInputChange}
-                className={styles.formInput}
-                placeholder="e.g. Principal Architect, Billing Manager, Supervisor"
-              />
-            </div>
-          </div>
-
-          <div className={styles.formRow}>
-            <div className={styles.formGroup}>
-              <label><Phone size={14} /> Contact Number</label>
-              <input
-                type="text"
-                name="contactNo"
-                value={formFields.contactNo}
-                onChange={handleInputChange}
-                className={styles.formInput}
-                placeholder="e.g. 9876543210"
-              />
-            </div>
-            <div className={styles.formGroup}>
-              <label><Mail size={14} /> Email Address</label>
-              <input
-                type="email"
-                name="emailId"
-                value={formFields.emailId}
-                onChange={handleInputChange}
-                className={styles.formInput}
-                placeholder="name@company.com"
-              />
-            </div>
-          </div>
-
-          <div className={styles.formRow}>
-            <div className={styles.formGroup}>
-              <label><Building size={14} /> Company / Firm Name</label>
-              <input
-                type="text"
-                name="companyName"
-                value={formFields.companyName}
-                onChange={handleInputChange}
-                className={styles.formInput}
-                placeholder="Firm/Agency Name"
-              />
-            </div>
-            <div className={styles.formGroup}>
-              <label><Wrench size={14} /> Trade Specialty / Category</label>
-              <select
-                name="category"
-                value={formFields.category}
-                onChange={handleInputChange}
-                className={styles.formSelect}
-              >
-                {categories.map(cat => (
-                  <option key={cat} value={cat}>{cat}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className={styles.formRow}>
-            <div className={styles.formGroup}>
-              <label><CheckCircle size={14} /> Appointment Status</label>
-              <select
-                name="appointmentStatus"
-                value={formFields.appointmentStatus}
-                onChange={handleInputChange}
-                className={styles.formSelect}
-              >
-                {appointmentStatuses.map(status => (
-                  <option key={status} value={status}>{status}</option>
-                ))}
-              </select>
-            </div>
-            <div className={styles.formGroup}>
-              <label><AlertCircle size={14} /> Escalation Level / Priority Contact</label>
-              <select
-                name="escalationLevel"
-                value={formFields.escalationLevel}
-                onChange={handleInputChange}
-                className={styles.formSelect}
-              >
-                {escalationLevels.map(level => (
-                  <option key={level} value={level}>{level} Contact Priority</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className={styles.formGroup}>
-            <label><MapPin size={14} /> Workplace / Company Address</label>
-            <input
-              type="text"
-              name="address"
-              value={formFields.address}
-              onChange={handleInputChange}
-              className={styles.formInput}
-              placeholder="Full location address"
-            />
-          </div>
 
           <div className={styles.formActions}>
             <button type="submit" disabled={submitting} className={styles.submitBtn}>

@@ -8,6 +8,8 @@ import {
   Eye, EyeOff, Briefcase, Building, UserCheck, Smartphone, Check,
   LayoutGrid, List
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import styles from './users.module.css';
 import Modal from '@/components/Modal';
 import GlobalLoading from '@/components/GlobalLoading';
@@ -28,6 +30,7 @@ interface User {
 }
 
 export default function UsersPage() {
+  const router = useRouter();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -265,7 +268,11 @@ export default function UsersPage() {
       <div className={styles.header}>
         <div className={styles.titleSection}>
           <h2>User Management</h2>
-          <p>Manage your team members and their account permissions.</p>
+          <div className="breadcrumbNav">
+            <Link href="/">Dashboard</Link>
+            <span className="separator">&gt;</span>
+            <span className="current">Users</span>
+          </div>
         </div>
         <div className={styles.headerActions}>
           <div className={styles.viewToggleGroup}>
@@ -530,6 +537,7 @@ export default function UsersPage() {
                 required 
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder=" "
               />
             </div>
             <div className={styles.formGroup}>
@@ -539,6 +547,7 @@ export default function UsersPage() {
                 required 
                 value={formData.mobile}
                 onChange={(e) => setFormData({ ...formData, mobile: e.target.value })}
+                placeholder=" "
               />
             </div>
           </div>
@@ -551,6 +560,7 @@ export default function UsersPage() {
                 required 
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                placeholder=" "
               />
             </div>
             <div className={styles.formGroup}>
@@ -562,6 +572,7 @@ export default function UsersPage() {
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   className={styles.passwordInput}
+                  placeholder=" "
                 />
                 <button 
                   type="button" 
@@ -575,7 +586,7 @@ export default function UsersPage() {
           </div>
 
           <div className={styles.formRow}>
-            <div className={styles.formGroup}>
+            <div className={styles.formGroup} data-has-value="true">
               <label><Building size={14} className={styles.labelIcon} /> Department</label>
               <div className={styles.selectWithAdd}>
                 <SearchableSelect 
@@ -589,7 +600,7 @@ export default function UsersPage() {
                 </button>
               </div>
             </div>
-            <div className={styles.formGroup}>
+            <div className={styles.formGroup} data-has-value="true">
               <label><Briefcase size={14} className={styles.labelIcon} /> Designation</label>
               <div className={styles.selectWithAdd}>
                 <SearchableSelect 
@@ -606,7 +617,7 @@ export default function UsersPage() {
           </div>
 
           <div className={styles.formRow}>
-            <div className={styles.formGroup}>
+            <div className={styles.formGroup} data-has-value="true">
               <label><Shield size={14} className={styles.labelIcon} /> Role</label>
               <div className={styles.toggleGroup}>
                 {roles.map(r => (
@@ -622,7 +633,7 @@ export default function UsersPage() {
                 ))}
               </div>
             </div>
-            <div className={styles.formGroup}>
+            <div className={styles.formGroup} data-has-value="true">
               <label><UserCheck size={14} className={styles.labelIcon} /> Status</label>
               <div className={styles.toggleGroup}>
                 {statuses.map(s => (

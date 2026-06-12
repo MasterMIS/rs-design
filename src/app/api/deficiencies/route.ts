@@ -12,9 +12,21 @@ const SHEET_ID = CONFIG.DEFICIENCY.SHEET_ID;
 const SHEET_NAME = CONFIG.DEFICIENCY.SHEET_NAME;
 const FOLDER_ID = CONFIG.DEFICIENCY.FOLDER_ID;
 
+const parseDocs = (str: string) => {
+  if (!str) return [];
+  try {
+    return JSON.parse(str);
+  } catch {
+    if (str.startsWith('http')) {
+      return [{ name: 'Attached Document', url: str }];
+    }
+    return [];
+  }
+};
+
 export async function GET() {
   try {
-    const data = await getSheetsData(SHEET_ID, `${SHEET_NAME}!A2:N1000`);
+    const data = await getSheetsData(SHEET_ID, `${SHEET_NAME}!A2:G1000`);
 
     if (!data || data.length === 0) return NextResponse.json([]);
 
@@ -24,16 +36,9 @@ export async function GET() {
       project: row[1] || '',
       reporter: row[2] || '',
       area: row[3] || '',
-      beforeDocs: row[4] || '',
+      documents: parseDocs(row[4]),
       remarks: row[5] || '',
-      title: row[6] || '',
-      category: row[7] || '',
-      priority: row[8] || 'Medium',
-      status: row[9] || 'Open',
-      assignedTo: row[10] || '',
-      dueDate: row[11] || '',
-      afterDocs: row[12] || '',
-      id: row[13] || `DEF-ROW-${index + 2}`,
+      id: row[6] || `DEF-ROW-${index + 2}`,
     }));
 
     return NextResponse.json(deficiencies);
@@ -51,24 +56,31 @@ export async function POST(request: NextRequest) {
     const reporter = formData.get('reporter') as string;
     const area = formData.get('area') as string;
     const remarks = formData.get('remarks') as string;
-    const title = formData.get('title') as string;
-    const category = formData.get('category') as string;
-    const priority = (formData.get('priority') as string) || 'Medium';
-    const status = (formData.get('status') as string) || 'Open';
-    const assignedTo = (formData.get('assignedTo') as string) || '';
-    const dueDate = (formData.get('dueDate') as string) || '';
-    const beforeImage = formData.get('beforeImage') as File | null;
 
-    let beforeDocsUrl = '';
-    if (beforeImage && beforeImage.size > 0 && FOLDER_ID) {
-      const buffer = Buffer.from(await beforeImage.arrayBuffer());
-      const driveFile = await uploadFileToDrive(
-        buffer, 
-        `before_${Date.now()}_${beforeImage.name}`, 
-        beforeImage.type, 
-        FOLDER_ID
-      );
-      beforeDocsUrl = driveFile.id ? `https://drive.google.com/file/d/${driveFile.id}/view` : '';
+    const newFiles = formData.getAll('newFiles') as File[];
+    const uploadedDocs: { name: string; url: string; title?: string }[] = [];
+    const fileTitlesStr = formData.get('fileTitles')?.toString() || '[]';
+    const fileTitles = JSON.parse(fileTitlesStr);
+
+    let fileIndex = 0;
+    for (const file of newFiles) {
+      if (file.size > 0 && FOLDER_ID) {
+        const buffer = Buffer.from(await file.arrayBuffer());
+        const driveFile = await uploadFileToDrive(
+          buffer, 
+          `deficiency_${Date.now()}_${file.name}`, 
+          file.type || 'application/octet-stream', 
+          FOLDER_ID
+        );
+        if (driveFile.id) {
+          uploadedDocs.push({ 
+            name: file.name, 
+            url: `https://drive.google.com/file/d/${driveFile.id}/view`,
+            title: fileTitles[fileIndex] || file.name
+          });
+        }
+        fileIndex++;
+      }
     }
 
     const deficiencyId = `DEF-${Date.now()}`;
@@ -79,15 +91,8 @@ export async function POST(request: NextRequest) {
       project,
       reporter,
       area,
-      beforeDocsUrl,
+      JSON.stringify(uploadedDocs),
       remarks,
-      title,
-      category,
-      priority,
-      status,
-      assignedTo,
-      dueDate,
-      '', // afterDocs is empty on creation
       deficiencyId
     ];
 
@@ -115,41 +120,34 @@ export async function PUT(request: NextRequest) {
     const reporter = formData.get('reporter') as string;
     const area = formData.get('area') as string;
     const remarks = formData.get('remarks') as string;
-    const title = formData.get('title') as string;
-    const category = formData.get('category') as string;
-    const priority = formData.get('priority') as string;
-    const status = formData.get('status') as string;
-    const assignedTo = formData.get('assignedTo') as string;
-    const dueDate = formData.get('dueDate') as string;
-    const beforeDocs = (formData.get('beforeDocs') as string) || '';
-    const afterDocs = (formData.get('afterDocs') as string) || '';
     const id = formData.get('id') as string;
 
-    const beforeImage = formData.get('beforeImage') as File | string | null;
-    const afterImage = formData.get('afterImage') as File | string | null;
+    const existingDocsStr = formData.get('existingDocs')?.toString() || '[]';
+    let existingDocs = JSON.parse(existingDocsStr);
 
-    let beforeDocsUrl = beforeDocs;
-    if (beforeImage instanceof File && beforeImage.size > 0 && FOLDER_ID) {
-      const buffer = Buffer.from(await beforeImage.arrayBuffer());
-      const driveFile = await uploadFileToDrive(
-        buffer, 
-        `before_${Date.now()}_${beforeImage.name}`, 
-        beforeImage.type, 
-        FOLDER_ID
-      );
-      beforeDocsUrl = driveFile.id ? `https://drive.google.com/file/d/${driveFile.id}/view` : '';
-    }
+    const newFiles = formData.getAll('newFiles') as File[];
+    const newFileTitlesStr = formData.get('newFileTitles')?.toString() || '[]';
+    const newFileTitles = JSON.parse(newFileTitlesStr);
 
-    let afterDocsUrl = afterDocs;
-    if (afterImage instanceof File && afterImage.size > 0 && FOLDER_ID) {
-      const buffer = Buffer.from(await afterImage.arrayBuffer());
-      const driveFile = await uploadFileToDrive(
-        buffer, 
-        `after_${Date.now()}_${afterImage.name}`, 
-        afterImage.type, 
-        FOLDER_ID
-      );
-      afterDocsUrl = driveFile.id ? `https://drive.google.com/file/d/${driveFile.id}/view` : '';
+    let fileIndex = 0;
+    for (const file of newFiles) {
+      if (file.size > 0 && FOLDER_ID) {
+        const buffer = Buffer.from(await file.arrayBuffer());
+        const driveFile = await uploadFileToDrive(
+          buffer, 
+          `deficiency_${Date.now()}_${file.name}`, 
+          file.type || 'application/octet-stream', 
+          FOLDER_ID
+        );
+        if (driveFile.id) {
+          existingDocs.push({ 
+            name: file.name, 
+            url: `https://drive.google.com/file/d/${driveFile.id}/view`,
+            title: newFileTitles[fileIndex] || file.name
+          });
+        }
+        fileIndex++;
+      }
     }
 
     const updatedRow = [
@@ -157,19 +155,12 @@ export async function PUT(request: NextRequest) {
       project,
       reporter,
       area,
-      beforeDocsUrl,
+      JSON.stringify(existingDocs),
       remarks,
-      title,
-      category,
-      priority,
-      status,
-      assignedTo,
-      dueDate,
-      afterDocsUrl,
       id
     ];
 
-    await updateSheetRow(SHEET_ID, `${SHEET_NAME}!A${rowIndex}:N${rowIndex}`, [updatedRow]);
+    await updateSheetRow(SHEET_ID, `${SHEET_NAME}!A${rowIndex}:G${rowIndex}`, [updatedRow]);
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
