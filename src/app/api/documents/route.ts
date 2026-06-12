@@ -14,13 +14,13 @@ const FOLDER_ID = CONFIG.DOCUMENT.FOLDER_ID;
 
 export async function GET() {
   try {
-    const data = await getSheetsData(SHEET_ID, `${SHEET_NAME}!A2:L1000`);
+    const data = await getSheetsData(SHEET_ID, `${SHEET_NAME}!A2:G1000`);
 
     if (!data || data.length === 0) return NextResponse.json([]);
 
     const documents = data.map((row: string[], index: number) => {
       let files = [];
-      const rawFiles = row[9] || '';
+      const rawFiles = row[4] || '';
       
       // Safe JSON parsing with fallback for legacy single links
       if (rawFiles.trim().startsWith('[')) {
@@ -45,15 +45,10 @@ export async function GET() {
         timestamp: row[0] || '',
         project: row[1] || '',
         title: row[2] || '',
-        category: row[3] || 'Agreement / Contract',
-        referenceNumber: row[4] || '',
-        issueDate: row[5] || '',
-        expiryDate: row[6] || '',
-        stakeholders: row[7] || '',
-        status: row[8] || 'Draft',
+        stakeholders: row[3] || '',
         files: normalizedFiles,
-        remarks: row[10] || '',
-        id: row[11] || `DOC-ROW-${index + 2}`,
+        remarks: row[5] || '',
+        id: row[6] || `DOC-ROW-${index + 2}`,
       };
     });
 
@@ -128,12 +123,7 @@ export async function POST(request: NextRequest) {
       timestamp,
       project,
       title,
-      category || 'Agreement / Contract',
-      referenceNumber || '',
-      issueDate || '',
-      expiryDate || '',
       stakeholders || '',
-      status,
       filesJson,
       remarks || '',
       docId
@@ -226,18 +216,13 @@ export async function PUT(request: NextRequest) {
       timestamp || new Date().toISOString(),
       project,
       title,
-      category || 'Agreement / Contract',
-      referenceNumber || '',
-      issueDate || '',
-      expiryDate || '',
       stakeholders || '',
-      status || 'Draft',
       filesJson,
       remarks || '',
       id
     ];
 
-    await updateSheetRow(SHEET_ID, `${SHEET_NAME}!A${rowIndex}:L${rowIndex}`, [updatedRow]);
+    await updateSheetRow(SHEET_ID, `${SHEET_NAME}!A${rowIndex}:G${rowIndex}`, [updatedRow]);
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {

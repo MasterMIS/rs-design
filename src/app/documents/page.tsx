@@ -56,6 +56,7 @@ export default function DocumentsPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [expandedProjects, setExpandedProjects] = useState<Record<string, boolean>>({});
+  const [users, setUsers] = useState<any[]>([]);
 
   // Search and Filter States
   const [searchQuery, setSearchQuery] = useState('');
@@ -108,8 +109,20 @@ export default function DocumentsPage() {
   useEffect(() => {
     fetchDocuments();
     fetchProjects();
-
+    fetchUsers();
     }, []);
+
+  async function fetchUsers() {
+    try {
+      const res = await fetch('/api/users');
+      if (res.ok) {
+        const data = await res.json();
+        setUsers(data);
+      }
+    } catch (err) {
+      console.error('Error fetching users:', err);
+    }
+  }
 
   async function fetchDocuments() {
     try {
@@ -157,9 +170,10 @@ export default function DocumentsPage() {
     setEditingDoc(null);
     setStagedFiles([]);
     setUploadMode('images');
+    setUploadMode('images');
     setExistingFiles([]);
     setFormFields({
-      project: projects[0]?.basicInfo?.name || '',
+      project: activeProject ? activeProject.name : (projects[0]?.basicInfo?.name || ''),
       title: '',
       category: 'Agreement / Contract',
       referenceNumber: '',
@@ -449,14 +463,13 @@ export default function DocumentsPage() {
             <thead>
               <tr>
                 <th>Actions</th>
-                <th>Document Name</th>
+                <th>Timestamp</th>
                 <th>Project</th>
-                <th>Category</th>
-                <th>Version / Ref</th>
-                <th>Execution Date</th>
-                <th>Status</th>
-                <th>Attachments</th>
-                <th>Stakeholders</th>
+                <th>Document Title</th>
+                <th>User Name</th>
+                <th>File Attachments</th>
+                <th>Remarks / Description</th>
+                <th>ID</th>
               </tr>
             </thead>
             <tbody>
@@ -473,33 +486,22 @@ export default function DocumentsPage() {
                     </div>
                   </td>
                   <td>
-                    <div className={styles.tableTitleCell}>
-                      <span className={styles.tableRepName}>{doc.title}</span>
-                      {doc.remarks && (
-                        <span className={styles.tableRepDetail}>{doc.remarks}</span>
-                      )}
-                    </div>
+                    {doc.timestamp ? new Date(doc.timestamp).toLocaleString('en-US', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
                   </td>
                   <td>{doc.project}</td>
                   <td>
-                    <span className={styles.categoryTag} style={{ fontSize: '0.65rem', padding: '1px 6px' }}>{doc.category}</span>
+                    <span className={styles.tableRepName}>{doc.title}</span>
                   </td>
-                  <td>{doc.referenceNumber || '—'}</td>
-                  <td>
-                    {doc.issueDate ? new Date(doc.issueDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
-                  </td>
-                  <td>
-                    <span className={`${styles.statusBadge} ${styles[doc.status.replace(/\s+/g, '').toLowerCase()]}`}>
-                      {doc.status}
-                    </span>
+                  <td style={{ fontSize: '0.8rem', color: 'var(--text-light)', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {doc.stakeholders || '—'}
                   </td>
                   <td>
                     <div className={styles.tableFilesCell}>
                       {doc.files && doc.files.length > 0 ? (
                         doc.files.map((file, idx) => (
-                          <a key={idx} href={file.url} target="_blank" rel="noopener noreferrer" className={styles.tableFileLink} title={`${file.title} (${file.name})`}>
+                          <a key={idx} href={file.url} target="_blank" rel="noopener noreferrer" className={styles.tableFileLink} title={`${file.title || file.name} (${file.name})`}>
                             <Link2 size={11} />
-                            <span>{file.title}</span>
+                            <span>{file.title || file.name}</span>
                           </a>
                         ))
                       ) : (
@@ -508,7 +510,10 @@ export default function DocumentsPage() {
                     </div>
                   </td>
                   <td style={{ fontSize: '0.8rem', color: 'var(--text-light)', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {doc.stakeholders || '—'}
+                    {doc.remarks || '—'}
+                  </td>
+                  <td style={{ fontSize: '0.8rem', color: 'var(--text-light)' }}>
+                    {doc.id}
                   </td>
                 </tr>
               ))}
@@ -534,6 +539,7 @@ export default function DocumentsPage() {
                 onChange={handleInputChange}
                 className={styles.formSelect}
                 required
+                disabled
               >
                 {projects.length > 0 ? (
                   projects.map(p => (
@@ -552,86 +558,25 @@ export default function DocumentsPage() {
                 value={formFields.title}
                 onChange={handleInputChange}
                 className={styles.formInput}
-                placeholder="e.g. Master Design Subcontract Agreement"
                 required
               />
             </div>
           </div>
 
+
+
           <div className={styles.formRow}>
             <div className={styles.formGroup}>
-              <label><FolderOpen size={14} /> Document Category *</label>
+              <label><Users size={14} /> User Person Name</label>
               <select
-                name="category"
-                value={formFields.category}
-                onChange={handleInputChange}
-                className={styles.formSelect}
-                required
-              >
-                {categories.map(c => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
-            </div>
-            <div className={styles.formGroup}>
-              <label><Tag size={14} /> Reference / Version Number</label>
-              <input
-                type="text"
-                name="referenceNumber"
-                value={formFields.referenceNumber}
-                onChange={handleInputChange}
-                className={styles.formInput}
-                placeholder="e.g. REV-3, permit-no, CONT-2026-10"
-              />
-            </div>
-          </div>
-
-          <div className={styles.formRow}>
-            <div className={styles.formGroup}>
-              <label><Calendar size={14} /> Issue / Execution Date *</label>
-              <input
-                type="date"
-                name="issueDate"
-                value={formFields.issueDate}
-                onChange={handleInputChange}
-                className={styles.formInput}
-                required
-              />
-            </div>
-            <div className={styles.formGroup}>
-              <label><CalendarCheck size={14} /> Expiry / Renewal Date</label>
-              <input
-                type="date"
-                name="expiryDate"
-                value={formFields.expiryDate}
-                onChange={handleInputChange}
-                className={styles.formInput}
-              />
-            </div>
-          </div>
-
-          <div className={styles.formRow}>
-            <div className={styles.formGroup}>
-              <label><Users size={14} /> Involved Stakeholders / Signatories</label>
-              <input
-                type="text"
                 name="stakeholders"
                 value={formFields.stakeholders}
                 onChange={handleInputChange}
-                className={styles.formInput}
-                placeholder="e.g. RSDesign, client representative name, managing consultant"
-              />
-            </div>
-            <div className={styles.formGroup}>
-              <label><AlertCircle size={14} /> Document Status</label>
-              <select
-                name="status"
-                value={formFields.status}
-                onChange={handleInputChange}
                 className={styles.formSelect}
               >
-                {statuses.map(s => (
-                  <option key={s} value={s}>{s}</option>
+                <option value="">Select User</option>
+                {users.map(u => (
+                  <option key={u.id} value={u.name}>{u.name}</option>
                 ))}
               </select>
             </div>
@@ -641,7 +586,7 @@ export default function DocumentsPage() {
           <div className={styles.formGroup}>
             <label><FileUp size={14} /> Attached Document Files (Select Multiple)</label>
             
-            <div style={{ display: 'flex', gap: '16px', fontSize: '0.8rem', color: 'var(--text-main)', marginBottom: '8px' }}>
+            <div style={{ display: 'flex', gap: '16px', fontSize: '0.8rem', color: 'var(--text-main)', marginBottom: '8px', marginTop: '12px' }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
                 <input type="radio" name="uploadMode" checked={uploadMode === 'images'} onChange={() => { setUploadMode('images'); setStagedFiles([]); }} />
                 Images (Auto-convert to PDF)
@@ -684,14 +629,6 @@ export default function DocumentsPage() {
                           {item.file.name}
                         </span>
                       </div>
-                      <input
-                        type="text"
-                        placeholder="Enter file title / label (e.g. Executive Summary)"
-                        value={item.title}
-                        onChange={(e) => handleStagedTitleChange(idx, e.target.value)}
-                        className={styles.stagedTitleInput}
-                        required
-                      />
                       <button type="button" className={styles.removeStagedBtn} onClick={() => removeStagedFile(idx)}>
                         <Trash size={13} />
                       </button>
@@ -710,19 +647,10 @@ export default function DocumentsPage() {
                     <div key={idx} className={styles.stagedFileItem} style={{ borderColor: 'rgba(39, 206, 138, 0.3)' }}>
                       <div className={styles.stagedFileLeft}>
                         <Link2 size={14} style={{ color: 'var(--success)', flexShrink: 0 }} />
-                        <a href={file.url} target="_blank" rel="noopener noreferrer" className={styles.stagedFileName} style={{ color: 'var(--success)', textDecoration: 'none' }} title={file.name}>
-                          {file.name}
+                        <a href={file.url} target="_blank" rel="noopener noreferrer" className={styles.stagedFileName} style={{ color: 'var(--success)', textDecoration: 'none', maxWidth: '200px' }} title={file.name}>
+                          {file.title || file.name}
                         </a>
                       </div>
-                      <input
-                        type="text"
-                        placeholder="Enter file title / label"
-                        value={file.title}
-                        onChange={(e) => handleExistingTitleChange(idx, e.target.value)}
-                        className={styles.stagedTitleInput}
-                        style={{ borderColor: 'rgba(39, 206, 138, 0.3)' }}
-                        required
-                      />
                       <button type="button" className={styles.removeStagedBtn} onClick={() => removeExistingFile(idx)} title="Remove attachment">
                         <Trash size={13} />
                       </button>
@@ -740,7 +668,6 @@ export default function DocumentsPage() {
               value={formFields.remarks}
               onChange={handleInputChange}
               className={styles.formTextarea}
-              placeholder="Enter summary details, important terms, or general observations..."
             />
           </div>
 

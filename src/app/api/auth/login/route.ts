@@ -8,9 +8,9 @@ export async function POST(request: NextRequest) {
     const { loginType } = body; // 'internal' or 'client'
 
     if (loginType === 'client') {
-      const { projectName, projectCode } = body;
-      if (!projectName || !projectCode) {
-        return NextResponse.json({ error: 'Project Name and Project Code are required.' }, { status: 400 });
+      const { projectName } = body;
+      if (!projectName) {
+        return NextResponse.json({ error: 'Project Name is required.' }, { status: 400 });
       }
 
       // Fetch projects
@@ -22,14 +22,13 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'No projects database found.' }, { status: 404 });
       }
 
-      // Find project matching basicInfo.name and basicInfo.code
+      // Find project matching basicInfo.name
       let matchedProject: any = null;
       for (const row of data) {
         try {
           const basicInfo = row[1] ? JSON.parse(row[1]) : {};
           if (
-            basicInfo.name?.toString().trim().toLowerCase() === projectName.toString().trim().toLowerCase() &&
-            basicInfo.code?.toString().trim() === projectCode.toString().trim()
+            basicInfo.name?.toString().trim().toLowerCase() === projectName.toString().trim().toLowerCase()
           ) {
             matchedProject = {
               id: row[0],
@@ -43,7 +42,7 @@ export async function POST(request: NextRequest) {
       }
 
       if (!matchedProject) {
-        return NextResponse.json({ error: 'Invalid Project Name or Project Code.' }, { status: 401 });
+        return NextResponse.json({ error: 'Project not found. Please check the project name.' }, { status: 401 });
       }
 
       const user = {
@@ -54,8 +53,7 @@ export async function POST(request: NextRequest) {
         avatar: '',
         status: 'active',
         projectName: matchedProject.basicInfo.name,
-        projectId: matchedProject.id,
-        projectCode: matchedProject.basicInfo.code
+        projectId: matchedProject.id
       };
 
       return NextResponse.json({ success: true, user });
