@@ -9,7 +9,7 @@ import {
   Home, Phone, Mail, FileText, Info, Edit2, ArrowLeft,
   ExternalLink, Layers, ShieldCheck, Activity, Tag,
   Layers3, Landmark, Contact, Map, Settings, BriefcaseBusiness,
-  LayoutGrid, List, Eye
+  LayoutGrid, List, Eye, PenTool
 } from 'lucide-react';
 import styles from './projects.module.css';
 import Modal from '@/components/Modal';
@@ -388,6 +388,12 @@ export default function ProjectsPage() {
                   <AlertTriangle size={28} strokeWidth={2.5} />
                 </div>
                 <span style={{ fontWeight: 700, color: 'var(--text-heading)', fontSize: '0.95rem', letterSpacing: '0.3px' }}>Snags / Deficiencies</span>
+              </button>
+              <button className={styles.moduleTile} onClick={() => navigateToModule('/drawings')}>
+                <div className={styles.moduleIconWrapper} style={{ background: 'linear-gradient(135deg, #8b5cf6, #5b21b6)', color: '#fff', boxShadow: '0 8px 20px rgba(91, 33, 182, 0.3)' }}>
+                  <PenTool size={28} strokeWidth={2.5} />
+                </div>
+                <span style={{ fontWeight: 700, color: 'var(--text-heading)', fontSize: '0.95rem', letterSpacing: '0.3px' }}>Drawing Schedule</span>
               </button>
             </div>
           </div>

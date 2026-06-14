@@ -3,7 +3,10 @@
 import React, { useState, useEffect } from 'react';
 import {
   Plus, Search, Edit2, Trash2, Settings,
-  Building, Tag, CheckSquare, X, AlertCircle
+  Building, Tag, CheckSquare, X, AlertCircle,
+  ListTodo, ChevronRight,
+  MonitorPlay, Bed, Hammer, HardHat, Zap, Droplet, Wind,
+  Paintbrush, Utensils, Bath, Grid, FileText, CheckCircle2, LayoutTemplate
 } from 'lucide-react';
 import styles from './checklists.module.css';
 import Modal from '@/components/Modal';
@@ -36,6 +39,26 @@ interface Project {
   };
 }
 
+const getTemplateIcon = (name: string, size = 16) => {
+  const lowerName = name.toLowerCase();
+  const style = { marginRight: '8px', flexShrink: 0 };
+  
+  if (lowerName.includes('3d') || lowerName.includes('design')) return <MonitorPlay size={size} style={style} />;
+  if (lowerName.includes('bed')) return <Bed size={size} style={style} />;
+  if (lowerName.includes('carpenter') || lowerName.includes('wood') || lowerName.includes('furniture')) return <Hammer size={size} style={style} />;
+  if (lowerName.includes('civil') || lowerName.includes('mason')) return <HardHat size={size} style={style} />;
+  if (lowerName.includes('electric') || lowerName.includes('light') || lowerName.includes('wiring')) return <Zap size={size} style={style} />;
+  if (lowerName.includes('plumb') || lowerName.includes('water')) return <Droplet size={size} style={style} />;
+  if (lowerName.includes('hvac') || lowerName.includes('ac ') || lowerName.includes('ventilation')) return <Wind size={size} style={style} />;
+  if (lowerName.includes('paint') || lowerName.includes('polish')) return <Paintbrush size={size} style={style} />;
+  if (lowerName.includes('kitchen')) return <Utensils size={size} style={style} />;
+  if (lowerName.includes('bath') || lowerName.includes('toilet')) return <Bath size={size} style={style} />;
+  if (lowerName.includes('floor') || lowerName.includes('tile') || lowerName.includes('marble')) return <Grid size={size} style={style} />;
+  if (lowerName.includes('execution') || lowerName.includes('final')) return <CheckCircle2 size={size} style={style} />;
+  
+  return <LayoutTemplate size={size} style={style} />;
+};
+
 export default function ChecklistsPage() {
   const { activeProject } = useProject();
   const [checklists, setChecklists] = useState<Checklist[]>([]);
@@ -47,29 +70,22 @@ export default function ChecklistsPage() {
 
   // Filters for Checklists
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterProject, setFilterProject] = useState('');
 
   // Filters for Templates
-  const [filterTemplateTitle, setFilterTemplateTitle] = useState('');
+  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [searchItemName, setSearchItemName] = useState('');
 
   // Modals
-  const [isChkModalOpen, setIsChkModalOpen] = useState(false);
   const [isTplModalOpen, setIsTplModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  
-  const [editingChk, setEditingChk] = useState<Checklist | null>(null);
+
   const [editingTplItem, setEditingTplItem] = useState<TemplateItem | null>(null);
   const [editingTplGroup, setEditingTplGroup] = useState<string | null>(null);
-  
-  const [itemToDelete, setItemToDelete] = useState<{type: 'checklist'|'template'|'templateGroup', data: any} | null>(null);
+
+  const [itemToDelete, setItemToDelete] = useState<{ type: 'checklist' | 'template' | 'templateGroup', data: any } | null>(null);
 
   // Forms
-  const [chkForm, setChkForm] = useState({
-    project: '',
-    remarks: ''
-  });
-  const [checkedState, setCheckedState] = useState<Record<string, boolean>>({});
+  const [localCheckedState, setLocalCheckedState] = useState<Record<string, boolean>>({});
 
   const [tplForm, setTplForm] = useState({
     templateName: ''
@@ -80,6 +96,19 @@ export default function ChecklistsPage() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  const activeProjectName = activeProject?.name || '';
+  const currentProjectChecklist = checklists.find(c => c.project === activeProjectName);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+  useEffect(() => {
+    if (currentProjectChecklist) {
+      setLocalCheckedState(currentProjectChecklist.checkedItems || {});
+    } else {
+      setLocalCheckedState({});
+    }
+    setHasUnsavedChanges(false);
+  }, [checklists, activeProjectName, currentProjectChecklist]);
 
   async function fetchData() {
     setLoading(true);
@@ -108,93 +137,41 @@ export default function ChecklistsPage() {
   }, {} as Record<string, TemplateItem[]>);
 
   const uniqueTemplateNames = Object.keys(groupedTemplates).sort();
+  const activeTemplateName = (selectedTemplate && uniqueTemplateNames.includes(selectedTemplate))
+    ? selectedTemplate
+    : uniqueTemplateNames[0] || null;
 
   // ---- CHECKLIST HANDLERS ----
-  const handleCreateChecklist = () => {
-    setEditingChk(null);
-    setChkForm({
-      project: projects[0]?.basicInfo?.name || '',
-      remarks: ''
-    });
-    
-    const initialChecked: Record<string, boolean> = {};
-    templateItems.forEach(item => {
-      initialChecked[item.id] = false;
-    });
-    setCheckedState(initialChecked);
-    setIsChkModalOpen(true);
-  };
-
-  const handleEditChecklist = (chk: Checklist) => {
-    setEditingChk(chk);
-    setChkForm({
-      project: chk.project,
-      remarks: chk.remarks
-    });
-    
-    // Merge saved state with current template structure
-    const mergedState: Record<string, boolean> = { ...chk.checkedItems };
-    templateItems.forEach(item => {
-      // Backwards compatibility with old keys
-      const oldKey = `${item.templateName}||${item.itemName}`;
-      if (mergedState[oldKey] !== undefined) {
-        mergedState[item.id] = mergedState[oldKey];
-        delete mergedState[oldKey];
-      }
-      
-      if (mergedState[item.id] === undefined) {
-        mergedState[item.id] = false;
-      }
-    });
-    
-    setCheckedState(mergedState);
-    setIsChkModalOpen(true);
-  };
-
   const toggleCheckItem = (key: string) => {
-    setCheckedState(prev => ({
+    setLocalCheckedState(prev => ({
       ...prev,
       [key]: !prev[key]
     }));
+    setHasUnsavedChanges(true);
   };
 
-  const handleSelectGroup = (tplName: string, selectAll: boolean) => {
-    const updated = { ...checkedState };
-    groupedTemplates[tplName]?.forEach(item => {
-      updated[item.id] = selectAll;
-    });
-    setCheckedState(updated);
-  };
-
-  const handleSelectAllGlobal = (selectAll: boolean) => {
-    const updated = { ...checkedState };
-    templateItems.forEach(item => {
-      updated[item.id] = selectAll;
-    });
-    setCheckedState(updated);
-  };
-
-  const submitChecklist = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!chkForm.project) return;
-
-    const totalItems = templateItems.length;
+  const saveChecklistProgress = async () => {
+    if (!activeProjectName) {
+      alert("No active project selected.");
+      return;
+    }
 
     try {
       setSubmitting(true);
+      const totalItems = templateItems.length;
       const payload = {
-        project: chkForm.project,
-        checkedItems: checkedState,
-        remarks: chkForm.remarks,
+        project: activeProjectName,
+        checkedItems: localCheckedState,
+        remarks: currentProjectChecklist?.remarks || '',
         totalItems
       };
 
       let res;
-      if (editingChk) {
-        res = await fetch(`/api/checklists?rowIndex=${editingChk.rowIndex}`, {
+      if (currentProjectChecklist) {
+        res = await fetch(`/api/checklists?rowIndex=${currentProjectChecklist.rowIndex}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...payload, referenceNo: editingChk.referenceNo, timestamp: editingChk.timestamp }),
+          body: JSON.stringify({ ...payload, referenceNo: currentProjectChecklist.referenceNo, timestamp: currentProjectChecklist.timestamp }),
         });
       } else {
         res = await fetch('/api/checklists', {
@@ -205,14 +182,15 @@ export default function ChecklistsPage() {
       }
 
       if (res.ok) {
-        setIsChkModalOpen(false);
-        fetchData();
+        setHasUnsavedChanges(false);
+        await fetchData(); // Refresh to get the new checklist ID if it was created
       } else {
         const err = await res.json();
-        alert(`Error: ${err.error}`);
+        alert(`Error saving progress: ${err.error}`);
       }
     } catch (err) {
       console.error(err);
+      alert('Failed to save checklist progress.');
     } finally {
       setSubmitting(false);
     }
@@ -241,10 +219,10 @@ export default function ChecklistsPage() {
     setEditingTplGroup(tplName);
     setEditingTplItem(null);
     setTplForm({ templateName: tplName });
-    
+
     const items = groupedTemplates[tplName]?.map(i => i.itemName) || [];
     setTplItemNames(items.length > 0 ? items : ['']);
-    
+
     setIsNewTemplateName(false);
     setIsTplModalOpen(true);
   };
@@ -265,7 +243,7 @@ export default function ChecklistsPage() {
   const submitTemplateItem = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanItems = tplItemNames.map(i => i.trim()).filter(i => i.length > 0);
-    
+
     if (!tplForm.templateName || cleanItems.length === 0) {
       alert('Template Name and at least one Item are required.');
       return;
@@ -320,7 +298,7 @@ export default function ChecklistsPage() {
     if (!itemToDelete) return;
     try {
       setSubmitting(true);
-      
+
       let endpoint = '';
       if (itemToDelete.type === 'checklist') {
         endpoint = `/api/checklists?rowIndex=${itemToDelete.data.rowIndex}`;
@@ -333,7 +311,7 @@ export default function ChecklistsPage() {
       const res = await fetch(endpoint, {
         method: 'DELETE',
       });
-      
+
       if (res.ok) {
         setIsDeleteModalOpen(false);
         setItemToDelete(null);
@@ -350,12 +328,8 @@ export default function ChecklistsPage() {
   };
 
   const filteredChecklists = checklists.filter(c => {
-    const searchMatch = c.referenceNo.toLowerCase().includes(searchQuery.toLowerCase()) || c.project.toLowerCase().includes(searchQuery.toLowerCase());
-    const projMatch = filterProject === '' || c.project === filterProject;
-    return searchMatch && projMatch;
+    return c.referenceNo.toLowerCase().includes(searchQuery.toLowerCase()) || c.project.toLowerCase().includes(searchQuery.toLowerCase());
   });
-
-  const uniqueProjectsList = Array.from(new Set(checklists.map(s => s.project))).filter(Boolean);
 
   const getProgressColor = (pct: number) => {
     if (pct < 40) return styles.low;
@@ -368,11 +342,6 @@ export default function ChecklistsPage() {
     if (pct < 80) return '#f39c12';
     return 'var(--success)';
   };
-
-  // Template Filtering
-  const filteredTemplateNames = uniqueTemplateNames.filter(name => {
-    return filterTemplateTitle === '' || name === filterTemplateTitle;
-  });
 
   return (
     <div className={styles.container}>
@@ -401,12 +370,22 @@ export default function ChecklistsPage() {
           </div>
         </div>
         <div className={styles.headerActions}>
+          <div className={styles.searchWrapper} style={{ width: '250px' }}>
+            <Search size={18} className={styles.searchIcon} />
+            <input
+              type="text"
+              placeholder="Search template items..."
+              className={styles.searchInput}
+              value={searchItemName}
+              onChange={(e) => setSearchItemName(e.target.value)}
+            />
+          </div>
           <button className={styles.secondaryButton} onClick={() => setActiveTab(activeTab === 'checklists' ? 'templates' : 'checklists')}>
             {activeTab === 'checklists' ? <><Settings size={18} /> Manage Templates</> : <><CheckSquare size={18} /> View Checklists</>}
           </button>
           {activeTab === 'checklists' ? (
-            <button className={styles.addButton} onClick={handleCreateChecklist}>
-              <Plus size={18} /> Add Checklist
+            <button className={`${styles.addButton} ${styles.saveButton} ${hasUnsavedChanges ? styles.unsavedSaveButton : styles.savedSaveButton}`} onClick={saveChecklistProgress} disabled={submitting}>
+              <CheckSquare size={18} /> {submitting ? 'Saving...' : 'Save Progress'}
             </button>
           ) : (
             <button className={styles.addButton} onClick={handleAddTemplateItem}>
@@ -418,267 +397,193 @@ export default function ChecklistsPage() {
 
       {loading ? (
         <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-light)' }}>Loading...</div>
-      ) : activeTab === 'checklists' ? (
-        <>
-          <div className={styles.filtersBar}>
-            <div className={styles.searchWrapper}>
-              <Search size={18} className={styles.searchIcon} />
-              <input
-                type="text"
-                placeholder="Search Checklists..."
-                className={styles.searchInput}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-            <div className={styles.filterControls}>
-              <select className={styles.filterSelect} value={filterProject} onChange={(e) => setFilterProject(e.target.value)}>
-                <option value="">All Projects</option>
-                {uniqueProjectsList.map(proj => <option key={proj} value={proj}>{proj}</option>)}
-              </select>
-            </div>
-          </div>
-
-          <div className={styles.chkGrid}>
-            {filteredChecklists.map(chk => {
-              const totalChecked = Object.values(chk.checkedItems).filter(Boolean).length;
-              return (
-                <div key={chk.id} className={styles.chkCard} style={{ borderTop: `4px solid ${getBorderColor(chk.completedPercentage)}` }}>
-                  <div className={styles.cardHeader}>
-                    <div className={styles.cardTitle}>
-                      <Building size={18} /> {chk.project}
-                    </div>
-                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: getBorderColor(chk.completedPercentage) }}>{chk.completedPercentage}%</span>
-                  </div>
-                  <div className={styles.cardMeta}>
-                    <span><Tag size={12} /> {chk.referenceNo}</span>
-                  </div>
-                  <div className={styles.cardBody}>
-                    <div className={styles.progressContainer}>
-                      <div className={styles.progressHeader}>
-                        <span>Overall Completion</span>
-                        <span>{totalChecked} / {templateItems.length} items</span>
-                      </div>
-                      <div className={styles.progressBar}>
-                        <div className={`${styles.progressFill} ${getProgressColor(chk.completedPercentage)}`} style={{ width: `${chk.completedPercentage}%` }} />
-                      </div>
-                    </div>
-                    
-                    {/* Sub-scores per Template */}
-                    <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {uniqueTemplateNames.map(tplName => {
-                        const itemsForTpl = groupedTemplates[tplName] || [];
-                        if (itemsForTpl.length === 0) return null;
-                        
-                        let checkedCount = 0;
-                        itemsForTpl.forEach(item => {
-                          // Support both new ID format and old string format
-                          if (chk.checkedItems[item.id] || chk.checkedItems[`${tplName}||${item.itemName}`]) {
-                            checkedCount++;
-                          }
-                        });
-                        
-                        const pct = Math.round((checkedCount / itemsForTpl.length) * 100);
-                        
-                        return (
-                          <div key={tplName} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '6px' }}>
-                            <span style={{ color: 'var(--text-main)', fontWeight: 700 }}>{tplName}</span>
-                            <span style={{ color: 'var(--text-light)', fontWeight: 600 }}>{checkedCount} / {itemsForTpl.length} <span style={{ color: getBorderColor(pct), marginLeft: '4px' }}>({pct}%)</span></span>
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {chk.remarks && (
-                      <div style={{ marginTop: '16px', fontSize: '0.8rem', color: 'var(--text-main)', backgroundColor: 'var(--bg-main)', padding: '8px', borderRadius: '6px' }}>
-                        <strong>Remarks:</strong> <span style={{ color: 'var(--text-light)' }}>{chk.remarks}</span>
-                      </div>
-                    )}
-                  </div>
-                  <div className={styles.cardActions}>
-                    <button className={`${styles.actionBtn} ${styles.primary}`} onClick={() => handleEditChecklist(chk)}><Edit2 size={12} /> Expand & Update</button>
-                    <button className={`${styles.controlBtn} ${styles.delete}`} onClick={() => { setItemToDelete({type: 'checklist', data: chk}); setIsDeleteModalOpen(true); }}><Trash2 size={14} /></button>
-                  </div>
-                </div>
-              );
-            })}
-            {filteredChecklists.length === 0 && <p style={{ color: 'var(--text-light)' }}>No checklists found.</p>}
-          </div>
-        </>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          <div className={styles.filtersBar}>
-            <div className={styles.filterControls} style={{ flex: 1 }}>
-              <select className={styles.filterSelect} style={{ width: '250px' }} value={filterTemplateTitle} onChange={(e) => setFilterTemplateTitle(e.target.value)}>
-                <option value="">All Template Titles</option>
-                {uniqueTemplateNames.map(name => <option key={name} value={name}>{name}</option>)}
-              </select>
+          <div className={styles.templateLayout}>
+            {/* Sidebar */}
+            <div className={styles.templateSidebar}>
+              <h3 className={styles.sidebarTitle}>All Templates</h3>
+              <div className={styles.sidebarList}>
+                {uniqueTemplateNames.map(name => (
+                  <button
+                    key={name}
+                    className={`${styles.sidebarItem} ${activeTemplateName === name ? styles.active : ''}`}
+                    onClick={() => setSelectedTemplate(name)}
+                  >
+                    {getTemplateIcon(name)}
+                    {name}
+                  </button>
+                ))}
+                {uniqueTemplateNames.length === 0 && (
+                  <p className={styles.emptySidebar}>No templates found.</p>
+                )}
+              </div>
             </div>
-            <div className={styles.searchWrapper}>
-              <Search size={18} className={styles.searchIcon} />
-              <input
-                type="text"
-                placeholder="Search items..."
-                className={styles.searchInput}
-                value={searchItemName}
-                onChange={(e) => setSearchItemName(e.target.value)}
-              />
-            </div>
-          </div>
-          
-          <div className={styles.projectGroupSection}>
-            {filteredTemplateNames.map(tplName => {
-              const items = groupedTemplates[tplName].filter(item => item.itemName.toLowerCase().includes(searchItemName.toLowerCase()));
-              if (items.length === 0) return null;
-              
-              return (
-                <div key={tplName} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <div className={styles.projectGroupHeader} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <h3 style={{ margin: 0 }}>{tplName}</h3>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <button 
-                        className={`${styles.actionBtn} ${styles.primary}`} 
-                        onClick={() => handleEditTemplateGroup(tplName)}
-                        title="Edit entire template title and items"
-                      >
-                        <Edit2 size={14} /> Edit Title
-                      </button>
-                      <button 
-                        className={`${styles.actionBtn} ${styles.delete}`} 
-                        onClick={() => { setItemToDelete({type: 'templateGroup', data: tplName}); setIsDeleteModalOpen(true); }}
-                        title="Delete entire template title and all its items"
-                      >
-                        <Trash2 size={14} /> Delete Title
-                      </button>
-                    </div>
-                  </div>
-                  <div className={styles.tableContainer}>
-                    <table className={styles.chkTable} style={{ minWidth: '400px' }}>
-                      <thead>
-                        <tr>
-                          <th>Checklist Item</th>
-                          <th style={{ width: '100px' }}>Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {items.map(item => (
-                          <tr key={item.rowIndex}>
-                            <td><strong>{item.itemName}</strong></td>
-                            <td>
-                              <div className={styles.tableActions}>
-                                <button className={styles.controlBtn} onClick={() => handleEditTemplateItem(item)}><Edit2 size={13} /></button>
-                                <button className={`${styles.controlBtn} ${styles.delete}`} onClick={() => { setItemToDelete({type: 'template', data: item}); setIsDeleteModalOpen(true); }}><Trash2 size={13} /></button>
+
+            {/* Content */}
+            <div className={styles.templateContent}>
+              {activeTemplateName ? (() => {
+                const allItemsForTemplate = groupedTemplates[activeTemplateName] || [];
+                const items = allItemsForTemplate.filter(item => item.itemName.toLowerCase().includes(searchItemName.toLowerCase()));
+                
+                // Calculate stats
+                const totalItems = allItemsForTemplate.length;
+                const completedItems = allItemsForTemplate.filter(item => localCheckedState[item.id]).length;
+                const pendingItems = totalItems - completedItems;
+                const completionPct = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
+
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    {items.length > 0 ? (
+                      <div className={styles.tableContainer}>
+                        <div style={{ display: 'flex', background: 'var(--banner-bg)', borderRadius: '12px', color: 'white', marginBottom: '10px', boxShadow: '0 4px 10px rgba(0, 0, 0, 0.1)', textTransform: 'uppercase', fontSize: '0.8rem', fontWeight: 700, minWidth: '800px' }}>
+                          <div style={{ flex: 1, padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                              <span style={{ color: 'rgba(255,255,255,0.85)' }}>Checklist Item</span>
+                              <span style={{ color: 'rgba(255,255,255,0.3)' }}>|</span>
+                              <span style={{ color: 'white', fontWeight: 800, fontSize: '0.95rem' }}>{activeTemplateName}</span>
+                            </div>
+                            {activeTab === 'checklists' && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginRight: '16px', backgroundColor: 'rgba(0,0,0,0.2)', padding: '6px 16px', borderRadius: '20px', fontSize: '0.75rem', border: '1px solid rgba(255,255,255,0.1)', textTransform: 'none' }}>
+                                <span style={{ color: 'rgba(255,255,255,0.9)' }}><strong>{totalItems}</strong> Total</span>
+                                <span style={{ color: 'rgba(255,255,255,0.3)' }}>•</span>
+                                <span style={{ color: 'var(--success)' }}><strong>{completedItems}</strong> Completed</span>
+                                <span style={{ color: 'rgba(255,255,255,0.3)' }}>•</span>
+                                <span style={{ color: '#f39c12' }}><strong>{pendingItems}</strong> Pending</span>
+                                <span style={{ color: 'rgba(255,255,255,0.3)' }}>•</span>
+                                <span style={{ color: 'white', fontWeight: 800 }}>{completionPct}%</span>
                               </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                            )}
+                          </div>
+                          <div style={{ width: '280px', padding: '14px 16px', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', flexShrink: 0 }}>
+                            {activeTab === 'templates' ? (
+                              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', alignItems: 'center' }}>
+                                <button
+                                  className={`${styles.actionBtn}`}
+                                  onClick={() => handleEditTemplateGroup(activeTemplateName)}
+                                  title="Edit entire template title and items"
+                                  style={{ padding: '4px 12px', fontSize: '0.75rem', whiteSpace: 'nowrap', backgroundColor: 'transparent', color: 'white', border: '1px solid rgba(255,255,255,0.5)' }}
+                                >
+                                  <Edit2 size={12} /> Edit Title
+                                </button>
+                                <button
+                                  className={`${styles.actionBtn}`}
+                                  onClick={() => { setItemToDelete({ type: 'templateGroup', data: activeTemplateName }); setIsDeleteModalOpen(true); }}
+                                  title="Delete entire template title and all its items"
+                                  style={{ padding: '4px 12px', fontSize: '0.75rem', whiteSpace: 'nowrap', backgroundColor: 'transparent', color: 'white', border: '1px solid rgba(255,255,255,0.5)' }}
+                                >
+                                  <Trash2 size={12} /> Delete Title
+                                </button>
+                                <span style={{ marginLeft: '16px', color: 'rgba(255,255,255,0.9)' }}>ACTIONS</span>
+                              </div>
+                            ) : (
+                              <span style={{ color: 'rgba(255,255,255,0.9)' }}>STATUS</span>
+                            )}
+                          </div>
+                        </div>
+                        <table className={styles.chkTable}>
+                          <colgroup>
+                            <col style={{ width: 'auto' }} />
+                            <col style={{ width: '280px' }} />
+                          </colgroup>
+                          <tbody>
+                            {items.map(item => (
+                              <tr 
+                                key={item.rowIndex}
+                                onClick={(e) => {
+                                  if (activeTab === 'checklists') {
+                                    if ((e.target as HTMLElement).tagName !== 'INPUT' && (e.target as HTMLElement).tagName !== 'BUTTON') {
+                                      toggleCheckItem(item.id);
+                                    }
+                                  }
+                                }}
+                                style={{ cursor: activeTab === 'checklists' ? 'pointer' : 'default' }}
+                              >
+                                <td>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                    {activeTab === 'checklists' && (
+                                      <input 
+                                        type="checkbox" 
+                                        className={styles.customCheckbox}
+                                        checked={!!localCheckedState[item.id]} 
+                                        onChange={() => toggleCheckItem(item.id)}
+                                      />
+                                    )}
+                                    {activeTab === 'templates' && <ChevronRight size={14} style={{ color: 'var(--text-light)' }} />}
+                                    <strong style={{ textDecoration: (activeTab === 'checklists' && localCheckedState[item.id]) ? 'line-through' : 'none', color: (activeTab === 'checklists' && localCheckedState[item.id]) ? 'var(--text-light)' : 'inherit', transition: 'all 0.2s' }}>{item.itemName}</strong>
+                                  </div>
+                                </td>
+                                <td>
+                                  {activeTab === 'templates' ? (
+                                    <div className={styles.tableActions}>
+                                      <button className={styles.controlBtn} onClick={() => handleEditTemplateItem(item)}><Edit2 size={13} /></button>
+                                      <button className={`${styles.controlBtn} ${styles.delete}`} onClick={() => { setItemToDelete({ type: 'template', data: item }); setIsDeleteModalOpen(true); }}><Trash2 size={13} /></button>
+                                    </div>
+                                  ) : (
+                                    <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                                      {localCheckedState[item.id] ? (
+                                        <span style={{ color: 'var(--success)', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.85rem', fontWeight: 600 }}><CheckCircle2 size={16} /> Completed</span>
+                                      ) : (
+                                        <span className={styles.blinkingPending}>Pending</span>
+                                      )}
+                                    </div>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <p style={{ color: 'var(--text-light)', padding: '20px', textAlign: 'center', backgroundColor: 'var(--bg-card)', borderRadius: '12px', border: '1px dashed var(--border-color)' }}>
+                        No items found matching your search.
+                      </p>
+                    )}
                   </div>
+                );
+              })() : (
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', minHeight: '200px', backgroundColor: 'var(--bg-card)', borderRadius: '12px', border: '1px dashed var(--border-color)' }}>
+                  <p style={{ color: 'var(--text-light)' }}>Please create a template first.</p>
                 </div>
-              );
-            })}
-            {filteredTemplateNames.length === 0 && <p style={{ color: 'var(--text-light)', padding: '20px', textAlign: 'center' }}>No templates found matching your criteria.</p>}
+              )}
+            </div>
           </div>
         </div>
       )}
 
-      {/* Unified Project Checklist Modal */}
-      <Modal isOpen={isChkModalOpen} onClose={() => !submitting && setIsChkModalOpen(false)} title={editingChk ? `Update ${editingChk.project} Checklists` : 'New Project Checklists'} width="800px">
-        <form onSubmit={submitChecklist} className={styles.formGrid}>
-          <div className={styles.formGroup}>
-            <label>Project</label>
-            <select value={chkForm.project} onChange={(e) => setChkForm({...chkForm, project: e.target.value})} className={styles.formSelect} required disabled={!!editingChk}>
-              {projects.map(p => <option key={p.id} value={p.basicInfo.name}>{p.basicInfo.name}</option>)}
-            </select>
-          </div>
-
-          <div className={styles.formGroup} style={{ marginTop: '12px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <label style={{ margin: 0 }}>Master Checklist (All Templates)</label>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button type="button" className={styles.secondaryButton} style={{ padding: '4px 10px', fontSize: '0.75rem', borderRadius: '12px' }} onClick={() => handleSelectAllGlobal(true)}>Select All</button>
-                <button type="button" className={styles.secondaryButton} style={{ padding: '4px 10px', fontSize: '0.75rem', borderRadius: '12px' }} onClick={() => handleSelectAllGlobal(false)}>Deselect All</button>
-              </div>
-            </div>
-            
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              {uniqueTemplateNames.length > 0 ? (
-                uniqueTemplateNames.map(tplName => (
-                  <div key={tplName} style={{ backgroundColor: 'var(--bg-main)', borderRadius: '12px', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
-                    <div style={{ backgroundColor: 'var(--primary-light)', padding: '12px 16px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <h4 style={{ color: 'var(--primary)', margin: 0, fontSize: '0.95rem' }}>{tplName}</h4>
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <button type="button" onClick={() => handleSelectGroup(tplName, true)} style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 600 }}>Select All</button>
-                        <span style={{ color: 'var(--primary)', opacity: 0.5 }}>|</span>
-                        <button type="button" onClick={() => handleSelectGroup(tplName, false)} style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 600 }}>Deselect All</button>
-                      </div>
-                    </div>
-                    <div className={styles.formRow} style={{ padding: '12px', gap: '10px' }}>
-                      {groupedTemplates[tplName].map(item => {
-                        const key = item.id;
-                        const isChecked = checkedState[key] || false;
-                        return (
-                          <div key={item.id} className={`${styles.checklistItem} ${isChecked ? styles.checked : ''}`} onClick={() => toggleCheckItem(key)}>
-                            <input type="checkbox" checked={isChecked} onChange={() => {}} onClick={(e) => e.stopPropagation()} />
-                            <span className={styles.itemLabel}>{item.itemName}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <p style={{ fontSize: '0.8rem', color: 'var(--text-light)' }}>No checklist templates have been configured yet.</p>
-              )}
-            </div>
-          </div>
-
-          <div className={styles.formGroup} style={{ marginTop: '12px' }}>
-            <label>Remarks / Notes</label>
-            <input type="text" value={chkForm.remarks} onChange={(e) => setChkForm({...chkForm, remarks: e.target.value})} className={styles.formInput} placeholder="Optional notes" />
-          </div>
-
-          <div className={styles.formActions}>
-            <button type="button" className={styles.cancelBtn} onClick={() => setIsChkModalOpen(false)} disabled={submitting}>Cancel</button>
-            <button type="submit" className={styles.submitBtn} disabled={submitting}>{submitting ? 'Saving...' : 'Save Master Checklist'}</button>
-          </div>
-        </form>
-      </Modal>
-
       {/* Template Item Modal */}
       <Modal isOpen={isTplModalOpen} onClose={() => !submitting && setIsTplModalOpen(false)} title={editingTplItem ? 'Edit Checklist Item' : editingTplGroup ? 'Edit Checklist Title' : 'Add Checklist Item'} width="500px">
         <form onSubmit={submitTemplateItem} className={styles.formGrid}>
-          
+
           <div className={styles.formGroup}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <label>Checklist Title (Template Name)</label>
               {!editingTplItem && !editingTplGroup && (
-                <button 
-                  type="button" 
-                  className={styles.secondaryButton} 
+                <button
+                  type="button"
+                  className={styles.secondaryButton}
                   style={{ padding: '2px 8px', fontSize: '0.7rem' }}
-                  onClick={() => { setIsNewTemplateName(!isNewTemplateName); setTplForm({...tplForm, templateName: ''}) }}
+                  onClick={() => { setIsNewTemplateName(!isNewTemplateName); setTplForm({ ...tplForm, templateName: '' }) }}
                 >
                   {isNewTemplateName ? 'Select Existing' : 'Create New Title'}
                 </button>
               )}
             </div>
-            
+
             {isNewTemplateName ? (
-              <input 
-                type="text" 
-                value={tplForm.templateName} 
-                onChange={(e) => setTplForm({...tplForm, templateName: e.target.value})} 
-                className={styles.formInput} 
-                placeholder="e.g. 3D CHECKLIST 2024" 
-                required 
+              <input
+                type="text"
+                value={tplForm.templateName}
+                onChange={(e) => setTplForm({ ...tplForm, templateName: e.target.value })}
+                className={styles.formInput}
+                placeholder="e.g. 3D CHECKLIST 2024"
+                required
               />
             ) : (
-              <select 
-                value={tplForm.templateName} 
-                onChange={(e) => setTplForm({...tplForm, templateName: e.target.value})} 
-                className={styles.formSelect} 
+              <select
+                value={tplForm.templateName}
+                onChange={(e) => setTplForm({ ...tplForm, templateName: e.target.value })}
+                className={styles.formSelect}
                 required
                 disabled={!!editingTplItem || !!editingTplGroup}
               >
@@ -693,13 +598,13 @@ export default function ChecklistsPage() {
             <div className={styles.dynamicItemList}>
               {tplItemNames.map((item, idx) => (
                 <div key={idx} className={styles.dynamicItemRow}>
-                  <input 
-                    type="text" 
-                    value={item} 
-                    onChange={(e) => handleTplItemNameChange(idx, e.target.value)} 
-                    className={styles.formInput} 
-                    placeholder="e.g. PROJECT NAME" 
-                    required 
+                  <input
+                    type="text"
+                    value={item}
+                    onChange={(e) => handleTplItemNameChange(idx, e.target.value)}
+                    className={styles.formInput}
+                    placeholder="e.g. PROJECT NAME"
+                    required
                   />
                   {!editingTplItem && tplItemNames.length > 1 && (
                     <button type="button" className={styles.removeItemBtn} onClick={() => removeTplItemNameRow(idx)}><X size={18} /></button>

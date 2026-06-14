@@ -57,5 +57,11 @@ export const CONFIG = {
     SHEET_ID: '1SLFLFiaQu4xrTKb9p7ptgg_VoqjlHclPYx40nyqzXH0',
     SHEET_NAME: 'Audit',
     FOLDER_ID: '1o3emtVZrG8SXM96XsSZ-6bUhzycLIy6z',
+  },
+  DRAWING_SCHEDULE: {
+    SHEET_ID: '1KaLZqMi0gBNwwv1dkoNPTOcCMDSLINjZLGTmrz8HVdg',
+    FOLDER_ID: '1j8iL0WFy52LhkUGN_g7UeZJOyYFb3AFP',
+    TEMPLATES_SHEET: 'Template',
+    SUBMISSIONS_SHEET: 'Drawing Schedule',
   }
 };
