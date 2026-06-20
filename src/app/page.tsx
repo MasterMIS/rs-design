@@ -53,10 +53,16 @@ export default function Dashboard() {
         </div>
         <div className={styles.actionButtons}>
           {user?.role === 'Admin' && (
-            <Link href="/users" className={styles.usersBtn}>
-              <UsersIcon size={18} />
-              Users
-            </Link>
+            <>
+              <Link href="/hrms" className={styles.usersBtn} style={{ backgroundColor: '#1abc9c', color: 'white', marginRight: '10px' }}>
+                <UsersIcon size={18} />
+                HRMS
+              </Link>
+              <Link href="/users" className={styles.usersBtn}>
+                <UsersIcon size={18} />
+                Users
+              </Link>
+            </>
           )}
           <Link href="/projects" className={styles.portfolioBtn}>
             <BriefcaseBusiness size={18} />

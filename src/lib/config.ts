@@ -63,5 +63,10 @@ export const CONFIG = {
     FOLDER_ID: '1j8iL0WFy52LhkUGN_g7UeZJOyYFb3AFP',
     TEMPLATES_SHEET: 'Template',
     SUBMISSIONS_SHEET: 'Drawing Schedule',
+  },
+  HRMS: {
+    SHEET_ID: '1VBplvxU47sHjmh4Dq_nneOhKLonvdobdqTtDV7RQimw',
+    SHEET_NAME: 'HRMS',
+    FOLDER_ID: '1Vsep1VQgFh9Do2idAqhQ7xsYukmARWrw',
   }
 };
