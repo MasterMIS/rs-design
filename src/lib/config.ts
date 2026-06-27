@@ -63,6 +63,19 @@ export const CONFIG = {
     FOLDER_ID: '1j8iL0WFy52LhkUGN_g7UeZJOyYFb3AFP',
     TEMPLATES_SHEET: 'Template',
     SUBMISSIONS_SHEET: 'Drawing Schedule',
+    PLANNED_SHEET: 'Planned',
+  },
+  PMS_TRACKER: {
+    SHEET_ID: '1vyr5eGtrVJEToDAWJ0EfxJxQmlG_dovG2SX_6fgTXn4',
+    TEMPLATES_SHEET: 'Template',
+    SUBMISSIONS_SHEET: 'PMS Tracker',
+    PLANNED_SHEET: 'Planned',
+  },
+  INVENTORY: {
+    SHEET_ID: '1WdeU6oMGhYFFS9Kx3zaYI6sCfnrOG2bQ26-7gvBfilY',
+    TEMPLATES_SHEET: 'Template',
+    ESTIMATES_SHEET: 'Estimates',
+    TRANSACTIONS_SHEET: 'Transactions',
   },
   HRMS: {
     SHEET_ID: '1VBplvxU47sHjmh4Dq_nneOhKLonvdobdqTtDV7RQimw',

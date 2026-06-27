@@ -9,7 +9,7 @@ import {
   Home, Phone, Mail, FileText, Info, Edit2, ArrowLeft,
   ExternalLink, Layers, ShieldCheck, Activity, Tag,
   Layers3, Landmark, Contact, Map, Settings, BriefcaseBusiness,
-  LayoutGrid, List, Eye, PenTool
+  LayoutGrid, List, Eye, PenTool, Package
 } from 'lucide-react';
 import styles from './projects.module.css';
 import Modal from '@/components/Modal';
@@ -394,6 +394,18 @@ export default function ProjectsPage() {
                   <PenTool size={28} strokeWidth={2.5} />
                 </div>
                 <span style={{ fontWeight: 700, color: 'var(--text-heading)', fontSize: '0.95rem', letterSpacing: '0.3px' }}>Drawing Schedule</span>
+              </button>
+              <button className={styles.moduleTile} onClick={() => navigateToModule('/pms-tracker')}>
+                <div className={styles.moduleIconWrapper} style={{ background: 'linear-gradient(135deg, #f59e0b, #b45309)', color: '#fff', boxShadow: '0 8px 20px rgba(180, 83, 9, 0.3)' }}>
+                  <Activity size={28} strokeWidth={2.5} />
+                </div>
+                <span style={{ fontWeight: 700, color: 'var(--text-heading)', fontSize: '0.95rem', letterSpacing: '0.3px' }}>PMS Tracker</span>
+              </button>
+              <button className={styles.moduleTile} onClick={() => navigateToModule('/inventory')}>
+                <div className={styles.moduleIconWrapper} style={{ background: 'linear-gradient(135deg, #10b981, #047857)', color: '#fff', boxShadow: '0 8px 20px rgba(4, 120, 87, 0.3)' }}>
+                  <Package size={28} strokeWidth={2.5} />
+                </div>
+                <span style={{ fontWeight: 700, color: 'var(--text-heading)', fontSize: '0.95rem', letterSpacing: '0.3px' }}>Inventory</span>
               </button>
             </div>
           </div>

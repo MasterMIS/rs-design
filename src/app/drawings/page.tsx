@@ -23,7 +23,6 @@ interface DrawingTemplate {
   resourceName: string;
   doerName: string;
   category: string;
-  tat: string;
 }
 
 interface DrawingScheduleItem {
@@ -46,6 +45,14 @@ interface DrawingScheduleItem {
   tplId?: string;
 }
 
+interface CategoryPlannedDate {
+  id: string;
+  rowIndex?: number;
+  project: string;
+  category: string;
+  planDate: string;
+}
+
 const getCategoryIcon = (name: string, size = 16) => {
   const lowerName = name.toLowerCase();
   const style = { marginRight: '8px', flexShrink: 0 };
@@ -63,6 +70,7 @@ export default function DrawingsPage() {
   const { activeProject } = useProject();
   const [templates, setTemplates] = useState<DrawingTemplate[]>([]);
   const [schedules, setSchedules] = useState<DrawingScheduleItem[]>([]);
+  const [plannedDates, setPlannedDates] = useState<CategoryPlannedDate[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -83,7 +91,7 @@ export default function DrawingsPage() {
 
   // Forms
   const [tplForm, setTplForm] = useState<Partial<DrawingTemplate>>({
-    drawingNo: '', areaName: '', drawingName: '', resourceName: '', doerName: '', category: 'Architecture', tat: ''
+    drawingNo: '', areaName: '', drawingName: '', resourceName: '', doerName: '', category: 'Architecture'
   });
   
   // State for project schedule
@@ -127,15 +135,8 @@ export default function DrawingsPage() {
     templates.forEach(tpl => {
       const existingEntries = projectSchedules.filter(s => s.drawingNo === tpl.drawingNo);
       
-      let calculatedPlanDate = '';
-      if (startDateStr) {
-        const sDate = new Date(startDateStr);
-        const tatDays = parseInt(tpl.tat || '0') || 0;
-        if (!isNaN(sDate.getTime())) {
-          sDate.setDate(sDate.getDate() + tatDays);
-          calculatedPlanDate = sDate.toISOString().split('T')[0];
-        }
-      }
+      const catPlan = plannedDates.find(p => p.project === activeProjectName && p.category === tpl.category);
+      const calculatedPlanDate = catPlan ? catPlan.planDate : '';
 
       if (existingEntries.length > 0) {
         const firstEntry = existingEntries[0];
@@ -180,22 +181,24 @@ export default function DrawingsPage() {
 
     setLocalSchedule(merged);
     setHasUnsavedChanges(false);
-  }, [templates, schedules, activeProjectName, projects]);
+  }, [templates, schedules, activeProjectName, projects, plannedDates]);
 
   async function fetchData() {
     setLoading(true);
     try {
-      const [tplRes, schRes, usersRes, projRes] = await Promise.all([
+      const [tplRes, schRes, usersRes, projRes, planRes] = await Promise.all([
         fetch('/api/drawings/templates'),
         fetch('/api/drawings'),
         fetch('/api/users'),
-        fetch('/api/projects')
+        fetch('/api/projects'),
+        fetch('/api/drawings/planned')
       ]);
 
       if (tplRes.ok) setTemplates(await tplRes.json());
       if (schRes.ok) setSchedules(await schRes.json());
       if (usersRes.ok) setUsers(await usersRes.json());
       if (projRes.ok) setProjects(await projRes.json());
+      if (planRes.ok) setPlannedDates(await planRes.json());
     } catch (err) {
       console.error('Error fetching data:', err);
     } finally {
@@ -233,7 +236,31 @@ export default function DrawingsPage() {
     setHasUnsavedChanges(true);
   };
 
-  // handleFileUpload is removed as file uploading is now staged and handled on Apply Changes
+  const handleSaveCategoryPlan = async (category: string, planDate: string) => {
+    if (!activeProjectName) return;
+    try {
+      setSubmitting(true);
+      const existingPlan = plannedDates.find(p => p.project === activeProjectName && p.category === category);
+      const url = existingPlan?.rowIndex ? `/api/drawings/planned?rowIndex=${existingPlan.rowIndex}` : '/api/drawings/planned';
+      const method = existingPlan?.rowIndex ? 'PUT' : 'POST';
+
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ project: activeProjectName, category, planDate })
+      });
+
+      if (res.ok) {
+        await fetchData();
+      } else {
+        alert('Failed to save planned date for category.');
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const saveScheduleProgress = async () => {
     if (!activeProjectName) {
@@ -288,7 +315,7 @@ export default function DrawingsPage() {
   // ---- TEMPLATE HANDLERS ----
   const handleAddTemplate = () => {
     setEditingTpl(null);
-    setTplForm({ drawingNo: '', areaName: '', drawingName: '', resourceName: '', doerName: '', category: uniqueCategories[0] || 'Architecture', tat: '' });
+    setTplForm({ drawingNo: '', areaName: '', drawingName: '', resourceName: '', doerName: '', category: uniqueCategories[0] || 'Architecture' });
     setIsTplModalOpen(true);
   };
 
@@ -435,8 +462,29 @@ export default function DrawingsPage() {
                   item.drawingNo.toLowerCase().includes(searchItemName.toLowerCase())
                 );
                 
+                const currentCategoryPlan = activeCategory ? plannedDates.find(p => p.project === activeProjectName && p.category === activeCategory) : null;
+                const currentPlanDate = currentCategoryPlan?.planDate || '';
+
                 return (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    {activeCategory && activeTab === 'schedule' && activeProjectName && (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px', backgroundColor: 'var(--bg-main)', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <Calendar size={18} color="var(--primary)" />
+                          <strong style={{ fontSize: '0.95rem', color: 'var(--text-heading)' }}>{activeCategory} Planned Date:</strong>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <input 
+                            type="date" 
+                            className={styles.customDateInput}
+                            value={currentPlanDate}
+                            onChange={(e) => handleSaveCategoryPlan(activeCategory, e.target.value)}
+                            disabled={submitting}
+                          />
+                        </div>
+                      </div>
+                    )}
+
                     {items.length > 0 ? (
                       <div className={styles.tableContainer}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -479,37 +527,43 @@ export default function DrawingsPage() {
                                     
                                     return itemHistory.map((hist, idx) => {
                                       const isLatest = idx === itemHistory.length - 1;
+                                      const dt = new Date(hist.lastUpdated);
+                                      const formattedDate = !isNaN(dt.getTime()) ? `${dt.getDate().toString().padStart(2, '0')} ${(dt.toLocaleString('default', { month: 'short' }))} ${dt.getHours().toString().padStart(2, '0')}:${dt.getMinutes().toString().padStart(2, '0')}` : '';
+
                                       return (
-                                        <a 
-                                          key={hist.id + idx} 
-                                          href={hist.drawingImage} 
-                                          target="_blank" 
-                                          rel="noopener noreferrer" 
-                                          title={`Rev ${hist.revisionNo} • ${new Date(hist.lastUpdated).toLocaleString()}`}
-                                          style={{
-                                            display: 'inline-flex', alignItems: 'center', gap: '6px',
-                                            padding: '8px 16px', borderRadius: '24px',
-                                            backgroundColor: 'transparent',
-                                            border: isLatest ? '2px solid #4f46e5' : '1px solid #cbd5e1',
-                                            color: isLatest ? '#4f46e5' : '#64748b',
-                                            fontSize: '0.85rem', textDecoration: 'none', fontWeight: 800,
-                                            transition: 'all 0.2s ease',
-                                          }}
-                                          onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 4px 10px rgba(0, 0, 0, 0.05)'; }}
-                                          onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
-                                        >
-                                          <FileImage size={14} />
-                                          R{hist.revisionNo}
-                                        </a>
+                                        <div key={hist.id + idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                                          <a 
+                                            href={hist.drawingImage} 
+                                            target="_blank" 
+                                            rel="noopener noreferrer" 
+                                            title={`Rev ${hist.revisionNo} • ${dt.toLocaleString()}`}
+                                            style={{
+                                              display: 'inline-flex', alignItems: 'center', gap: '6px',
+                                              padding: '6px 14px', borderRadius: '20px',
+                                              backgroundColor: 'transparent',
+                                              border: isLatest ? '2px solid #4f46e5' : '1px solid #cbd5e1',
+                                              color: isLatest ? '#4f46e5' : '#64748b',
+                                              fontSize: '0.85rem', textDecoration: 'none', fontWeight: 800,
+                                              transition: 'all 0.2s ease',
+                                            }}
+                                            onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 4px 10px rgba(0, 0, 0, 0.05)'; }}
+                                            onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
+                                          >
+                                            <FileImage size={14} />
+                                            R{hist.revisionNo}
+                                          </a>
+                                          {formattedDate && (
+                                            <span style={{ fontSize: '0.65rem', color: '#64748b', fontWeight: 600 }}>
+                                              {formattedDate}
+                                            </span>
+                                          )}
+                                        </div>
                                       );
                                     });
                                   })()}
                                 </div>
                               ) : (
                                 <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '20px', padding: '0 15px' }}>
-                                  <span className={styles.metaTag} style={{ color: '#9a3412', fontSize: '0.85rem', padding: '6px 0', fontWeight: 700 }}>
-                                    <Clock size={14} /> TAT: {item.tat || 'N/A'} Days
-                                  </span>
                                   <span className={styles.metaTag} style={{ color: '#0f766e', fontSize: '0.85rem', padding: '6px 0', fontWeight: 700 }}>
                                     <User size={14} /> Doer: {item.doerName || 'Unassigned'}
                                   </span>
@@ -518,7 +572,7 @@ export default function DrawingsPage() {
 
                               {/* Right Section: Controls */}
                               {activeTab === 'schedule' ? (
-                                <div style={{ flex: '0 0 450px', display: 'flex', alignItems: 'center', gap: '15px' }}>
+                                <div style={{ flex: '0 0 340px', display: 'flex', alignItems: 'center', gap: '15px' }}>
                                   <div className={styles.datesCol} style={{ flex: 1, paddingLeft: '15px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                     <div style={{ fontSize: '0.8rem', color: '#312e81', fontWeight: 600 }}>
                                       <strong style={{ color: '#4f46e5', marginRight: '4px' }}>Plan:</strong> {formatDate(scheduleItem?.planDate) === 'N/A' ? '' : formatDate(scheduleItem?.planDate)}
@@ -535,10 +589,6 @@ export default function DrawingsPage() {
                                     <div className={`${styles.statusSelect} ${styles[scheduleItem?.clientStatus?.replace(/\s+/g, '') || 'Pending']}`} style={{ display: 'inline-block', textAlign: 'center', pointerEvents: 'none', width: '100%', padding: '4px', fontWeight: 700 }}>
                                       Client: {scheduleItem?.clientStatus || 'Pending'}
                                     </div>
-                                  </div>
-
-                                  <div className={styles.revCol} style={{ flex: '0 0 40px', display: 'flex', justifyContent: 'center' }}>
-                                    <div className={styles.revBadge} style={{ fontWeight: 800, color: '#1e293b' }}>R{scheduleItem?.revisionNo || '0'}</div>
                                   </div>
 
                                   <div style={{ flex: '0 0 60px', display: 'flex', justifyContent: 'center' }}>
@@ -664,15 +714,7 @@ export default function DrawingsPage() {
               ))}
             </datalist>
           </div>
-          <div className={styles.formGroup}>
-            <label>Turnaround Time (TAT) in Days</label>
-            <input 
-              type="number" 
-              min="0"
-              value={tplForm.tat} 
-              onChange={e => setTplForm({...tplForm, tat: e.target.value})} 
-            />
-          </div>
+
           <div className={styles.modalActions}>
             <button type="button" className={styles.cancelBtn} onClick={() => setIsTplModalOpen(false)}>Cancel</button>
             <button type="submit" className={styles.submitBtn} disabled={submitting}>

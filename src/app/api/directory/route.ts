@@ -12,7 +12,7 @@ const SHEET_NAME = CONFIG.DIRECTORY.SHEET_NAME;
 
 export async function GET() {
   try {
-    const data = await getSheetsData(SHEET_ID, `${SHEET_NAME}!A2:K1000`);
+    const data = await getSheetsData(SHEET_ID, `${SHEET_NAME}!A2:I1000`);
 
     if (!data || data.length === 0) return NextResponse.json([]);
 
@@ -25,10 +25,8 @@ export async function GET() {
       contactNo: row[4] || '',
       emailId: row[5] || '',
       companyName: row[6] || '',
-      category: row[7] || '',
-      address: row[8] || '',
-      appointmentStatus: row[9] || 'Shortlisted',
-      id: row[10] || `DIR-ROW-${index + 2}`,
+      appointmentStatus: row[7] || 'Shortlisted',
+      id: row[8] || `DIR-ROW-${index + 2}`,
     }));
 
     return NextResponse.json(directory);
@@ -64,8 +62,6 @@ export async function POST(request: NextRequest) {
         entry.contactNo || '',
         entry.emailId || '',
         entry.companyName || '',
-        entry.category || '',
-        entry.address || '',
         entry.appointmentStatus || 'Yes',
         directoryId
       ];
@@ -98,8 +94,6 @@ export async function PUT(request: NextRequest) {
       contactNo, 
       emailId, 
       companyName, 
-      category, 
-      address, 
       appointmentStatus, 
       id
     } = body;
@@ -116,13 +110,11 @@ export async function PUT(request: NextRequest) {
       contactNo || '',
       emailId || '',
       companyName || '',
-      category || '',
-      address || '',
       appointmentStatus || 'Shortlisted',
       id
     ];
 
-    await updateSheetRow(SHEET_ID, `${SHEET_NAME}!A${rowIndex}:K${rowIndex}`, [updatedRow]);
+    await updateSheetRow(SHEET_ID, `${SHEET_NAME}!A${rowIndex}:I${rowIndex}`, [updatedRow]);
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {

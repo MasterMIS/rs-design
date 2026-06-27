@@ -2,32 +2,33 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSheetsData, appendSheetsData, updateSheetRow, deleteSheetRow } from '@/lib/google-sheets';
 import { CONFIG } from '@/lib/config';
 
-const SHEET_ID = CONFIG.DRAWING_SCHEDULE.SHEET_ID;
-const SHEET_NAME = CONFIG.DRAWING_SCHEDULE.TEMPLATES_SHEET;
+const SHEET_ID = CONFIG.PMS_TRACKER.SHEET_ID;
+const SHEET_NAME = CONFIG.PMS_TRACKER.TEMPLATES_SHEET;
 
 export async function GET() {
   try {
-    const data = await getSheetsData(SHEET_ID, `${SHEET_NAME}!A2:F1000`);
+    const data = await getSheetsData(SHEET_ID, `${SHEET_NAME}!A2:G1000`);
 
     if (!data || data.length === 0) return NextResponse.json([]);
 
     const items = data.map((row: string[], index: number) => {
       return {
         rowIndex: index + 2,
-        id: `TPL-${index + 2}`,
-        drawingNo: row[0] || '',
+        id: row[0] || `PMS-TPL-${index + 2}`,
+        trackerId: row[0] || `PMS-TPL-${index + 2}`,
         areaName: row[1] || '',
-        drawingName: row[2] || '',
+        taskName: row[2] || '',
         resourceName: row[3] || '',
         doerName: row[4] || '',
         category: row[5] || 'Uncategorized',
+        tat: row[6] || '0',
       };
-    }).filter((t: any) => t.drawingName);
+    }).filter((t: any) => t.taskName);
 
     return NextResponse.json(items);
   } catch (error: unknown) {
     const err = error as Error;
-    console.error('API Error (GET Drawing Templates):', err);
+    console.error('API Error (GET PMS Templates):', err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
@@ -35,19 +36,20 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { drawingNo, areaName, drawingName, resourceName, doerName, category } = body;
+    const { trackerId, areaName, taskName, resourceName, doerName, category, tat } = body;
 
-    if (!drawingName) {
-      return NextResponse.json({ error: 'Drawing Name is required.' }, { status: 400 });
+    if (!taskName) {
+      return NextResponse.json({ error: 'Task Name is required.' }, { status: 400 });
     }
 
     const newRow = [
-      drawingNo || '',
+      trackerId || '',
       areaName || '',
-      drawingName || '',
+      taskName || '',
       resourceName || '',
       doerName || '',
-      category || 'Uncategorized'
+      category || 'Uncategorized',
+      tat || '0'
     ];
 
     await appendSheetsData(SHEET_ID, `${SHEET_NAME}!A2`, [newRow]);
@@ -55,7 +57,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
     const err = error as Error;
-    console.error('API Error (POST Drawing Template):', err);
+    console.error('API Error (POST PMS Template):', err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
@@ -69,27 +71,28 @@ export async function PUT(request: NextRequest) {
     const rowIndex = parseInt(rowIndexStr);
 
     const body = await request.json();
-    const { drawingNo, areaName, drawingName, resourceName, doerName, category } = body;
+    const { trackerId, areaName, taskName, resourceName, doerName, category, tat } = body;
 
-    if (!drawingName) {
-      return NextResponse.json({ error: 'Drawing Name is required.' }, { status: 400 });
+    if (!taskName) {
+      return NextResponse.json({ error: 'Task Name is required.' }, { status: 400 });
     }
 
     const updatedRow = [
-      drawingNo || '',
+      trackerId || '',
       areaName || '',
-      drawingName || '',
+      taskName || '',
       resourceName || '',
       doerName || '',
-      category || 'Uncategorized'
+      category || 'Uncategorized',
+      tat || '0'
     ];
 
-    await updateSheetRow(SHEET_ID, `${SHEET_NAME}!A${rowIndex}:F${rowIndex}`, [updatedRow]);
+    await updateSheetRow(SHEET_ID, `${SHEET_NAME}!A${rowIndex}:G${rowIndex}`, [updatedRow]);
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
     const err = error as Error;
-    console.error('API Error (PUT Drawing Template):', err);
+    console.error('API Error (PUT PMS Template):', err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
@@ -109,7 +112,7 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
     const err = error as Error;
-    console.error('API Error (DELETE Drawing Template):', err);
+    console.error('API Error (DELETE PMS Template):', err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }

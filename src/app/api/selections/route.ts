@@ -14,13 +14,13 @@ const FOLDER_ID = CONFIG.SELECTION.FOLDER_ID;
 
 export async function GET() {
   try {
-    const data = await getSheetsData(SHEET_ID, `${SHEET_NAME}!A2:J1000`);
+    const data = await getSheetsData(SHEET_ID, `${SHEET_NAME}!A2:G1000`);
 
     if (!data || data.length === 0) return NextResponse.json([]);
 
     const selections = data.map((row: string[], index: number) => {
       let files = [];
-      const rawFiles = row[8] || '';
+      const rawFiles = row[5] || '';
       
       if (rawFiles.trim().startsWith('[')) {
         try {
@@ -42,15 +42,12 @@ export async function GET() {
         rowIndex: index + 2,
         timestamp: row[0] || '',
         project: row[1] || '',
-        selectionNo: row[2] || '',
-        selectArea: row[3] || '',
-        areaName: row[4] || '',
-        productName: row[5] || '',
-        vendor: row[6] || '',
-        assignedTo: row[7] || '',
+        areaName: row[2] || '',
+        productName: row[3] || '',
+        vendor: row[4] || '',
         files: normalizedFiles,
-        remarks: row[9] || '',
-        id: row[2] || `SEL-ROW-${index + 2}`,
+        remarks: row[6] || '',
+        id: `SEL-ROW-${index + 2}`,
       };
     });
 
@@ -62,23 +59,14 @@ export async function GET() {
   }
 }
 
-function generateSelectionNo() {
-  const date = new Date();
-  const year = date.getFullYear().toString().slice(-2);
-  const month = (date.getMonth() + 1).toString().padStart(2, '0');
-  const randomStr = Math.floor(1000 + Math.random() * 9000).toString();
-  return `SEL-${year}${month}-${randomStr}`;
-}
 
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
     const project = formData.get('project') as string;
-    const selectArea = formData.get('selectArea') as string;
     const areaName = formData.get('areaName') as string;
     const productName = formData.get('productName') as string;
     const vendor = formData.get('vendor') as string;
-    const assignedTo = formData.get('assignedTo') as string;
     const remarks = formData.get('remarks') as string;
 
     const files = formData.getAll('files') as File[];
@@ -123,25 +111,21 @@ export async function POST(request: NextRequest) {
 
     const timestamp = new Date().toISOString();
     const filesJson = JSON.stringify(uploadedFiles);
-    const selectionNo = generateSelectionNo();
 
-    // A:J — Timestamp, Project, SelectionNo, SelectArea, AreaName, ProductName, Vendor, AssignedTo, Files, Remarks
+    // A:G — Timestamp, Project, AreaName, ProductName, Vendor, Files, Remarks
     const newRow = [
       timestamp,
       project,
-      selectionNo,
-      selectArea || '',
       areaName || '',
       productName || '',
       vendor || '',
-      assignedTo || '',
       filesJson,
       remarks || ''
     ];
 
     await appendSheetsData(SHEET_ID, `${SHEET_NAME}!A2`, [newRow]);
 
-    return NextResponse.json({ success: true, id: selectionNo, selectionNo });
+    return NextResponse.json({ success: true });
   } catch (error: unknown) {
     const err = error as Error;
     console.error('API Error (POST Selections):', err);
@@ -160,12 +144,9 @@ export async function PUT(request: NextRequest) {
     const formData = await request.formData();
     const timestamp = formData.get('timestamp') as string;
     const project = formData.get('project') as string;
-    const selectionNo = formData.get('selectionNo') as string;
-    const selectArea = formData.get('selectArea') as string;
     const areaName = formData.get('areaName') as string;
     const productName = formData.get('productName') as string;
     const vendor = formData.get('vendor') as string;
-    const assignedTo = formData.get('assignedTo') as string;
     const remarks = formData.get('remarks') as string;
 
     const existingFilesJson = formData.get('existingFiles') as string;
@@ -218,21 +199,18 @@ export async function PUT(request: NextRequest) {
 
     const filesJson = JSON.stringify(finalFilesList);
 
-    // A:J — Timestamp, Project, SelectionNo, SelectArea, AreaName, ProductName, Vendor, AssignedTo, Files, Remarks
+    // A:G — Timestamp, Project, AreaName, ProductName, Vendor, Files, Remarks
     const updatedRow = [
       timestamp || new Date().toISOString(),
       project,
-      selectionNo || '',
-      selectArea || '',
       areaName || '',
       productName || '',
       vendor || '',
-      assignedTo || '',
       filesJson,
       remarks || ''
     ];
 
-    await updateSheetRow(SHEET_ID, `${SHEET_NAME}!A${rowIndex}:J${rowIndex}`, [updatedRow]);
+    await updateSheetRow(SHEET_ID, `${SHEET_NAME}!A${rowIndex}:G${rowIndex}`, [updatedRow]);
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {

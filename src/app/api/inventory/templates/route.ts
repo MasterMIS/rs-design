@@ -2,32 +2,30 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSheetsData, appendSheetsData, updateSheetRow, deleteSheetRow } from '@/lib/google-sheets';
 import { CONFIG } from '@/lib/config';
 
-const SHEET_ID = CONFIG.DRAWING_SCHEDULE.SHEET_ID;
-const SHEET_NAME = CONFIG.DRAWING_SCHEDULE.TEMPLATES_SHEET;
+const SHEET_ID = CONFIG.INVENTORY.SHEET_ID;
+const SHEET_NAME = CONFIG.INVENTORY.TEMPLATES_SHEET;
 
 export async function GET() {
   try {
-    const data = await getSheetsData(SHEET_ID, `${SHEET_NAME}!A2:F1000`);
+    const data = await getSheetsData(SHEET_ID, `${SHEET_NAME}!A2:D1000`);
 
     if (!data || data.length === 0) return NextResponse.json([]);
 
     const items = data.map((row: string[], index: number) => {
       return {
         rowIndex: index + 2,
-        id: `TPL-${index + 2}`,
-        drawingNo: row[0] || '',
-        areaName: row[1] || '',
-        drawingName: row[2] || '',
-        resourceName: row[3] || '',
-        doerName: row[4] || '',
-        category: row[5] || 'Uncategorized',
+        id: row[0] || `INV-TPL-${index + 2}`,
+        itemNo: row[0] || `INV-TPL-${index + 2}`,
+        itemName: row[1] || '',
+        category: row[2] || 'Uncategorized',
+        unit: row[3] || 'Nos',
       };
-    }).filter((t: any) => t.drawingName);
+    }).filter((t: any) => t.itemName);
 
     return NextResponse.json(items);
   } catch (error: unknown) {
     const err = error as Error;
-    console.error('API Error (GET Drawing Templates):', err);
+    console.error('API Error (GET Inventory Templates):', err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
@@ -35,19 +33,17 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { drawingNo, areaName, drawingName, resourceName, doerName, category } = body;
+    const { itemNo, itemName, category, unit } = body;
 
-    if (!drawingName) {
-      return NextResponse.json({ error: 'Drawing Name is required.' }, { status: 400 });
+    if (!itemName) {
+      return NextResponse.json({ error: 'Item Name is required.' }, { status: 400 });
     }
 
     const newRow = [
-      drawingNo || '',
-      areaName || '',
-      drawingName || '',
-      resourceName || '',
-      doerName || '',
-      category || 'Uncategorized'
+      itemNo || '',
+      itemName || '',
+      category || 'Uncategorized',
+      unit || 'Nos'
     ];
 
     await appendSheetsData(SHEET_ID, `${SHEET_NAME}!A2`, [newRow]);
@@ -55,7 +51,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
     const err = error as Error;
-    console.error('API Error (POST Drawing Template):', err);
+    console.error('API Error (POST Inventory Template):', err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
@@ -69,27 +65,25 @@ export async function PUT(request: NextRequest) {
     const rowIndex = parseInt(rowIndexStr);
 
     const body = await request.json();
-    const { drawingNo, areaName, drawingName, resourceName, doerName, category } = body;
+    const { itemNo, itemName, category, unit } = body;
 
-    if (!drawingName) {
-      return NextResponse.json({ error: 'Drawing Name is required.' }, { status: 400 });
+    if (!itemName) {
+      return NextResponse.json({ error: 'Item Name is required.' }, { status: 400 });
     }
 
     const updatedRow = [
-      drawingNo || '',
-      areaName || '',
-      drawingName || '',
-      resourceName || '',
-      doerName || '',
-      category || 'Uncategorized'
+      itemNo || '',
+      itemName || '',
+      category || 'Uncategorized',
+      unit || 'Nos'
     ];
 
-    await updateSheetRow(SHEET_ID, `${SHEET_NAME}!A${rowIndex}:F${rowIndex}`, [updatedRow]);
+    await updateSheetRow(SHEET_ID, `${SHEET_NAME}!A${rowIndex}:D${rowIndex}`, [updatedRow]);
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
     const err = error as Error;
-    console.error('API Error (PUT Drawing Template):', err);
+    console.error('API Error (PUT Inventory Template):', err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
@@ -109,7 +103,7 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
     const err = error as Error;
-    console.error('API Error (DELETE Drawing Template):', err);
+    console.error('API Error (DELETE Inventory Template):', err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }

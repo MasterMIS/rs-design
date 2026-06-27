@@ -24,12 +24,9 @@ interface Selection {
   rowIndex: number;
   timestamp: string;
   project: string;
-  selectionNo: string;
-  selectArea: string;
   areaName: string;
   productName: string;
   vendor: string;
-  assignedTo: string;
   files: FileAttachment[];
   remarks: string;
   id: string;
@@ -46,13 +43,12 @@ export default function SelectionsPage() {
   const { activeProject } = useProject();
   const [selections, setSelections] = useState<Selection[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
-  const [users, setUsers] = useState<{ name: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
   // Search and Filter States
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterArea, setFilterArea] = useState('');
+  const [selectedAreaTile, setSelectedAreaTile] = useState<string | null>(null);
 
   // Modals States
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -63,11 +59,9 @@ export default function SelectionsPage() {
   // Form States
   const [formFields, setFormFields] = useState({
     project: '',
-    selectArea: 'Living Room',
     areaName: '',
     productName: '',
     vendor: '',
-    assignedTo: '',
     remarks: '',
   });
 
@@ -76,44 +70,12 @@ export default function SelectionsPage() {
   const [uploadMode, setUploadMode] = useState<'images' | 'pdf'>('images');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Dynamic dropdown options from Dropdown sheet
-  const [selectAreaOptions, setSelectAreaOptions] = useState<string[]>([]);
-  const [areaMap, setAreaMap] = useState<Record<string, string[]>>({});
-
-  // Derived: area names filtered by currently selected select area
-  const filteredAreaNames = (formFields.selectArea && areaMap[formFields.selectArea]) || [];
-
   useEffect(() => {
     fetchSelections();
     fetchProjects();
-    fetchUsers();
-    fetchDropdowns();
   }, []);
 
-  async function fetchDropdowns() {
-    try {
-      const res = await fetch('/api/selections/dropdowns');
-      if (res.ok) {
-        const data = await res.json();
-        setSelectAreaOptions(data.selectAreas || []);
-        setAreaMap(data.areaMap || {});
-      }
-    } catch (err) {
-      console.error('Error fetching dropdown options:', err);
-    }
-  }
 
-  async function fetchUsers() {
-    try {
-      const res = await fetch('/api/users');
-      if (res.ok) {
-        const data = await res.json();
-        setUsers(data);
-      }
-    } catch (err) {
-      console.error('Error fetching users:', err);
-    }
-  }
 
   async function fetchSelections() {
     try {
@@ -146,11 +108,9 @@ export default function SelectionsPage() {
     setEditingSel(null);
     setFormFields({
       project: activeProject ? activeProject.name : (projects[0]?.basicInfo?.name || ''),
-      selectArea: selectAreaOptions[0] || '',
       areaName: '',
       productName: '',
       vendor: '',
-      assignedTo: '',
       remarks: '',
     });
     setSelectedFiles([]);
@@ -163,11 +123,9 @@ export default function SelectionsPage() {
     setEditingSel(sel);
     setFormFields({
       project: sel.project,
-      selectArea: sel.selectArea,
       areaName: sel.areaName,
       productName: sel.productName,
       vendor: sel.vendor,
-      assignedTo: sel.assignedTo,
       remarks: sel.remarks,
     });
     setSelectedFiles([]);
@@ -178,12 +136,7 @@ export default function SelectionsPage() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    // When Select Area changes, reset the Specific Area Name
-    if (name === 'selectArea') {
-      setFormFields(prev => ({ ...prev, selectArea: value, areaName: '' }));
-    } else {
-      setFormFields(prev => ({ ...prev, [name]: value }));
-    }
+    setFormFields(prev => ({ ...prev, [name]: value }));
   };
 
   // File Handlers
@@ -213,11 +166,9 @@ export default function SelectionsPage() {
       setSubmitting(true);
       const formData = new FormData();
       formData.append('project', formFields.project);
-      formData.append('selectArea', formFields.selectArea);
       formData.append('areaName', formFields.areaName);
       formData.append('productName', formFields.productName);
       formData.append('vendor', formFields.vendor);
-      formData.append('assignedTo', formFields.assignedTo);
       formData.append('remarks', formFields.remarks);
 
       let finalFiles = selectedFiles;
@@ -280,7 +231,6 @@ export default function SelectionsPage() {
 
       let res;
       if (editingSel) {
-        formData.append('selectionNo', editingSel.selectionNo);
         formData.append('timestamp', editingSel.timestamp);
         formData.append('existingFiles', JSON.stringify(existingFiles));
 
@@ -342,24 +292,18 @@ export default function SelectionsPage() {
 
     const matchesSearch =
       sel.productName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      sel.selectionNo.toLowerCase().includes(searchQuery.toLowerCase()) ||
       sel.vendor.toLowerCase().includes(searchQuery.toLowerCase()) ||
       sel.areaName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       sel.remarks.toLowerCase().includes(searchQuery.toLowerCase());
 
-    const matchesArea = filterArea === '' || sel.selectArea === filterArea;
-
-    return matchesSearch && matchesArea;
+    return matchesSearch;
   });
 
+  const uniqueAreas = Array.from(new Set(filteredSels.map(sel => sel.areaName))).filter(Boolean);
 
-  const groupedData: Record<string, Selection[]> = {};
-  filteredSels.forEach(sel => {
-    if (!groupedData[sel.project]) {
-      groupedData[sel.project] = [];
-    }
-    groupedData[sel.project].push(sel);
-  });
+  const tableSels = selectedAreaTile 
+    ? filteredSels.filter(sel => sel.areaName === selectedAreaTile)
+    : filteredSels;
 
 
   return (
@@ -400,12 +344,6 @@ export default function SelectionsPage() {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <div className={styles.filterControls}>
-              <select className={styles.filterSelect} value={filterArea} onChange={(e) => setFilterArea(e.target.value)}>
-                <option value="">All Areas</option>
-                {selectAreaOptions.map(area => <option key={area} value={area}>{area}</option>)}
-              </select>
-            </div>
           </div>
           <button className={styles.addButton} onClick={handleCreateNew}>
             <Plus size={18} />
@@ -423,21 +361,52 @@ export default function SelectionsPage() {
           <p>No selections found.</p>
         </div>
       ) : (
-        <div className={styles.tableContainer}>
-          <table className={styles.selTable}>
+        <>
+          <div className={styles.areaGrid}>
+            <div
+              className={`${styles.areaTile} ${selectedAreaTile === null ? styles.activeTile : ''}`}
+              onClick={() => setSelectedAreaTile(null)}
+            >
+              <div className={`${styles.areaIconWrapper} ${styles.color0}`}>
+                <LayoutGrid size={24} />
+              </div>
+              <h4>All Areas</h4>
+              <p>{filteredSels.length} Items</p>
+            </div>
+            {uniqueAreas.map((area, index) => {
+              const count = filteredSels.filter(s => s.areaName === area).length;
+              const isSelected = selectedAreaTile === area;
+              const colorClass = styles[`color${(index + 1) % 8}`];
+              return (
+                <div
+                  key={area}
+                  className={`${styles.areaTile} ${isSelected ? styles.activeTile : ''}`}
+                  onClick={() => setSelectedAreaTile(area)}
+                >
+                  <div className={`${styles.areaIconWrapper} ${colorClass}`}>
+                    <LayoutGrid size={24} />
+                  </div>
+                  <h4>{area}</h4>
+                  <p>{count} Items</p>
+                </div>
+              );
+            })}
+          </div>
+          <div className={styles.tableContainer}>
+            <table className={styles.selTable}>
             <thead>
               <tr>
                 <th>Actions</th>
-                <th>Sel No</th>
                 <th>Project</th>
-                <th>Product & Area</th>
+                <th>Area Name</th>
+                <th>Product Name</th>
                 <th>Vendor</th>
-                <th>Selected By</th>
+                <th>Remarks</th>
                 <th>Files</th>
               </tr>
             </thead>
             <tbody>
-              {filteredSels.map(sel => (
+              {tableSels.map(sel => (
                 <tr key={sel.id}>
                   <td>
                     <div className={styles.tableActions}>
@@ -445,16 +414,11 @@ export default function SelectionsPage() {
                       <button className={`${styles.controlBtn} ${styles.delete}`} onClick={() => confirmDelete(sel)}><Trash2 size={13} /></button>
                     </div>
                   </td>
-                  <td><strong>{sel.selectionNo}</strong></td>
                   <td>{sel.project}</td>
-                  <td>
-                    <div className={styles.tableTitleCell}>
-                      <span className={styles.tableRepName}>{sel.productName}</span>
-                      <span className={styles.tableRepDetail}>{sel.selectArea} {sel.areaName ? `(${sel.areaName})` : ''}</span>
-                    </div>
-                  </td>
+                  <td>{sel.areaName}</td>
+                  <td><strong>{sel.productName}</strong></td>
                   <td>{sel.vendor || '—'}</td>
-                  <td>{sel.assignedTo || '—'}</td>
+                  <td>{sel.remarks || '—'}</td>
                   <td>
                     <div className={styles.tableFilesCell}>
                       {sel.files && sel.files.length > 0 ? (
@@ -475,6 +439,7 @@ export default function SelectionsPage() {
             </tbody>
           </table>
         </div>
+        </>
       )}
 
       {/* Add / Edit Modal */}
@@ -503,33 +468,16 @@ export default function SelectionsPage() {
           </div>
 
           <div className={styles.formRow}>
-            <div className={styles.formGroup}>
-              <label><LayoutGrid size={14} /> Select Area</label>
-              <select name="selectArea" value={formFields.selectArea} onChange={handleInputChange} className={styles.formSelect}>
-                <option value="">— Select Area —</option>
-                {selectAreaOptions.map(a => <option key={a} value={a}>{a}</option>)}
-              </select>
-            </div>
-            <div className={styles.formGroup}>
-              <label><Tag size={14} /> Specific Area Name</label>
-              <select name="areaName" value={formFields.areaName} onChange={handleInputChange} className={styles.formSelect} disabled={!formFields.selectArea || filteredAreaNames.length === 0}>
-                <option value="">{!formFields.selectArea ? '— Select Area first —' : filteredAreaNames.length === 0 ? '— No options —' : '— Select Area Name —'}</option>
-                {filteredAreaNames.map(n => <option key={n} value={n}>{n}</option>)}
-              </select>
+            <div className={styles.formGroup} style={{ width: '100%' }}>
+              <label><Tag size={14} /> Area Name / Detail</label>
+              <input type="text" name="areaName" value={formFields.areaName} onChange={handleInputChange} className={styles.formInput} />
             </div>
           </div>
 
           <div className={styles.formRow}>
-            <div className={styles.formGroup}>
+            <div className={styles.formGroup} style={{ width: '100%' }}>
               <label><Building size={14} /> Vendor / Supplier</label>
               <input type="text" name="vendor" value={formFields.vendor} onChange={handleInputChange} className={styles.formInput} placeholder=" " />
-            </div>
-            <div className={styles.formGroup}>
-              <label><Tag size={14} /> Selected By</label>
-              <select name="assignedTo" value={formFields.assignedTo} onChange={handleInputChange} className={styles.formSelect}>
-                <option value="">Unassigned</option>
-                {users.map(u => <option key={u.name} value={u.name}>{u.name}</option>)}
-              </select>
             </div>
           </div>
 

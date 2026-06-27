@@ -22,8 +22,6 @@ interface Contact {
   contactNo: string;
   emailId: string;
   companyName: string;
-  category: string;
-  address: string;
   appointmentStatus: string;
   id: string;
 }
@@ -66,8 +64,6 @@ export default function DirectoryPage() {
     contactNo: '',
     emailId: '',
     companyName: '',
-    category: 'CIVIL',
-    address: '',
     appointmentStatus: 'Yes',
   }]);
 
@@ -90,13 +86,6 @@ export default function DirectoryPage() {
   ];
 
   const appointmentStatuses = ['Yes', 'No'];
-
-  const categories = [
-    'CIVIL', 'ELECTRICAL', 'PLUMBING', 'AC', 'TILES AND MARBLE', 'CARPENTRY',
-    'PAINT AND POLISH', 'FALSE CEILING', 'FURNISHING', 'WATER PROOFING',
-    'FIRE FIGHTING', 'WALL PAINTER', 'POLISHER', 'WINDOW', 'READYMADE FURNITURE',
-    'HEAT PUMP', 'PRESSURE PUMP', 'WATER TREATMENT', 'STP', 'SWIMMING POOL', 'IT'
-  ];
 
   useEffect(() => {
     fetchDirectory();
@@ -155,8 +144,6 @@ export default function DirectoryPage() {
       contactNo: '',
       emailId: '',
       companyName: '',
-      category: categories[0],
-      address: '',
       appointmentStatus: 'Yes',
     }]);
     setIsModalOpen(true);
@@ -175,8 +162,6 @@ export default function DirectoryPage() {
       contactNo: contact.contactNo,
       emailId: contact.emailId,
       companyName: contact.companyName,
-      category: contact.category,
-      address: contact.address,
       appointmentStatus: contact.appointmentStatus,
     }]);
     setIsModalOpen(true);
@@ -201,8 +186,6 @@ export default function DirectoryPage() {
       contactNo: '',
       emailId: '',
       companyName: '',
-      category: categories[0],
-      address: '',
       appointmentStatus: 'Yes',
     }]);
   };
@@ -240,8 +223,6 @@ export default function DirectoryPage() {
           contactNo: entry.contactNo,
           emailId: entry.emailId,
           companyName: entry.companyName,
-          category: entry.category,
-          address: entry.address,
           appointmentStatus: entry.appointmentStatus,
           timestamp: editingContact.timestamp,
           id: editingContact.id
@@ -268,8 +249,6 @@ export default function DirectoryPage() {
           contactNo: entry.contactNo,
           emailId: entry.emailId,
           companyName: entry.companyName,
-          category: entry.category,
-          address: entry.address,
           appointmentStatus: entry.appointmentStatus,
         }));
 
@@ -330,9 +309,7 @@ export default function DirectoryPage() {
       contact.nameOfPerson.toLowerCase().includes(searchQuery.toLowerCase()) ||
       contact.companyName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       contact.contactNo.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      contact.emailId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      contact.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      contact.address.toLowerCase().includes(searchQuery.toLowerCase());
+      contact.emailId.toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesProject = filterProject === '' || contact.project === filterProject;
     const matchesTeam = filterTeam === '' || contact.selectTeam === filterTeam;
@@ -415,7 +392,6 @@ export default function DirectoryPage() {
                 <th>Representative</th>
                 <th>Project</th>
                 <th>Assigned Team</th>
-                <th>Trade Specialty</th>
                 <th>Status</th>
                 <th>Company</th>
                 <th>Contact Info</th>
@@ -445,7 +421,6 @@ export default function DirectoryPage() {
                       {member.selectTeam}
                     </span>
                   </td>
-                  <td>{member.category}</td>
                   <td>
                     <span className={`${styles.statusBadge} ${styles[member.appointmentStatus.replace(' ', '_')]}`}>
                       {member.appointmentStatus}
@@ -584,19 +559,6 @@ export default function DirectoryPage() {
                     className={styles.formInput}
                   />
                 </div>
-                <div className={styles.formGroup}>
-                  <label><Wrench size={14} /> Trade Specialty / Category</label>
-                  <select
-                    name="category"
-                    value={entry.category}
-                    onChange={(e) => handleEntryChange(index, e)}
-                    className={styles.formSelect}
-                  >
-                    {categories.map(cat => (
-                      <option key={cat} value={cat}>{cat}</option>
-                    ))}
-                  </select>
-                </div>
               </div>
 
               <div className={styles.formRow}>
@@ -615,16 +577,6 @@ export default function DirectoryPage() {
                 </div>
               </div>
 
-              <div className={styles.formGroup}>
-                <label><MapPin size={14} /> Workplace / Company Address</label>
-                <input
-                  type="text"
-                  name="address"
-                  value={entry.address}
-                  onChange={(e) => handleEntryChange(index, e)}
-                  className={styles.formInput}
-                />
-              </div>
             </div>
           ))}
 
