@@ -8,7 +8,8 @@ import {
   ShoppingBag, 
   Users as UsersIcon,
   Package,
-  BriefcaseBusiness
+  BriefcaseBusiness,
+  Layers
 } from 'lucide-react';
 import Link from 'next/link';
 import { 
@@ -52,19 +53,21 @@ export default function Dashboard() {
           <h2 className={styles.pageTitle}>Dashboard</h2>
         </div>
         <div className={styles.actionButtons}>
+          <Link href="/em" className={styles.usersBtn} style={{ background: 'linear-gradient(to right, #8a2387, #e94057, #f27121)', color: 'white', marginRight: '10px', border: 'none' }}>
+            <Layers size={18} />
+            EM
+          </Link>
+          <Link href="/hrms" className={styles.usersBtn} style={{ background: 'linear-gradient(to right, #00c6ff, #0072ff)', color: 'white', marginRight: '10px', border: 'none' }}>
+            <UsersIcon size={18} />
+            HRMS
+          </Link>
           {user?.role === 'Admin' && (
-            <>
-              <Link href="/hrms" className={styles.usersBtn} style={{ backgroundColor: '#1abc9c', color: 'white', marginRight: '10px' }}>
-                <UsersIcon size={18} />
-                HRMS
-              </Link>
-              <Link href="/users" className={styles.usersBtn}>
-                <UsersIcon size={18} />
-                Users
-              </Link>
-            </>
+            <Link href="/users" className={styles.usersBtn} style={{ background: 'linear-gradient(to right, #11998e, #38ef7d)', color: 'white', marginRight: '10px', border: 'none' }}>
+              <UsersIcon size={18} />
+              Users
+            </Link>
           )}
-          <Link href="/projects" className={styles.portfolioBtn}>
+          <Link href="/projects" className={styles.portfolioBtn} style={{ background: 'linear-gradient(to right, #4b6cb7, #182848)', color: 'white', border: 'none' }}>
             <BriefcaseBusiness size={18} />
             Go to Project Portfolio
           </Link>

@@ -1,0 +1,361 @@
+.container {
+  padding: 8px 16px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.header {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.titleSection h2 {
+  font-size: 2rem;
+  color: #0f172a;
+  margin: 0 0 8px 0;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+.slicersContainer {
+  background: white;
+  border-radius: 16px;
+  padding: 12px 20px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.slicersRow {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.dateFilterBox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #f8fafc;
+  padding: 4px 10px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+}
+
+.dateSelect {
+  border: none;
+  background: transparent;
+  font-weight: 600;
+  color: #334155;
+  outline: none;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.dateInput {
+  border: none;
+  background: white;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 0.8rem;
+  color: #0f172a;
+  outline: none;
+  border: 1px solid #cbd5e1;
+}
+
+.backButton {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 10px;
+  background-color: white;
+  color: #334155;
+  text-decoration: none;
+  font-weight: 600;
+  border: 1px solid #e2e8f0;
+  transition: all 0.2s ease;
+  margin-left: auto;
+}
+
+.backButton:hover {
+  background-color: #f1f5f9;
+  color: #0f172a;
+}
+
+.tabsContainer {
+  display: inline-flex;
+  gap: 8px;
+  margin-bottom: 24px;
+  background-color: white;
+  padding: 6px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: transparent;
+  border: none;
+  color: #64748b;
+}
+
+.tab.active {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: white;
+  box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);
+}
+
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.kpiCard {
+  background-color: white;
+  border-radius: 16px;
+  padding: 20px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.kpiIconWrapper {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+}
+
+.kpiInfo h4 {
+  margin: 0 0 4px 0;
+  color: #64748b;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.kpiInfo p {
+  margin: 0;
+  font-size: 1.8rem;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1;
+}
+
+.chartsGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.grid2Col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.grid2Col2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.grid3Col {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.fullWidthChart {
+  grid-column: 1 / -1;
+}
+
+.chartCard {
+  background-color: white;
+  border-radius: 16px;
+  padding: 24px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.chartCard h3 {
+  margin: 0 0 20px 0;
+  color: #1e293b;
+  font-size: 1.1rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.noData {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  font-style: italic;
+}
+
+/* Tables */
+.tableWrapper {
+  overflow-x: auto;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.dataTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.dataTable th {
+  background: #f8fafc;
+  color: #475569;
+  font-weight: 700;
+  text-align: left;
+  padding: 12px 16px;
+  border-bottom: 2px solid #e2e8f0;
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.dataTable td {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f1f5f9;
+  color: #334155;
+  white-space: nowrap;
+}
+
+.dataTable tbody tr:hover td {
+  background-color: #f8fafc;
+}
+
+/* Badges */
+.badgeSuccess { background: #dcfce7; color: #166534; padding: 4px 8px; border-radius: 6px; font-weight: 700; font-size: 0.75rem; }
+.badgeWarning { background: #fef3c7; color: #92400e; padding: 4px 8px; border-radius: 6px; font-weight: 700; font-size: 0.75rem; }
+.badgeDanger { background: #fee2e2; color: #b91c1c; padding: 4px 8px; border-radius: 6px; font-weight: 700; font-size: 0.75rem; }
+.badgeInfo { background: #e0e7ff; color: #3730a3; padding: 4px 8px; border-radius: 6px; font-weight: 700; font-size: 0.75rem; }
+
+/* Delay Blocks */
+.delayBlocks {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  flex: 1;
+}
+
+.delayBlock {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px;
+  text-align: center;
+}
+
+.delayBlockHeader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.delayDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.delayLabel {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #64748b;
+}
+
+.delayValue {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.delayCount {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  margin-top: 4px;
+}
+
+/* Daily Activity */
+.dailyGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  justify-content: center;
+  flex: 1;
+}
+
+.dailyItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  background: #f8fafc;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.dailyLabel {
+  font-weight: 700;
+  color: #475569;
+  font-size: 0.95rem;
+}
+
+.dailyVal {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+@media (max-width: 1200px) {
+  .grid2Col, .grid2Col2, .grid3Col {
+    grid-template-columns: 1fr;
+  }
+  .chartCard[style*="gridColumn"], .chartCard[style*="gridRow"] {
+    grid-column: auto !important;
+    grid-row: auto !important;
+  }
+}

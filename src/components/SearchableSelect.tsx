@@ -9,9 +9,11 @@ interface SearchableSelectProps {
   value: string;
   onChange: (value: string) => void;
   placeholder: string;
+  name?: string;
+  icon?: React.ReactNode;
 }
 
-export default function SearchableSelect({ options, value, onChange, placeholder }: SearchableSelectProps) {
+export default function SearchableSelect({ options, value, onChange, placeholder, name, icon }: SearchableSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
@@ -32,8 +34,14 @@ export default function SearchableSelect({ options, value, onChange, placeholder
 
   return (
     <div className={styles.container} ref={containerRef}>
+      {name && <input type="hidden" name={name} value={value} />}
+      {icon && (
+        <div style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--primary)', opacity: 0.7, pointerEvents: 'none', zIndex: 10 }}>
+          {icon}
+        </div>
+      )}
       <div 
-        className={`${styles.selectBox} ${isOpen ? styles.selectBoxActive : ''}`} 
+        className={`${styles.selectBox} ${isOpen ? styles.selectBoxActive : ''} ${icon ? styles.withIcon : ''}`} 
         onClick={() => setIsOpen(!isOpen)}
       >
         <span className={value ? styles.value : styles.placeholder}>

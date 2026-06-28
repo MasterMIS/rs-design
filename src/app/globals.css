@@ -61,7 +61,7 @@ body {
 
 .page-container {
   flex: 1;
-  padding: 12px 24px 24px 24px; /* Reduced top padding */
+  padding: 12px 16px 24px 16px; /* Reduced side padding for more compact layout */
 }
 
 /* Scrollbar Styles */

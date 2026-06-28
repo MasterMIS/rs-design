@@ -81,5 +81,10 @@ export const CONFIG = {
     SHEET_ID: '1VBplvxU47sHjmh4Dq_nneOhKLonvdobdqTtDV7RQimw',
     SHEET_NAME: 'HRMS',
     FOLDER_ID: '1Vsep1VQgFh9Do2idAqhQ7xsYukmARWrw',
+  },
+  EM: {
+    SHEET_ID: '138xP7iXmKVKLLbHYhVmHNVZY3cLyWRI81_MG5NF5ckk',
+    DESIGN_SHEET: 'Design',
+    EXECUTION_SHEET: 'Execution',
   }
 };
