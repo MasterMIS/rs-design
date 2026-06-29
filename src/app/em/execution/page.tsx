@@ -35,7 +35,7 @@ export default function ExecutionPage() {
   const [usersList, setUsersList] = useState<any[]>([]);
 
   const [formProject, setFormProject] = useState('');
-  const [formDoer, setFormDoer] = useState('');
+  const [formSupervisor, setFormSupervisor] = useState('');
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -73,14 +73,14 @@ export default function ExecutionPage() {
   const handleOpenCreate = () => {
     setEditingTask(null);
     setFormProject('');
-    setFormDoer(user?.role !== 'Admin' ? user?.name || '' : '');
+    setFormSupervisor(user?.role !== 'Admin' ? user?.name || '' : '');
     setIsModalOpen(true);
   };
 
   const handleOpenEdit = (task: any) => {
     setEditingTask(task);
     setFormProject(task.project_name || '');
-    setFormDoer(task.doer || '');
+    setFormSupervisor(task.supervisor_name || '');
     setIsModalOpen(true);
   };
 
@@ -412,10 +412,14 @@ export default function ExecutionPage() {
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingTask ? "Edit Execution Task" : "Add Execution Task"}>
         <form onSubmit={handleSubmit} className={styles.formGrid}>
           <div className={styles.fieldGroup}>
-            <div className={styles.inputWrapper}>
-              <User className={styles.inputIcon} size={18} />
-              <input type="text" name="supervisor_name" className={`${styles.formInput} ${styles.withIcon}`} defaultValue={editingTask?.supervisor_name} placeholder=" " required />
-            </div>
+            <SearchableSelect 
+              name="supervisor_name" 
+              value={formSupervisor} 
+              onChange={setFormSupervisor} 
+              options={usersList.map((u: any) => u.name).filter(Boolean)} 
+              placeholder="Select Supervisor" 
+              icon={<User size={18} />}
+            />
             <label>Supervisor Name (Site Engineer)</label>
           </div>
 
@@ -459,14 +463,10 @@ export default function ExecutionPage() {
 
           <div className={styles.formRow}>
             <div className={styles.fieldGroup}>
-              <SearchableSelect 
-                name="doer" 
-                value={formDoer} 
-                onChange={setFormDoer} 
-                options={usersList.map((u: any) => u.name).filter(Boolean)} 
-                placeholder="Select Doer" 
-                icon={<User size={18} />}
-              />
+              <div className={styles.inputWrapper}>
+                <User className={styles.inputIcon} size={18} />
+                <input type="text" name="doer" className={`${styles.formInput} ${styles.withIcon}`} defaultValue={editingTask?.doer} placeholder=" " />
+              </div>
               <label>Doer</label>
             </div>
             <div className={styles.fieldGroup}>

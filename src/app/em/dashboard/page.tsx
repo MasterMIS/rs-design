@@ -60,7 +60,7 @@ export default function EMDashboard() {
   }, []);
 
   const allProjects = Array.from(new Set([...designTasks, ...executionTasks].map(t => t.project_name).filter(Boolean))).sort();
-  const allDoers = Array.from(new Set([...designTasks, ...executionTasks].map(t => t.doer_name || t.doer).filter(Boolean))).sort();
+  const allDoers = Array.from(new Set([...designTasks, ...executionTasks].map(t => t.doer_name || t.supervisor_name).filter(Boolean))).sort();
   const allStatuses = ['Completed', 'Pending', 'Hold', 'Cancelled'];
 
   const filteredData = useMemo(() => {
@@ -80,11 +80,11 @@ export default function EMDashboard() {
 
     return rawData.filter(t => {
       if (selectedProjects.length > 0 && !selectedProjects.includes(t.project_name)) return false;
-      const doer = t.doer_name || t.doer;
+      const doer = t.doer_name || t.supervisor_name;
       if (selectedDoers.length > 0 && !selectedDoers.includes(doer)) return false;
       if (selectedStatuses.length > 0 && !selectedStatuses.includes(t.status || 'Pending')) return false;
 
-      const pDate = parseDate(t.planned_date || t.work_from);
+      const pDate = parseDate(t.planned_date || t.work_to);
       
       if (dateFilterType === 'Today') {
         if (!pDate || pDate.getTime() !== today.getTime()) return false;
@@ -105,22 +105,33 @@ export default function EMDashboard() {
   // Helpers
   const today = getStartOfDay(new Date());
 
-  const getDelayDays = (t: any) => {
-    const pDate = parseDate(t.planned_date || t.work_from);
+  const isDelayed = (t: any) => {
+    if (t.status !== 'Completed') return false;
+    const pDate = parseDate(t.planned_date || t.work_to);
+    const aDate = parseDate(t.actual_date);
+    if (!pDate || !aDate) return false;
+    return aDate.getTime() > pDate.getTime();
+  };
+
+  const getOverdueDays = (t: any) => {
+    if (t.status === 'Completed') return 0;
+    const pDate = parseDate(t.planned_date || t.work_to);
     if (!pDate) return 0;
-    
-    if (t.status === 'Completed' && t.actual_date) {
-      const aDate = parseDate(t.actual_date);
-      if (!aDate) return 0;
-      const diffTime = aDate.getTime() - pDate.getTime();
-      return Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
-    }
-    
     const diffTime = today.getTime() - pDate.getTime();
     return Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
   };
 
-  const isDelayed = (t: any) => getDelayDays(t) > 0;
+  const getDelayDays = (t: any) => {
+    if (t.status === 'Completed') {
+      const pDate = parseDate(t.planned_date || t.work_to);
+      const aDate = parseDate(t.actual_date);
+      if (!pDate || !aDate) return 0;
+      const diffTime = aDate.getTime() - pDate.getTime();
+      return Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+    } else {
+      return getOverdueDays(t);
+    }
+  };
 
   // 1. Executive Summary
   const totalTasks = filteredData.length;
@@ -135,35 +146,47 @@ export default function EMDashboard() {
   // 2. Project Performance
   const projectMap = filteredData.reduce((acc, t) => {
     const proj = t.project_name || 'Unknown';
-    if (!acc[proj]) acc[proj] = { name: proj, Completed: 0, Pending: 0, Delayed: 0, total: 0 };
+    if (!acc[proj]) acc[proj] = { name: proj, Completed: 0, Pending: 0, Delayed: 0, total: 0, OnTime: 0 };
     acc[proj].total += 1;
     
-    if (isDelayed(t)) {
-      acc[proj].Delayed += 1;
-    } else if (t.status === 'Completed') {
+    if (t.status === 'Completed') {
       acc[proj].Completed += 1;
+      if (isDelayed(t)) {
+        acc[proj].Delayed += 1;
+      } else {
+        acc[proj].OnTime += 1;
+      }
     } else {
       acc[proj].Pending += 1;
     }
     return acc;
   }, {} as Record<string, any>);
-  const allProjectData = Object.values(projectMap).sort((a: any, b: any) => b.total - a.total);
+  const allProjectData = Object.values(projectMap).map((p: any) => ({
+    ...p,
+    completionPercent: p.total === 0 ? 0 : Math.round((p.Completed / p.total) * 100),
+    delayPercent: p.total === 0 ? 0 : Math.round((p.Delayed / p.total) * 100)
+  })).sort((a: any, b: any) => b.total - a.total);
   const projectData = allProjectData.slice(0, 15);
 
   // 3. Doer Performance
   const doerMap = filteredData.reduce((acc, t) => {
-    const doer = t.doer_name || t.doer || 'Unknown';
+    const doer = t.doer_name || t.supervisor_name || 'Unknown';
     if (!acc[doer]) acc[doer] = { name: doer, total: 0, completed: 0, pending: 0, delayed: 0 };
     acc[doer].total += 1;
-    if (t.status === 'Completed') acc[doer].completed += 1;
-    else acc[doer].pending += 1;
-    if (isDelayed(t)) acc[doer].delayed += 1;
+    if (t.status === 'Completed') {
+      acc[doer].completed += 1;
+      if (isDelayed(t)) acc[doer].delayed += 1;
+    } else {
+      acc[doer].pending += 1;
+    }
     return acc;
   }, {} as Record<string, any>);
   
   const doerTable = Object.values(doerMap).map((d: any) => ({
-    ...d, delayPercent: d.total === 0 ? 0 : Math.round((d.delayed / d.total) * 100)
-  })).sort((a, b) => b.total - a.total);
+    ...d, 
+    delayPercent: d.total === 0 ? 0 : Math.round((d.delayed / d.total) * 100),
+    pendingPercent: d.total === 0 ? 0 : Math.round((d.pending / d.total) * 100)
+  })).sort((a: any, b: any) => b.total - a.total);
 
   const topPerformers = [...doerTable].sort((a, b) => b.completed - a.completed).slice(0, 5);
   const delayRanking = [...doerTable].sort((a, b) => b.delayPercent - a.delayPercent).slice(0, 5);
@@ -171,7 +194,7 @@ export default function EMDashboard() {
   // 4. Timeline Performance
   const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const trendMap = filteredData.reduce((acc, t) => {
-    const pDate = parseDate(t.planned_date || t.work_from);
+    const pDate = parseDate(t.planned_date || t.work_to);
     if (pDate) {
       const m = pDate.getMonth();
       const y = pDate.getFullYear();
@@ -217,7 +240,7 @@ export default function EMDashboard() {
 
   // 7. Daily Activity
   const todayTasks = filteredData.filter(t => {
-    const pDate = parseDate(t.planned_date || t.work_from);
+    const pDate = parseDate(t.planned_date || t.work_to);
     return pDate && pDate.getTime() === today.getTime();
   });
   const todayPlanned = todayTasks.length;
@@ -239,7 +262,7 @@ export default function EMDashboard() {
     
     allMonthsSet.add(JSON.stringify({ key: monthKey, sortVal }));
     
-    const doer = t.doer_name || t.doer || 'Unknown';
+    const doer = t.doer_name || t.supervisor_name || 'Unknown';
     if (!acc[doer]) acc[doer] = { doer, total: 0 };
     acc[doer][monthKey] = (acc[doer][monthKey] || 0) + 1;
     acc[doer].total += 1;
@@ -252,8 +275,8 @@ export default function EMDashboard() {
 
   // 9. Pending Work Tracker
   const pendingTracker = filteredData.filter(t => t.status !== 'Completed').map(t => {
-    const pDate = parseDate(t.planned_date || t.work_from);
-    const delay = getDelayDays(t);
+    const pDate = parseDate(t.planned_date || t.work_to);
+    const delay = getOverdueDays(t);
     let priorityVal = 3; // Upcoming
     let priority = 'Upcoming';
     
@@ -265,8 +288,8 @@ export default function EMDashboard() {
     return {
       project: t.project_name || '-',
       workName: t.work_name || t.work_type || '-',
-      doer: t.doer_name || t.doer || '-',
-      plannedDate: t.planned_date || t.work_from || '-',
+      doer: t.doer_name || t.supervisor_name || '-',
+      plannedDate: t.planned_date || t.work_to || '-',
       delay,
       status: t.status || 'Pending',
       priority,
@@ -351,22 +374,68 @@ export default function EMDashboard() {
         </div>
       </div>
 
+      {/* Doer Tiles Row */}
+      <div className={styles.doerTilesWrapper}>
+        {doerTable.map((d: any, i: number) => {
+          const TILE_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#f43f5e'];
+          const tileColor = TILE_COLORS[i % TILE_COLORS.length];
+          return (
+          <div key={i} className={styles.doerTile} style={{ borderTop: `4px solid ${tileColor}` }}>
+            <div className={styles.doerTileHeader}>
+              <div className={styles.doerTileName} style={{ color: '#1e293b' }}>
+                <User size={18} color={tileColor} /> <span style={{ fontWeight: 700 }}>{d.name}</span>
+              </div>
+            </div>
+            
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <span className={styles.badgeWarning}>Not Done: {d.pendingPercent > 0 ? '-' : ''}{d.pendingPercent}%</span>
+              <span className={d.delayPercent > 20 ? styles.badgeDanger : (d.delayPercent > 0 ? styles.badgeWarning : styles.badgeSuccess)}>Late: {d.delayPercent > 0 ? '-' : ''}{d.delayPercent}%</span>
+            </div>
+
+            <div className={styles.doerTileStats}>
+              <div className={styles.doerTileStat}>
+                <span className={styles.doerTileStatLabel}>Total</span>
+                <span className={styles.doerTileStatValue}>{d.total}</span>
+              </div>
+              <div className={styles.doerTileStat}>
+                <span className={styles.doerTileStatLabel}>Done</span>
+                <span className={styles.doerTileStatValue} style={{ color: '#10b981' }}>{d.completed}</span>
+              </div>
+              <div className={styles.doerTileStat}>
+                <span className={styles.doerTileStatLabel}>Pend</span>
+                <span className={styles.doerTileStatValue} style={{ color: '#f59e0b' }}>{d.pending}</span>
+              </div>
+              <div className={styles.doerTileStat}>
+                <span className={styles.doerTileStatLabel}>Late</span>
+                <span className={styles.doerTileStatValue} style={{ color: '#ef4444' }}>{d.delayed}</span>
+              </div>
+            </div>
+          </div>
+        )})}
+      </div>
+
       {/* 2. PROJECT PERFORMANCE DASHBOARD */}
       <div className={styles.chartsGrid}>
         <div className={`${styles.chartCard} ${styles.fullWidthChart}`}>
           <h3><Briefcase size={22} color="#4f46e5" /> Project Performance (Stacked Status)</h3>
           <div style={{ height: 350, width: '100%', minWidth: 0, minHeight: 0 }}>
             {projectData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="99%" height="100%">
                 <BarChart data={projectData} margin={{ top: 20, right: 30, left: 0, bottom: 50 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                   <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#64748b' }} tickLine={false} axisLine={false} angle={-45} textAnchor="end" />
                   <YAxis tick={{ fontSize: 12, fill: '#64748b' }} tickLine={false} axisLine={false} />
                   <Tooltip cursor={{ fill: '#f1f5f9' }} contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
                   <Legend verticalAlign="top" height={36} />
-                  <Bar dataKey="Completed" stackId="a" fill={STATUS_COLORS['Completed']} radius={[0, 0, 4, 4]} barSize={32} />
-                  <Bar dataKey="Pending" stackId="a" fill={STATUS_COLORS['Pending']} />
-                  <Bar dataKey="Delayed" stackId="a" fill={STATUS_COLORS['Delayed']} radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="OnTime" name="Completed (On Time)" stackId="a" fill={STATUS_COLORS['Completed']} radius={[0, 0, 4, 4]} barSize={32}>
+                    <LabelList dataKey="OnTime" position="center" fill="#fff" fontSize={11} fontWeight="bold" formatter={(val: any) => val > 0 ? val : ''} />
+                  </Bar>
+                  <Bar dataKey="Pending" stackId="a" fill={STATUS_COLORS['Pending']}>
+                    <LabelList dataKey="Pending" position="center" fill="#fff" fontSize={11} fontWeight="bold" formatter={(val: any) => val > 0 ? val : ''} />
+                  </Bar>
+                  <Bar dataKey="Delayed" name="Completed (Late)" stackId="a" fill={STATUS_COLORS['Delayed']} radius={[4, 4, 0, 0]}>
+                    <LabelList dataKey="Delayed" position="center" fill="#fff" fontSize={11} fontWeight="bold" formatter={(val: any) => val > 0 ? val : ''} />
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             ) : <div className={styles.noData}>No project data</div>}
@@ -384,6 +453,8 @@ export default function EMDashboard() {
                   <th>Completed</th>
                   <th>Pending</th>
                   <th>Delayed</th>
+                  <th>Completion %</th>
+                  <th>Delay %</th>
                 </tr>
               </thead>
               <tbody>
@@ -395,6 +466,16 @@ export default function EMDashboard() {
                     <td><span style={{ color: '#3b82f6', fontWeight: 600 }}>{p.Pending}</span></td>
                     <td>
                       {p.Delayed > 0 ? <span style={{ color: '#ef4444', fontWeight: 600 }}>{p.Delayed}</span> : '-'}
+                    </td>
+                    <td>
+                      <span className={p.completionPercent >= 80 ? styles.badgeSuccess : p.completionPercent >= 40 ? styles.badgeWarning : styles.badgeDanger}>
+                        {p.completionPercent}%
+                      </span>
+                    </td>
+                    <td>
+                      <span className={p.delayPercent > 20 ? styles.badgeDanger : p.delayPercent > 0 ? styles.badgeWarning : styles.badgeSuccess}>
+                        {p.delayPercent}%
+                      </span>
                     </td>
                   </tr>
                 ))}
@@ -476,7 +557,7 @@ export default function EMDashboard() {
         <div className={styles.chartCard}>
           <h3><TrendingDown size={22} color="#ef4444" /> Delay Ranking (Top 5)</h3>
           <div style={{ height: 250, width: '100%', minWidth: 0, minHeight: 0 }}>
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="99%" height="100%">
               <BarChart data={delayRanking} layout="vertical" margin={{ top: 10, right: 30, left: 10, bottom: 5 }}>
                 <XAxis type="number" tick={{ fontSize: 12 }} />
                 <YAxis dataKey="name" type="category" width={90} tick={{ fontSize: 11, fontWeight: 600 }} />
@@ -499,16 +580,22 @@ export default function EMDashboard() {
           <h3><LineChartIcon size={22} color="#8b5cf6" /> Monthly Trend</h3>
           <div style={{ height: 320, width: '100%', minWidth: 0, minHeight: 0 }}>
             {trendData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="99%" height="100%">
                 <LineChart data={trendData} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                   <XAxis dataKey="label" tick={{ fontSize: 12, fill: '#64748b' }} tickLine={false} axisLine={false} />
                   <YAxis tick={{ fontSize: 12, fill: '#64748b' }} tickLine={false} axisLine={false} />
                   <Tooltip contentStyle={{ borderRadius: '12px' }} />
                   <Legend verticalAlign="top" height={36} />
-                  <Line name="Planned Tasks" type="monotone" dataKey="Planned" stroke="#94a3b8" strokeWidth={3} dot={{ r: 4 }} />
-                  <Line name="Completed Tasks" type="monotone" dataKey="Completed" stroke="#10b981" strokeWidth={4} dot={{ r: 5 }} />
-                  <Line name="Delayed Tasks" type="monotone" dataKey="Delayed" stroke="#ef4444" strokeWidth={3} dot={{ r: 4 }} />
+                  <Line name="Planned Tasks" type="monotone" dataKey="Planned" stroke="#94a3b8" strokeWidth={3} dot={{ r: 4 }}>
+                    <LabelList dataKey="Planned" position="top" fill="#94a3b8" fontSize={11} formatter={(val: any) => val > 0 ? val : ''} />
+                  </Line>
+                  <Line name="Completed Tasks" type="monotone" dataKey="Completed" stroke="#10b981" strokeWidth={4} dot={{ r: 5 }}>
+                    <LabelList dataKey="Completed" position="top" fill="#10b981" fontSize={11} fontWeight="bold" formatter={(val: any) => val > 0 ? val : ''} />
+                  </Line>
+                  <Line name="Delayed Tasks" type="monotone" dataKey="Delayed" stroke="#ef4444" strokeWidth={3} dot={{ r: 4 }}>
+                    <LabelList dataKey="Delayed" position="bottom" fill="#ef4444" fontSize={11} fontWeight="bold" formatter={(val: any) => val > 0 ? val : ''} />
+                  </Line>
                 </LineChart>
               </ResponsiveContainer>
             ) : <div className={styles.noData}>No timeline data</div>}
@@ -559,7 +646,7 @@ export default function EMDashboard() {
         <div className={styles.chartCard}>
           <h3><Trophy size={22} color="#10b981" /> Top Performers</h3>
           <div style={{ height: 200, width: '100%', minWidth: 0, minHeight: 0 }}>
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="99%" height="100%">
               <BarChart data={topPerformers} layout="vertical" margin={{ top: 10, right: 30, left: 10, bottom: 5 }}>
                 <XAxis type="number" hide />
                 <YAxis dataKey="name" type="category" width={90} tick={{ fontSize: 11, fontWeight: 600 }} axisLine={false} tickLine={false} />
