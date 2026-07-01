@@ -86,5 +86,10 @@ export const CONFIG = {
     SHEET_ID: '138xP7iXmKVKLLbHYhVmHNVZY3cLyWRI81_MG5NF5ckk',
     DESIGN_SHEET: 'Design',
     EXECUTION_SHEET: 'Execution',
+  },
+  SALES: {
+    SHEET_ID: '1qID9Lo3VE0Z8sXsc3QQe44R-HWqi34CWrXMZ0g1e1rs',
+    SHEET_NAME: 'Sales',
+    DROPDOWN_SHEET: 'Dropdown',
   }
 };

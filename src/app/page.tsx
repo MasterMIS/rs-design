@@ -9,7 +9,8 @@ import {
   Users as UsersIcon,
   Package,
   BriefcaseBusiness,
-  Layers
+  Layers,
+  BarChart3
 } from 'lucide-react';
 import Link from 'next/link';
 import { 
@@ -53,7 +54,12 @@ export default function Dashboard() {
           <h2 className={styles.pageTitle}>Dashboard</h2>
         </div>
         <div className={styles.actionButtons}>
+          <Link href="/sales" className={styles.usersBtn} style={{ background: 'linear-gradient(to right, #ff9966, #ff5e62)', color: 'white', marginRight: '10px', border: 'none' }}>
+            <BarChart3 size={18} />
+            Sales
+          </Link>
           <Link href="/em" className={styles.usersBtn} style={{ background: 'linear-gradient(to right, #8a2387, #e94057, #f27121)', color: 'white', marginRight: '10px', border: 'none' }}>
+
             <Layers size={18} />
             EM
           </Link>
