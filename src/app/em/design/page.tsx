@@ -80,7 +80,8 @@ export default function DesignPage() {
     setEditingTask(null);
     setFormProject('');
     setFormWorkType('');
-    setFormDoer(user?.role !== 'Admin' ? user?.name || '' : '');
+    const allowedRoles = ['Admin', 'EA', 'PC', 'MIS'];
+    setFormDoer(!allowedRoles.includes(user?.role || '') ? user?.name || '' : '');
     setIsModalOpen(true);
   };
 
@@ -195,7 +196,8 @@ export default function DesignPage() {
     const matchesStatus = statusFilter.length === 0 || statusFilter.includes(taskStatus);
     
     let userMatches = true;
-    if (user?.role !== 'Admin') {
+    const allowedRoles = ['Admin', 'EA', 'PC', 'MIS'];
+    if (user?.role && !allowedRoles.includes(user.role)) {
       userMatches = t.doer_name === user?.name;
     }
 

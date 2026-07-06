@@ -7,6 +7,7 @@ import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, Resp
 import styles from './dashboard.module.css';
 import GlobalLoading from '@/components/GlobalLoading';
 import MultiSelectFilter from '@/components/MultiSelectFilter';
+import { useAuth } from '@/context/AuthContext';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#ec4899', '#14b8a6', '#f97316'];
 const STATUS_COLORS = { 'Completed': '#10b981', 'Pending': '#3b82f6', 'Delayed': '#ef4444' };
@@ -25,6 +26,7 @@ const getStartOfDay = (d: Date) => {
 };
 
 export default function EMDashboard() {
+  const { user } = useAuth();
   const [designTasks, setDesignTasks] = useState<any[]>([]);
   const [executionTasks, setExecutionTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -79,6 +81,12 @@ export default function EMDashboard() {
     const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
 
     return rawData.filter(t => {
+      const allowedRoles = ['Admin', 'EA', 'PC', 'MIS'];
+      if (user?.role && !allowedRoles.includes(user.role)) {
+        const doer = t.doer_name || t.supervisor_name || t.doer;
+        if (doer !== user.name) return false;
+      }
+
       if (selectedProjects.length > 0 && !selectedProjects.includes(t.project_name)) return false;
       const doer = t.doer_name || t.supervisor_name;
       if (selectedDoers.length > 0 && !selectedDoers.includes(doer)) return false;
@@ -100,7 +108,7 @@ export default function EMDashboard() {
 
       return true;
     });
-  }, [designTasks, executionTasks, activeTab, dateFilterType, startDate, endDate, selectedProjects, selectedDoers, selectedStatuses]);
+  }, [designTasks, executionTasks, activeTab, dateFilterType, startDate, endDate, selectedProjects, selectedDoers, selectedStatuses, user]);
 
   // Helpers
   const today = getStartOfDay(new Date());

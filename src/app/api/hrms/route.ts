@@ -16,7 +16,7 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const data = await getSheetsData(SHEET_ID, `${SHEET_NAME}!A2:R`);
+    const data = await getSheetsData(SHEET_ID, `${SHEET_NAME}!A2:AN`);
 
     if (!data || data.length === 0) return NextResponse.json([]);
 
@@ -37,10 +37,32 @@ export async function GET() {
         company_details: row[11] || '',
         cv_upload: row[12] || '',
         photo_upload: row[13] || '',
-        ea_remarks: row[14] || '',
-        director_remarks: row[15] || '',
-        first_round_remark: row[16] || '',
-        final_round_remark: row[17] || '',
+        planned_1: row[14] || '',
+        actual_1: row[15] || '',
+        status_1: row[16] || '',
+        next_follow_up_date_1: row[17] || '',
+        remark_1: row[18] || '',
+        planned_2: row[19] || '',
+        actual_2: row[20] || '',
+        status_2: row[21] || '',
+        next_follow_up_date_2: row[22] || '',
+        remark_2: row[23] || '',
+        planned_3: row[24] || '',
+        actual_3: row[25] || '',
+        status_3: row[26] || '',
+        next_follow_up_date_3: row[27] || '',
+        remark_3: row[28] || '',
+        planned_4: row[29] || '',
+        actual_4: row[30] || '',
+        status_4: row[31] || '',
+        next_follow_up_date_4: row[32] || '',
+        remark_4: row[33] || '',
+        planned_5: row[34] || '',
+        actual_5: row[35] || '',
+        status_5: row[36] || '',
+        next_follow_up_date_5: row[37] || '',
+        remark_5: row[38] || '',
+        lost_remark: row[39] || ''
       };
     });
 
@@ -78,52 +100,38 @@ export async function POST(request: NextRequest) {
 
     if (cvFile && cvFile.size > 0 && FOLDER_ID) {
       const buffer = Buffer.from(await cvFile.arrayBuffer());
-      const driveFile = await uploadFileToDrive(
-        buffer,
-        `CV_${Date.now()}_${cvFile.name}`,
-        cvFile.type,
-        FOLDER_ID
-      );
-      if (driveFile.id) {
-        cvUrl = `https://drive.google.com/file/d/${driveFile.id}/view`;
-      }
+      const driveFile = await uploadFileToDrive(buffer, `CV_${Date.now()}_${cvFile.name}`, cvFile.type, FOLDER_ID);
+      if (driveFile.id) cvUrl = `https://drive.google.com/file/d/${driveFile.id}/view`;
     }
 
     if (photoFile && photoFile.size > 0 && FOLDER_ID) {
       const buffer = Buffer.from(await photoFile.arrayBuffer());
-      const driveFile = await uploadFileToDrive(
-        buffer,
-        `PHOTO_${Date.now()}_${photoFile.name}`,
-        photoFile.type,
-        FOLDER_ID
-      );
-      if (driveFile.id) {
-        photoUrl = `https://drive.google.com/file/d/${driveFile.id}/view`;
-      }
+      const driveFile = await uploadFileToDrive(buffer, `PHOTO_${Date.now()}_${photoFile.name}`, photoFile.type, FOLDER_ID);
+      if (driveFile.id) photoUrl = `https://drive.google.com/file/d/${driveFile.id}/view`;
     }
 
     const id = `EMP-${Date.now()}`;
-    const timestamp = new Date().toISOString();
+    const now = new Date();
+    const timestamp = now.toISOString();
+
+    const planned_1_date = new Date(now);
+    planned_1_date.setDate(planned_1_date.getDate() + 1);
+    if (planned_1_date.getDay() === 0) { // Sunday
+      planned_1_date.setDate(planned_1_date.getDate() + 1);
+    }
+    planned_1_date.setHours(18, 0, 0, 0);
+    const planned_1 = planned_1_date.toISOString();
 
     const newRow = [
-      id,
-      timestamp,
-      timestamp, // updated_at
-      employee_name || '',
-      contact_no || '',
-      post_applied || '',
-      qualification || '',
-      date_of_birth || '',
-      marital_status || '',
-      address || '',
-      expectation || '',
-      company_details || '',
-      cvUrl,
-      photoUrl,
-      '', // ea_remarks
-      '', // director_remarks
-      '', // first_round_remark
-      '', // final_round_remark
+      id, timestamp, timestamp, employee_name || '', contact_no || '', post_applied || '',
+      qualification || '', date_of_birth || '', marital_status || '', address || '',
+      expectation || '', company_details || '', cvUrl, photoUrl,
+      planned_1, '', '', '', '', // Step 1
+      '', '', '', '', '', // Step 2
+      '', '', '', '', '', // Step 3
+      '', '', '', '', '', // Step 4
+      '', '', '', '', '', // Step 5
+      ''                  // Lost Remark
     ];
 
     await appendSheetsData(SHEET_ID, `${SHEET_NAME}!A2`, [newRow]);
@@ -159,10 +167,6 @@ export async function PUT(request: NextRequest) {
     const company_details = formData.get('company_details') as string;
     const existingCvUrl = formData.get('existing_cv_url') as string || '';
     const existingPhotoUrl = formData.get('existing_photo_url') as string || '';
-    const ea_remarks = formData.get('ea_remarks') as string;
-    const director_remarks = formData.get('director_remarks') as string;
-    const first_round_remark = formData.get('first_round_remark') as string;
-    const final_round_remark = formData.get('final_round_remark') as string;
 
     const cvFile = formData.get('cv_upload') as File | null;
     const photoFile = formData.get('photo_upload') as File | null;
@@ -172,50 +176,31 @@ export async function PUT(request: NextRequest) {
 
     if (cvFile && cvFile.size > 0 && FOLDER_ID) {
       const buffer = Buffer.from(await cvFile.arrayBuffer());
-      const driveFile = await uploadFileToDrive(
-        buffer,
-        `CV_${Date.now()}_${cvFile.name}`,
-        cvFile.type,
-        FOLDER_ID
-      );
+      const driveFile = await uploadFileToDrive(buffer, `CV_${Date.now()}_${cvFile.name}`, cvFile.type, FOLDER_ID);
       if (driveFile.id) cvUrl = `https://drive.google.com/file/d/${driveFile.id}/view`;
     }
 
     if (photoFile && photoFile.size > 0 && FOLDER_ID) {
       const buffer = Buffer.from(await photoFile.arrayBuffer());
-      const driveFile = await uploadFileToDrive(
-        buffer,
-        `PHOTO_${Date.now()}_${photoFile.name}`,
-        photoFile.type,
-        FOLDER_ID
-      );
+      const driveFile = await uploadFileToDrive(buffer, `PHOTO_${Date.now()}_${photoFile.name}`, photoFile.type, FOLDER_ID);
       if (driveFile.id) photoUrl = `https://drive.google.com/file/d/${driveFile.id}/view`;
     }
 
     const updated_at = new Date().toISOString();
 
     const updatedRow = [
-      id,
-      created_at,
-      updated_at,
-      employee_name || '',
-      contact_no || '',
-      post_applied || '',
-      qualification || '',
-      date_of_birth || '',
-      marital_status || '',
-      address || '',
-      expectation || '',
-      company_details || '',
-      cvUrl,
-      photoUrl,
-      ea_remarks || '',
-      director_remarks || '',
-      first_round_remark || '',
-      final_round_remark || '',
+      id, created_at, updated_at, employee_name || '', contact_no || '', post_applied || '',
+      qualification || '', date_of_birth || '', marital_status || '', address || '',
+      expectation || '', company_details || '', cvUrl, photoUrl,
+      formData.get('planned_1') as string || '', formData.get('actual_1') as string || '', formData.get('status_1') as string || '', formData.get('next_follow_up_date_1') as string || '', formData.get('remark_1') as string || '',
+      formData.get('planned_2') as string || '', formData.get('actual_2') as string || '', formData.get('status_2') as string || '', formData.get('next_follow_up_date_2') as string || '', formData.get('remark_2') as string || '',
+      formData.get('planned_3') as string || '', formData.get('actual_3') as string || '', formData.get('status_3') as string || '', formData.get('next_follow_up_date_3') as string || '', formData.get('remark_3') as string || '',
+      formData.get('planned_4') as string || '', formData.get('actual_4') as string || '', formData.get('status_4') as string || '', formData.get('next_follow_up_date_4') as string || '', formData.get('remark_4') as string || '',
+      formData.get('planned_5') as string || '', formData.get('actual_5') as string || '', formData.get('status_5') as string || '', formData.get('next_follow_up_date_5') as string || '', formData.get('remark_5') as string || '',
+      formData.get('lost_remark') as string || ''
     ];
 
-    await updateSheetRow(SHEET_ID, `${SHEET_NAME}!A${rowIndex}:R${rowIndex}`, [updatedRow]);
+    await updateSheetRow(SHEET_ID, `${SHEET_NAME}!A${rowIndex}:AN${rowIndex}`, [updatedRow]);
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
