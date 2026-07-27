@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Plus, Search, Briefcase, Users, MapPin, 
   Calendar, DollarSign, Filter, MoreVertical,
@@ -8,15 +8,18 @@ import {
   User, Trash2, ArrowRight, ChevronRight, Globe,
   Home, Phone, Mail, FileText, Info, Edit2, ArrowLeft,
   ExternalLink, Layers, ShieldCheck, Activity, Tag,
-  Layers3, Landmark, Contact, Map, Settings, BriefcaseBusiness,
+  Layers3, Landmark, Contact, Map as MapIcon, Settings, BriefcaseBusiness,
   LayoutGrid, List, Eye, PenTool, Package
 } from 'lucide-react';
 import styles from './projects.module.css';
 import Modal from '@/components/Modal';
+import SearchableSelect from '@/components/SearchableSelect';
 import GlobalLoading from '@/components/GlobalLoading';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useProject } from '@/context/ProjectContext';
+import { useAuth } from '@/context/AuthContext';
+import { filterProjectsForUser } from '@/lib/project-access';
 
 interface Project {
   id: string;
@@ -29,10 +32,23 @@ interface Project {
   metadata: any;
 }
 
+function getActiveTeamNames(team: any[]): string {
+  const names = (team || [])
+    .filter((m) => m.isActive !== 'No' && m.name?.trim())
+    .map((m) => m.name.trim());
+  return names.length > 0 ? names.join(', ') : 'No team assigned';
+}
+
 export default function ProjectsPage() {
   const router = useRouter();
   const { setActiveProject } = useProject();
-  const [projects, setProjects] = useState<Project[]>([]);
+  const { user } = useAuth();
+  const [allProjects, setAllProjects] = useState<Project[]>([]);
+  const [users, setUsers] = useState<{ name: string; status?: string; role?: string }[]>([]);
+  const projects = useMemo(
+    () => filterProjectsForUser<Project>(allProjects, user),
+    [allProjects, user]
+  );
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -42,6 +58,66 @@ export default function ProjectsPage() {
   const [viewingProject, setViewingProject] = useState<Project | null>(null);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [typeFilter, setTypeFilter] = useState('All');
+
+  const projectTypeTabs = useMemo(() => {
+    const typeCounts = new Map<string, { label: string; count: number }>();
+    projects.forEach((project) => {
+      const type = project.basicInfo?.type?.trim();
+      if (!type) return;
+      const key = type.toLowerCase();
+      const existing = typeCounts.get(key);
+      if (existing) {
+        existing.count += 1;
+      } else {
+        typeCounts.set(key, { label: type, count: 1 });
+      }
+    });
+
+    const priority = ['flat', 'villa', 'bunglow'];
+    const entries = Array.from(typeCounts.values());
+    const ordered = [
+      ...priority
+        .map((key) => entries.find((entry) => entry.label.toLowerCase() === key))
+        .filter((entry): entry is { label: string; count: number } => !!entry),
+      ...entries
+        .filter((entry) => !priority.includes(entry.label.toLowerCase()))
+        .sort((a, b) => a.label.localeCompare(b.label)),
+    ];
+
+    return ordered.map((entry) => ({
+      type: entry.label,
+      count: entry.count,
+    }));
+  }, [projects]);
+
+  const filteredProjects = useMemo(() => {
+    let result = projects;
+
+    if (typeFilter !== 'All') {
+      result = result.filter(
+        (project) =>
+          project.basicInfo?.type?.toLowerCase() === typeFilter.toLowerCase()
+      );
+    }
+
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return result;
+
+    return result.filter((project) => {
+      const teamNames = getActiveTeamNames(project.team).toLowerCase();
+      return (
+        project.basicInfo?.name?.toLowerCase().includes(query) ||
+        project.basicInfo?.code?.toLowerCase().includes(query) ||
+        project.id?.toLowerCase().includes(query) ||
+        project.basicInfo?.type?.toLowerCase().includes(query) ||
+        project.basicInfo?.status?.toLowerCase().includes(query) ||
+        project.clients?.[0]?.name?.toLowerCase().includes(query) ||
+        teamNames.includes(query)
+      );
+    });
+  }, [projects, searchQuery, typeFilter]);
   
   // Dropdowns
   const projectTypes = ['Flat', 'Corporate Office', 'Retail Store', 'Bunglow', 'Apartment', 'Showroom', 'Factory', 'Warehouse', 'Hotels', 'Club House', 'Restaurent', 'Building'];
@@ -63,8 +139,20 @@ export default function ProjectsPage() {
     team: [{ role: 'Project Manager', name: '', employeeId: '', responsibility: '', assignedDate: '', isActive: 'Yes' }]
   });
 
+  const userOptions = useMemo(() => {
+    const fromUsers = users
+      .filter((u) => u.status !== 'Inactive' && u.role !== 'Client')
+      .map((u) => u.name)
+      .filter(Boolean);
+    const fromTeam = formData.team.map((m) => m.name).filter(Boolean);
+    return Array.from(new Set([...fromUsers, ...fromTeam])).sort((a, b) =>
+      a.localeCompare(b)
+    );
+  }, [users, formData.team]);
+
   useEffect(() => {
     fetchProjects();
+    fetchUsers();
     const saved = localStorage.getItem('projects_view_mode') as 'card' | 'table';
     if (saved === 'card' || saved === 'table') {
       setTimeout(() => {
@@ -78,17 +166,30 @@ export default function ProjectsPage() {
     localStorage.setItem('projects_view_mode', mode);
   };
 
+  async function fetchUsers() {
+    try {
+      const res = await fetch('/api/users');
+      if (res.ok) {
+        const data = await res.json();
+        setUsers(Array.isArray(data) ? data : []);
+      }
+    } catch (err) {
+      console.error('Fetch users error:', err);
+    }
+  }
+
   async function fetchProjects() {
     try {
       setLoading(true);
       const res = await fetch('/api/projects');
       const data = await res.json();
-      setProjects(data);
+      setAllProjects(data);
       // Auto-open project detail if navigating back from a module page
       const pendingId = localStorage.getItem('pending_view_project_id');
       if (pendingId) {
         localStorage.removeItem('pending_view_project_id');
-        const found = data.find((p: Project) => p.id === pendingId);
+        const visible = filterProjectsForUser<Project>(data, user);
+        const found = visible.find((p) => p.id === pendingId);
         if (found) setViewingProject(found);
       }
     } catch (err) {
@@ -439,11 +540,11 @@ export default function ProjectsPage() {
           <div className={styles.tabHeader}>
             <button className={`${styles.tabBtn} ${activeTab === 'basic' ? styles.activeTab : ''}`} onClick={() => setActiveTab('basic')}><Landmark size={16} /> Basic Details</button>
             <button className={`${styles.tabBtn} ${activeTab === 'clients' ? styles.activeTab : ''}`} onClick={() => setActiveTab('clients')}><Contact size={16} /> Clients ({formData.clients.length})</button>
-            <button className={`${styles.tabBtn} ${activeTab === 'sites' ? styles.activeTab : ''}`} onClick={() => setActiveTab('sites')}><Map size={16} /> Sites ({formData.sites.length})</button>
+            <button className={`${styles.tabBtn} ${activeTab === 'sites' ? styles.activeTab : ''}`} onClick={() => setActiveTab('sites')}><MapIcon size={16} /> Sites ({formData.sites.length})</button>
             <button className={`${styles.tabBtn} ${activeTab === 'team' ? styles.activeTab : ''}`} onClick={() => setActiveTab('team')}><BriefcaseBusiness size={16} /> Internal Team</button>
           </div>
 
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} className={styles.outlineForm}>
             {activeTab === 'basic' && (
               <div className={styles.formSection}>
                 <div className={styles.gridForm}>
@@ -529,7 +630,7 @@ export default function ProjectsPage() {
                       <div className={styles.formGroup}><label><Home size={14} className={styles.labelIcon} /> Type</label><select value={site.type} onChange={(e) => updateSection('sites', idx, 'type', e.target.value)}>{siteTypes.map(t => <option key={t}>{t}</option>)}</select></div>
                       <div className={styles.formGroup}><label><Layers size={14} className={styles.labelIcon} /> Area (Sqft)</label><input type="number" value={site.area} onChange={(e) => updateSection('sites', idx, 'area', e.target.value)} /></div>
                       <div className={styles.formGroup}><label><Globe size={14} className={styles.labelIcon} /> City</label><input type="text" value={site.city} onChange={(e) => updateSection('sites', idx, 'city', e.target.value)} /></div>
-                      <div className={`${styles.formGroup} ${styles.fullWidth}`}><label><Map size={14} className={styles.labelIcon} /> Site Address</label><textarea value={site.address} onChange={(e) => updateSection('sites', idx, 'address', e.target.value)} /></div>
+                      <div className={`${styles.formGroup} ${styles.fullWidth}`}><label><MapIcon size={14} className={styles.labelIcon} /> Site Address</label><textarea value={site.address} onChange={(e) => updateSection('sites', idx, 'address', e.target.value)} /></div>
                       <div className={`${styles.formGroup} ${styles.fullWidth}`}><label><ExternalLink size={14} className={styles.labelIcon} /> Map URL</label><input type="url" value={site.googleLocation} onChange={(e) => updateSection('sites', idx, 'googleLocation', e.target.value)} /></div>
                     </div>
                   </div>
@@ -545,7 +646,16 @@ export default function ProjectsPage() {
                     <div className={styles.rowHeader}><h4>Member {idx + 1}</h4>{formData.team.length > 1 && <button type="button" onClick={() => removeRow('team', idx)} className={styles.removeBtn}><Trash2 size={16} /></button>}</div>
                     <div className={styles.gridForm}>
                       <div className={styles.formGroup}><label><ShieldCheck size={14} className={styles.labelIcon} /> Role</label><select value={member.role} onChange={(e) => updateSection('team', idx, 'role', e.target.value)}>{memberRoles.map(r => <option key={r}>{r}</option>)}</select></div>
-                      <div className={styles.formGroup}><label><User size={14} className={styles.labelIcon} /> Name</label><input type="text" value={member.name} onChange={(e) => updateSection('team', idx, 'name', e.target.value)} /></div>
+                      <div className={styles.formGroup}>
+                        <label><User size={14} className={styles.labelIcon} /> Name</label>
+                        <SearchableSelect
+                          value={member.name}
+                          onChange={(val) => updateSection('team', idx, 'name', val)}
+                          options={userOptions}
+                          placeholder="Select User"
+                          icon={<User size={14} />}
+                        />
+                      </div>
                       <div className={styles.formGroup}><label><Calendar size={14} className={styles.labelIcon} /> Assigned Date</label><input type="date" value={member.assignedDate} onChange={(e) => updateSection('team', idx, 'assignedDate', e.target.value)} /></div>
                     </div>
                   </div>
@@ -583,6 +693,16 @@ export default function ProjectsPage() {
           </div>
         </div>
         <div className={styles.headerActions}>
+          <div className={styles.searchContainer}>
+            <Search size={16} className={styles.searchIcon} />
+            <input
+              type="text"
+              className={styles.searchInput}
+              placeholder="Search projects..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
           <div className={styles.viewToggleGroup}>
             <button 
               type="button"
@@ -608,41 +728,41 @@ export default function ProjectsPage() {
         </div>
       </div>
 
-      <div className={styles.statsRow}>
-        <div className={styles.statCard}>
-          <div className={`${styles.statIcon} ${styles.blueBg}`}><Briefcase color="#3bafda" /></div>
-          <div className={styles.statInfo}>
-            <h3>{projects.length}</h3>
-            <p>Total Projects</p>
-          </div>
-        </div>
-        <div className={styles.statCard}>
-          <div className={`${styles.statIcon} ${styles.greenBg}`}><CheckCircle color="#2ecc71" /></div>
-          <div className={styles.statInfo}>
-            <h3>{projects.filter(p => p.metadata?.completion === 100).length}</h3>
-            <p>Completed</p>
-          </div>
-        </div>
-        <div className={styles.statCard}>
-          <div className={`${styles.statIcon} ${styles.orangeBg}`}><Clock color="#f39c12" /></div>
-          <div className={styles.statInfo}>
-            <h3>{projects.filter(p => p.metadata?.status === 'Active').length}</h3>
-            <p>Active Now</p>
-          </div>
-        </div>
+      <div className={styles.typeFilterRow}>
+        <button
+          type="button"
+          className={`${styles.typeFilterTab} ${typeFilter === 'All' ? styles.typeFilterTabActive : ''}`}
+          onClick={() => setTypeFilter('All')}
+        >
+          All ({projects.length})
+        </button>
+        {projectTypeTabs.map(({ type, count }) => (
+          <button
+            key={type}
+            type="button"
+            className={`${styles.typeFilterTab} ${typeFilter.toLowerCase() === type.toLowerCase() ? styles.typeFilterTabActive : ''}`}
+            onClick={() => setTypeFilter(type)}
+          >
+            {type} ({count})
+          </button>
+        ))}
       </div>
 
       {loading ? (
         <div style={{ display: 'flex', justifyContent: 'center', padding: '100px 0', color: 'var(--text-light)' }}>
           <p>Loading projects...</p>
         </div>
-      ) : projects.length === 0 ? (
+      ) : filteredProjects.length === 0 ? (
         <div style={{ display: 'flex', justifyContent: 'center', padding: '100px 0', color: 'var(--text-light)' }}>
-          <p>No projects found.</p>
+          <p>
+            {searchQuery.trim() || typeFilter !== 'All'
+              ? 'No projects match your filters.'
+              : 'No projects found.'}
+          </p>
         </div>
       ) : viewMode === 'card' ? (
         <div className={styles.projectGrid}>
-          {projects.map((project) => (
+          {filteredProjects.map((project) => (
             <div key={project.id} className={styles.projectCard}>
               <div className={styles.cardTop}>
                 <div className={styles.cardHeader}>
@@ -671,12 +791,8 @@ export default function ProjectsPage() {
                   <span>{project.clients[0]?.name || 'N/A'}</span>
                 </div>
                 <div className={styles.detailItem}>
-                  <MapPin size={14} />
-                  <span>{project.sites[0]?.city || 'No Location'}</span>
-                </div>
-                <div className={styles.detailItem}>
-                  <DollarSign size={14} />
-                  <span>Budget: ₹{project.basicInfo.estimatedBudget || '0'}</span>
+                  <Users size={14} />
+                  <span>{getActiveTeamNames(project.team)}</span>
                 </div>
               </div>
 
@@ -700,13 +816,11 @@ export default function ProjectsPage() {
                 <th>Type</th>
                 <th>Progress</th>
                 <th>Client</th>
-                <th>Location</th>
-                <th>Budget</th>
-                <th>Team</th>
+                <th>Internal Team</th>
               </tr>
             </thead>
             <tbody>
-              {projects.map((project) => (
+              {filteredProjects.map((project) => (
                 <tr key={project.id}>
                   <td>
                     <div className={styles.tableActions}>
@@ -761,15 +875,8 @@ export default function ProjectsPage() {
                   </td>
                   <td>
                     <div className={styles.tableMetaCell}>
-                      <MapPin size={14} />
-                      <span>{project.sites[0]?.city || 'No Location'}</span>
-                    </div>
-                  </td>
-                  <td>₹{project.basicInfo.estimatedBudget || '0'}</td>
-                  <td>
-                    <div className={styles.tableMetaCell}>
                       <Users size={14} />
-                      <span>{project.team.length} Members</span>
+                      <span>{getActiveTeamNames(project.team)}</span>
                     </div>
                   </td>
                 </tr>
@@ -789,11 +896,11 @@ export default function ProjectsPage() {
         <div className={styles.tabHeader}>
           <button className={`${styles.tabBtn} ${activeTab === 'basic' ? styles.activeTab : ''}`} onClick={() => setActiveTab('basic')}><Landmark size={16} /> Basic Details</button>
           <button className={`${styles.tabBtn} ${activeTab === 'clients' ? styles.activeTab : ''}`} onClick={() => setActiveTab('clients')}><Contact size={16} /> Clients ({formData.clients.length})</button>
-          <button className={`${styles.tabBtn} ${activeTab === 'sites' ? styles.activeTab : ''}`} onClick={() => setActiveTab('sites')}><Map size={16} /> Sites ({formData.sites.length})</button>
+          <button className={`${styles.tabBtn} ${activeTab === 'sites' ? styles.activeTab : ''}`} onClick={() => setActiveTab('sites')}><MapIcon size={16} /> Sites ({formData.sites.length})</button>
           <button className={`${styles.tabBtn} ${activeTab === 'team' ? styles.activeTab : ''}`} onClick={() => setActiveTab('team')}><BriefcaseBusiness size={16} /> Internal Team</button>
         </div>
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} className={styles.outlineForm}>
           {activeTab === 'basic' && (
             <div className={styles.formSection}>
               <div className={styles.gridForm}>
@@ -879,7 +986,7 @@ export default function ProjectsPage() {
                     <div className={styles.formGroup}><label><Home size={14} className={styles.labelIcon} /> Type</label><select value={site.type} onChange={(e) => updateSection('sites', idx, 'type', e.target.value)}>{siteTypes.map(t => <option key={t}>{t}</option>)}</select></div>
                     <div className={styles.formGroup}><label><Layers size={14} className={styles.labelIcon} /> Area (Sqft)</label><input type="number" value={site.area} onChange={(e) => updateSection('sites', idx, 'area', e.target.value)} /></div>
                     <div className={styles.formGroup}><label><Globe size={14} className={styles.labelIcon} /> City</label><input type="text" value={site.city} onChange={(e) => updateSection('sites', idx, 'city', e.target.value)} /></div>
-                    <div className={`${styles.formGroup} ${styles.fullWidth}`}><label><Map size={14} className={styles.labelIcon} /> Site Address</label><textarea value={site.address} onChange={(e) => updateSection('sites', idx, 'address', e.target.value)} /></div>
+                    <div className={`${styles.formGroup} ${styles.fullWidth}`}><label><MapIcon size={14} className={styles.labelIcon} /> Site Address</label><textarea value={site.address} onChange={(e) => updateSection('sites', idx, 'address', e.target.value)} /></div>
                     <div className={`${styles.formGroup} ${styles.fullWidth}`}><label><ExternalLink size={14} className={styles.labelIcon} /> Map URL</label><input type="url" value={site.googleLocation} onChange={(e) => updateSection('sites', idx, 'googleLocation', e.target.value)} /></div>
                   </div>
                 </div>
@@ -895,7 +1002,16 @@ export default function ProjectsPage() {
                   <div className={styles.rowHeader}><h4>Member {idx + 1}</h4>{formData.team.length > 1 && <button type="button" onClick={() => removeRow('team', idx)} className={styles.removeBtn}><Trash2 size={16} /></button>}</div>
                   <div className={styles.gridForm}>
                     <div className={styles.formGroup}><label><ShieldCheck size={14} className={styles.labelIcon} /> Role</label><select value={member.role} onChange={(e) => updateSection('team', idx, 'role', e.target.value)}>{memberRoles.map(r => <option key={r}>{r}</option>)}</select></div>
-                    <div className={styles.formGroup}><label><User size={14} className={styles.labelIcon} /> Name</label><input type="text" value={member.name} onChange={(e) => updateSection('team', idx, 'name', e.target.value)} /></div>
+                    <div className={styles.formGroup}>
+                      <label><User size={14} className={styles.labelIcon} /> Name</label>
+                      <SearchableSelect
+                        value={member.name}
+                        onChange={(val) => updateSection('team', idx, 'name', val)}
+                        options={userOptions}
+                        placeholder="Select User"
+                        icon={<User size={14} />}
+                      />
+                    </div>
                     <div className={styles.formGroup}><label><Calendar size={14} className={styles.labelIcon} /> Assigned Date</label><input type="date" value={member.assignedDate} onChange={(e) => updateSection('team', idx, 'assignedDate', e.target.value)} /></div>
                   </div>
                 </div>

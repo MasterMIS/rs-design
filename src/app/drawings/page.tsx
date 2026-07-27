@@ -12,6 +12,8 @@ import {
 import styles from './drawings.module.css';
 import Modal from '@/components/Modal';
 import { useProject } from '@/context/ProjectContext';
+import { useAuth } from '@/context/AuthContext';
+import { filterProjectsForUser } from '@/lib/project-access';
 import Link from 'next/link';
 
 interface DrawingTemplate {
@@ -68,6 +70,7 @@ const getCategoryIcon = (name: string, size = 16) => {
 
 export default function DrawingsPage() {
   const { activeProject } = useProject();
+  const { user } = useAuth();
   const [templates, setTemplates] = useState<DrawingTemplate[]>([]);
   const [schedules, setSchedules] = useState<DrawingScheduleItem[]>([]);
   const [plannedDates, setPlannedDates] = useState<CategoryPlannedDate[]>([]);
@@ -117,7 +120,7 @@ export default function DrawingsPage() {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     // Merge templates with existing schedule for the active project
@@ -197,7 +200,10 @@ export default function DrawingsPage() {
       if (tplRes.ok) setTemplates(await tplRes.json());
       if (schRes.ok) setSchedules(await schRes.json());
       if (usersRes.ok) setUsers(await usersRes.json());
-      if (projRes.ok) setProjects(await projRes.json());
+      if (projRes.ok) {
+        const data = await projRes.json();
+        setProjects(filterProjectsForUser(data, user));
+      }
       if (planRes.ok) setPlannedDates(await planRes.json());
     } catch (err) {
       console.error('Error fetching data:', err);

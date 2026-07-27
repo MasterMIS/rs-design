@@ -11,6 +11,8 @@ import {
 import styles from './checklists.module.css';
 import Modal from '@/components/Modal';
 import { useProject } from '@/context/ProjectContext';
+import { useAuth } from '@/context/AuthContext';
+import { filterProjectsForUser } from '@/lib/project-access';
 import Link from 'next/link';
 
 interface TemplateItem {
@@ -61,6 +63,7 @@ const getTemplateIcon = (name: string, size = 16) => {
 
 export default function ChecklistsPage() {
   const { activeProject } = useProject();
+  const { user } = useAuth();
   const [checklists, setChecklists] = useState<Checklist[]>([]);
   const [templateItems, setTemplateItems] = useState<TemplateItem[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -95,7 +98,7 @@ export default function ChecklistsPage() {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [user]);
 
   const activeProjectName = activeProject?.name || '';
   const currentProjectChecklist = checklists.find(c => c.project === activeProjectName);
@@ -121,7 +124,10 @@ export default function ChecklistsPage() {
 
       if (chkRes.ok) setChecklists(await chkRes.json());
       if (tplRes.ok) setTemplateItems(await tplRes.json());
-      if (projRes.ok) setProjects(await projRes.json());
+      if (projRes.ok) {
+        const data = await projRes.json();
+        setProjects(filterProjectsForUser(data, user));
+      }
     } catch (err) {
       console.error('Error fetching data:', err);
     } finally {

@@ -386,72 +386,312 @@
   transition: width 1s ease-out;
 }
 
+/* Progress overview strip under hero (tracker + drawings) */
+.heroProgressStrip {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+  z-index: 5;
+  position: relative;
+}
+
+.progressCompactCard {
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  border-radius: 16px;
+  padding: 16px 18px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto 1fr auto;
+  gap: 4px 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.02);
+  min-height: 120px;
+}
+
+.progressCompactHeader {
+  grid-column: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.progressCompactHeader h4 {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #0f172a;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.progressCompactPercent {
+  font-size: 1.5rem;
+  font-weight: 900;
+  color: var(--primary);
+  line-height: 1;
+}
+
+.progressCompactChart {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  width: 96px;
+  height: 96px;
+}
+
+.progressCompactMeta {
+  grid-column: 1;
+  font-size: 0.75rem;
+  color: #64748b;
+  font-weight: 600;
+  margin: 0;
+}
+
+.progressChartsSection {
+  margin-bottom: 28px;
+}
+
+.progressChartsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.progressChartCard {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 20px;
+}
+
+.progressChartTitle {
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0 0 12px;
+}
+
+.progressPieWrap {
+  position: relative;
+  height: 220px;
+  width: 100%;
+}
+
+.progressPieCenter {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.progressPieCenter strong {
+  font-size: 1.6rem;
+  font-weight: 900;
+  color: #0f172a;
+  line-height: 1;
+}
+
+.progressPieCenter span {
+  font-size: 0.72rem;
+  color: #64748b;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-top: 4px;
+}
+
+.progressBarWrap {
+  height: 280px;
+  width: 100%;
+  min-width: 0;
+}
+
+.progressChartCaption {
+  text-align: center;
+  font-size: 0.78rem;
+  color: #64748b;
+  font-weight: 600;
+  margin: 8px 0 0;
+}
+
+/* Legacy info strip — kept for reference, unused */
+.heroInfoStrip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  z-index: 5;
+  position: relative;
+}
+
+.heroInfoCard {
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  border-radius: 16px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.02);
+}
+
+.heroInfoCard svg {
+  color: var(--primary);
+  flex-shrink: 0;
+}
+
+.heroInfoCard span {
+  display: block;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #94a3b8;
+  font-weight: 700;
+}
+
+.heroInfoCard strong {
+  display: block;
+  font-size: 0.88rem;
+  color: #0f172a;
+  font-weight: 800;
+  margin-top: 2px;
+}
+
+/* Sticky module navigation below hero */
+.moduleNav {
+  position: sticky;
+  top: 12px;
+  z-index: 90;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  border-radius: 18px;
+  padding: 8px;
+  backdrop-filter: blur(16px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
+}
+
+.moduleNavInner {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.moduleNavInner::-webkit-scrollbar {
+  display: none;
+}
+
+.moduleNavBtn {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #475569;
+  padding: 10px 16px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s;
+}
+
+.moduleNavBtn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: var(--primary-light);
+}
+
+.moduleNavBtnActive {
+  background: linear-gradient(135deg, var(--primary) 0%, #4a00e0 100%);
+  border-color: transparent;
+  color: white;
+  box-shadow: 0 6px 16px rgba(59, 175, 218, 0.25);
+}
+
+.moduleNavCount {
+  background: rgba(255, 255, 255, 0.22);
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.moduleNavBtn:not(.moduleNavBtnActive) .moduleNavCount {
+  background: #e2e8f0;
+  color: #64748b;
+}
+
 /* Widescreen STAT CARDS with Stunning Vibrant Gradients & Pure White Text */
 .statsSummaryRow {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 18px;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 10px;
+  overflow-x: auto;
+  scrollbar-width: thin;
 }
 
 .statCard {
-  border-radius: 22px;
-  padding: 22px 24px;
+  border-radius: 16px;
+  padding: 12px 10px;
   display: flex;
   align-items: center;
-  gap: 18px;
+  gap: 8px;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   overflow: hidden;
-  border: none;
+  border: 2px solid transparent;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  min-width: 0;
 }
 
-/* Custom Multi-Color Radiant Gradients */
-.statCard.totalCard {
-  background: linear-gradient(135deg, #00c6ff 0%, #0072ff 100%);
-}
+.statCardReq { background: linear-gradient(135deg, #00c6ff 0%, #0072ff 100%); }
+.statCardSel { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); }
+.statCardMom { background: linear-gradient(135deg, #ff9f43 0%, #ff5252 100%); }
+.statCardDir { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+.statCardQuo { background: linear-gradient(135deg, #f857a6 0%, #ff5858 100%); }
+.statCardAud { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); }
+.statCardDrw { background: linear-gradient(135deg, #8a2be2 0%, #4a00e0 100%); }
+.statCardTrk { background: linear-gradient(135deg, #3bafda 0%, #1a6ca8 100%); }
 
-.statCard.deficienciesCard {
-  background: linear-gradient(135deg, #f857a6 0%, #ff5858 100%);
-}
-
-.statCard.momCard {
-  background: linear-gradient(135deg, #ff9f43 0%, #ff5252 100%);
-}
-
-.statCard.docsCard {
-  background: linear-gradient(135deg, #8a2be2 0%, #4a00e0 100%);
-}
-
-.statCard:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 16px 35px rgba(0, 0, 0, 0.12);
+.statCardActive {
+  transform: translateY(-4px);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.15);
+  border-color: rgba(255, 255, 255, 0.45);
 }
 
 .statIconBox {
-  width: 44px;
-  height: 44px;
-  border-radius: 14px;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
   background-color: rgba(255, 255, 255, 0.2);
   color: white !important;
+  flex-shrink: 0;
 }
 
 .statData h4 {
-  font-size: 1.25rem;
+  font-size: 1rem;
   font-weight: 900;
   color: white !important;
   line-height: 1.1;
 }
 
 .statData p {
-  font-size: 0.78rem;
+  font-size: 0.62rem;
   color: rgba(255, 255, 255, 0.85) !important;
   font-weight: 700;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.2px;
   margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Widescreen Central Card Workspace Panel */
@@ -1050,6 +1290,264 @@
   font-weight: 600;
 }
 
+/* Module cards */
+.moduleCardGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 18px;
+}
+
+.moduleCard {
+  background: #f8fafc;
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  border-radius: 18px;
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: all 0.2s;
+}
+
+.moduleCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.04);
+  border-color: rgba(59, 175, 218, 0.25);
+}
+
+.moduleCardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.moduleCardTag {
+  background: rgba(59, 175, 218, 0.1);
+  color: var(--primary);
+  font-size: 0.68rem;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 6px;
+  text-transform: uppercase;
+}
+
+.moduleCardRef {
+  font-size: 0.72rem;
+  color: #94a3b8;
+  font-weight: 700;
+}
+
+.moduleCard h3 {
+  font-size: 1rem;
+  font-weight: 850;
+  color: #0f172a;
+  line-height: 1.35;
+}
+
+.moduleCardSub {
+  font-size: 0.78rem;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.moduleCardBody {
+  font-size: 0.82rem;
+  color: #475569;
+  line-height: 1.5;
+}
+
+.moduleCardFooter {
+  border-top: 1px dashed #e2e8f0;
+  padding-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.moduleCardFooter strong {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  color: #94a3b8;
+  letter-spacing: 0.4px;
+}
+
+.noFilesText {
+  font-size: 0.78rem;
+  color: #94a3b8;
+  font-style: italic;
+}
+
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.statusBadge_success { background: rgba(39, 206, 138, 0.12); color: var(--success); }
+.statusBadge_warning { background: rgba(243, 156, 18, 0.12); color: #f39c12; }
+.statusBadge_info { background: rgba(59, 175, 218, 0.12); color: var(--primary); }
+.statusBadge_neutral { background: #e2e8f0; color: #64748b; }
+
+/* Directory */
+.directoryGroups {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.directoryGroupTitle {
+  font-size: 0.95rem;
+  font-weight: 850;
+  color: #0f172a;
+  margin-bottom: 12px;
+}
+
+.directoryGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+}
+
+.directoryCard {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 16px;
+  display: flex;
+  gap: 12px;
+}
+
+.directoryAvatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--primary-light);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.directoryMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.78rem;
+  color: #64748b;
+}
+
+.directoryMeta strong {
+  font-size: 0.88rem;
+  color: #0f172a;
+}
+
+.directoryMeta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.directoryStatus {
+  font-size: 0.68rem !important;
+  font-weight: 800;
+  color: var(--primary) !important;
+  text-transform: uppercase;
+}
+
+/* Data tables */
+.dataTableWrap {
+  overflow-x: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+}
+
+.dataTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.dataTable th {
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 12px 14px;
+  text-align: left;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.dataTable td {
+  padding: 12px 14px;
+  border-bottom: 1px solid #f1f5f9;
+  color: #334155;
+  vertical-align: top;
+}
+
+.dataTable tr:last-child td {
+  border-bottom: none;
+}
+
+.tableSub {
+  display: block;
+  font-size: 0.72rem;
+  color: #94a3b8;
+  margin-top: 2px;
+}
+
+.tableLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--primary);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.tableLink:hover {
+  text-decoration: underline;
+}
+
+/* Footer */
+.clientFooter {
+  margin-top: 8px;
+  padding: 20px 0 8px;
+  border-top: 1px solid #e2e8f0;
+  z-index: 5;
+  position: relative;
+}
+
+.clientFooterInner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.clientFooterInner strong {
+  font-size: 0.9rem;
+  color: #0f172a;
+}
+
+.clientFooterInner p {
+  font-size: 0.78rem;
+  color: #64748b;
+  margin: 4px 0 0;
+}
+
+.clientFooterCopy {
+  font-size: 0.72rem !important;
+  color: #94a3b8 !important;
+  margin: 0 !important;
+}
+
 /* Animations */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(8px); }
@@ -1067,17 +1565,10 @@
     flex-direction: column;
     padding: 16px;
   }
-  
-  .headerTabs {
-    width: 100%;
-    overflow-x: auto;
-    justify-content: flex-start;
-  }
-  
-  .headerTabBtn {
-    flex: 1;
-    white-space: nowrap;
-    justify-content: center;
+
+  .heroInfoStrip,
+  .heroProgressStrip {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 
@@ -1119,6 +1610,24 @@
   
   .attendeesSplitGrid {
     grid-template-columns: 1fr;
+  }
+
+  .heroInfoStrip,
+  .heroProgressStrip {
+    grid-template-columns: 1fr;
+  }
+
+  .progressChartsGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .statsSummaryRow {
+    grid-template-columns: repeat(8, minmax(100px, 1fr));
+  }
+
+  .clientFooterInner {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 

@@ -180,6 +180,67 @@
   width: 100%;
 }
 
+.filterBar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  background-color: var(--bg-card);
+  padding: 16px 20px;
+  border-radius: 8px;
+  box-shadow: 0 0 35px 0 rgba(154, 161, 171, 0.15);
+}
+
+:global([data-theme='dark']) .filterBar {
+  box-shadow: 0 0 35px 0 rgba(0, 0, 0, 0.25);
+}
+
+.filterLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-heading);
+  white-space: nowrap;
+}
+
+.filterSelect {
+  width: min(320px, 100%);
+}
+
+.filterScope {
+  font-size: 0.78rem;
+  color: var(--text-light);
+  font-weight: 600;
+}
+
+.moduleSection {
+  background-color: var(--bg-card);
+  padding: 24px;
+  border-radius: 8px;
+  box-shadow: 0 0 35px 0 rgba(154, 161, 171, 0.15);
+}
+
+:global([data-theme='dark']) .moduleSection {
+  box-shadow: 0 0 35px 0 rgba(0, 0, 0, 0.25);
+}
+
+.moduleSectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
+}
+
+.moduleSectionHeader h4 {
+  font-size: 1rem;
+  color: var(--text-heading);
+  margin: 0;
+}
+
 @media (max-width: 1200px) {
   .chartsGrid {
     grid-template-columns: 1fr;

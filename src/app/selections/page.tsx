@@ -12,6 +12,8 @@ import styles from './selections.module.css';
 import Modal from '@/components/Modal';
 
 import { useProject } from '@/context/ProjectContext';
+import { useAuth } from '@/context/AuthContext';
+import { filterProjectsForUser } from '@/lib/project-access';
 import jsPDF from 'jspdf';
 
 interface FileAttachment {
@@ -41,6 +43,7 @@ interface Project {
 
 export default function SelectionsPage() {
   const { activeProject } = useProject();
+  const { user } = useAuth();
   const [selections, setSelections] = useState<Selection[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
@@ -73,7 +76,7 @@ export default function SelectionsPage() {
   useEffect(() => {
     fetchSelections();
     fetchProjects();
-  }, []);
+  }, [user]);
 
 
 
@@ -97,7 +100,7 @@ export default function SelectionsPage() {
       const res = await fetch('/api/projects');
       if (res.ok) {
         const data = await res.json();
-        setProjects(data);
+        setProjects(filterProjectsForUser(data, user));
       }
     } catch (err) {
       console.error('Error fetching projects:', err);

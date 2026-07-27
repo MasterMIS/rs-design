@@ -11,6 +11,8 @@ import {
 import styles from './requirements.module.css';
 import Modal from '@/components/Modal';
 import { useProject } from '@/context/ProjectContext';
+import { useAuth } from '@/context/AuthContext';
+import { filterProjectsForUser } from '@/lib/project-access';
 import jsPDF from 'jspdf';
 
 interface FileAttachment {
@@ -44,6 +46,7 @@ interface Project {
 
 export default function RequirementsPage() {
   const { activeProject } = useProject();
+  const { user } = useAuth();
   const [requirements, setRequirements] = useState<Requirement[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [users, setUsers] = useState<{name: string}[]>([]);
@@ -79,7 +82,7 @@ export default function RequirementsPage() {
     fetchProjects();
     fetchUsers();
 
-    }, []);
+    }, [user]);
 
   async function fetchUsers() {
     try {
@@ -113,7 +116,7 @@ export default function RequirementsPage() {
       const res = await fetch('/api/projects');
       if (res.ok) {
         const data = await res.json();
-        setProjects(data);
+        setProjects(filterProjectsForUser(data, user));
       }
     } catch (err) {
       console.error('Error fetching projects:', err);

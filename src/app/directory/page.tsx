@@ -11,6 +11,8 @@ import {
 import styles from './directory.module.css';
 import Modal from '@/components/Modal';
 import { useProject } from '@/context/ProjectContext';
+import { useAuth } from '@/context/AuthContext';
+import { filterProjectsForUser } from '@/lib/project-access';
 import Link from 'next/link';
 
 interface Contact {
@@ -37,6 +39,7 @@ interface Project {
 
 export default function DirectoryPage() {
   const { activeProject } = useProject();
+  const { user } = useAuth();
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
@@ -90,7 +93,7 @@ export default function DirectoryPage() {
   useEffect(() => {
     fetchDirectory();
     fetchProjects();
-    }, []);
+    }, [user]);
 
   async function fetchDirectory() {
     try {
@@ -120,7 +123,7 @@ export default function DirectoryPage() {
       const res = await fetch('/api/projects');
       if (res.ok) {
         const data = await res.json();
-        setProjects(data);
+        setProjects(filterProjectsForUser(data, user));
       }
     } catch (err) {
       console.error('Error fetching projects:', err);

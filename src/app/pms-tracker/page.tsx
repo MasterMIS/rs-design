@@ -9,6 +9,8 @@ import {
 import styles from './pms-tracker.module.css';
 import Modal from '@/components/Modal';
 import { useProject } from '@/context/ProjectContext';
+import { useAuth } from '@/context/AuthContext';
+import { filterProjectsForUser } from '@/lib/project-access';
 import Link from 'next/link';
 
 interface TrackerTemplate {
@@ -49,6 +51,7 @@ const getCategoryIcon = (name: string, size = 16) => {
 
 export default function PMSTrackerPage() {
   const { activeProject } = useProject();
+  const { user } = useAuth();
   const [templates, setTemplates] = useState<TrackerTemplate[]>([]);
   const [schedules, setSchedules] = useState<TrackerScheduleItem[]>([]);
   const [plannedDates, setPlannedDates] = useState<CategoryPlannedDate[]>([]);
@@ -91,7 +94,7 @@ export default function PMSTrackerPage() {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     if (!activeProjectName || templates.length === 0) {
@@ -140,7 +143,10 @@ export default function PMSTrackerPage() {
       if (tplRes.ok) setTemplates(await tplRes.json());
       if (schRes.ok) setSchedules(await schRes.json());
       if (usersRes.ok) setUsers(await usersRes.json());
-      if (projRes.ok) setProjects(await projRes.json());
+      if (projRes.ok) {
+        const data = await projRes.json();
+        setProjects(filterProjectsForUser(data, user));
+      }
       if (planRes.ok) setPlannedDates(await planRes.json());
     } catch (err) {
       console.error('Error fetching data:', err);

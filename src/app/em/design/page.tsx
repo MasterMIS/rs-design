@@ -12,6 +12,7 @@ import Modal from '@/components/Modal';
 import MultiSelectFilter from '@/components/MultiSelectFilter';
 import SearchableSelect from '@/components/SearchableSelect';
 import { useAuth } from '@/context/AuthContext';
+import { filterProjectsForUser } from '@/lib/project-access';
 
 export default function DesignPage() {
   const { user } = useAuth();
@@ -63,7 +64,7 @@ export default function DesignPage() {
       if (Array.isArray(data)) setTasks(data);
       else setTasks([]);
 
-      if (Array.isArray(projData)) setProjectsList(projData);
+      if (Array.isArray(projData)) setProjectsList(filterProjectsForUser(projData, user));
       if (Array.isArray(usersData)) setUsersList(usersData);
     } catch (err) {
       console.error(err);
@@ -74,7 +75,7 @@ export default function DesignPage() {
 
   useEffect(() => {
     fetchTasks();
-  }, []);
+  }, [user]);
 
   const handleOpenCreate = () => {
     setEditingTask(null);

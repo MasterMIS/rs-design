@@ -11,6 +11,8 @@ import {
 import styles from './mom.module.css';
 import Modal from '@/components/Modal';
 import { useProject } from '@/context/ProjectContext';
+import { useAuth } from '@/context/AuthContext';
+import { filterProjectsForUser } from '@/lib/project-access';
 import Link from 'next/link';
 import jsPDF from 'jspdf';
 
@@ -37,6 +39,7 @@ interface Project {
 
 export default function MOMPage() {
   const { activeProject } = useProject();
+  const { user } = useAuth();
   const [momList, setMomList] = useState<MOM[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
@@ -74,7 +77,7 @@ export default function MOMPage() {
     fetchMOMList();
     fetchProjects();
 
-    }, []);
+    }, [user]);
 
   async function fetchMOMList() {
     try {
@@ -104,7 +107,7 @@ export default function MOMPage() {
       const res = await fetch('/api/projects');
       if (res.ok) {
         const data = await res.json();
-        setProjects(data);
+        setProjects(filterProjectsForUser(data, user));
       }
     } catch (err) {
       console.error('Error fetching projects:', err);

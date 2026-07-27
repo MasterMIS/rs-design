@@ -10,6 +10,8 @@ import {
 import styles from './site-visits.module.css';
 import Modal from '@/components/Modal';
 import { useProject } from '@/context/ProjectContext';
+import { useAuth } from '@/context/AuthContext';
+import { filterProjectsForUser } from '@/lib/project-access';
 import Link from 'next/link';
 import jsPDF from 'jspdf';
 
@@ -60,6 +62,7 @@ export default function SiteVisitsPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const { activeProject } = useProject();
+  const { user } = useAuth();
 
   // Search and Filter States
   const [searchQuery, setSearchQuery] = useState('');
@@ -108,7 +111,7 @@ export default function SiteVisitsPage() {
     fetchProjects();
     fetchUsers();
 
-  }, []);
+  }, [user]);
 
   async function fetchUsers() {
     try {
@@ -142,7 +145,7 @@ export default function SiteVisitsPage() {
       const res = await fetch('/api/projects');
       if (res.ok) {
         const data = await res.json();
-        setProjects(data);
+        setProjects(filterProjectsForUser(data, user));
       }
     } catch (err) {
       console.error('Error fetching projects:', err);
