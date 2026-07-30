@@ -182,6 +182,14 @@ export default function PMSTrackerPage() {
     ? selectedCategory
     : uniqueCategories[0] || null;
 
+  const categoryHasPlanDates = (category: string) => {
+    if (!activeProjectName) return true;
+    const plan = plannedDates.find(
+      (p) => p.project === activeProjectName && p.category === category
+    );
+    return !!(plan?.startDate?.trim() && plan?.endDate?.trim());
+  };
+
   // ---- SCHEDULE HANDLERS ----
   const handleMarkComplete = async (tplId: string, trackerId: string) => {
     if (!activeProjectName) return;
@@ -432,16 +440,27 @@ export default function PMSTrackerPage() {
             <div className={styles.templateSidebar}>
               <h3 className={styles.sidebarTitle}>Categories</h3>
               <div className={styles.sidebarList}>
-                {uniqueCategories.map(cat => (
+                {uniqueCategories.map(cat => {
+                  const missingPlanDates =
+                    activeTab === 'schedule' &&
+                    activeProjectName &&
+                    !categoryHasPlanDates(cat);
+
+                  return (
                   <button
                     key={cat}
                     className={`${styles.sidebarItem} ${activeCategory === cat ? styles.active : ''}`}
                     onClick={() => setSelectedCategory(cat)}
+                    title={missingPlanDates ? 'Start or end date not set for this category' : undefined}
                   >
                     {getCategoryIcon(cat)}
-                    {cat}
+                    <span className={styles.sidebarItemLabel}>{cat}</span>
+                    {missingPlanDates && (
+                      <span className={styles.missingDateDot} aria-label="Planned dates not set" />
+                    )}
                   </button>
-                ))}
+                  );
+                })}
                 {uniqueCategories.length === 0 && (
                   <p className={styles.emptySidebar}>No categories found.</p>
                 )}

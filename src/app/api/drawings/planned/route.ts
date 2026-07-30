@@ -7,7 +7,7 @@ const SHEET_NAME = CONFIG.DRAWING_SCHEDULE.PLANNED_SHEET;
 
 export async function GET() {
   try {
-    const data = await getSheetsData(SHEET_ID, `${SHEET_NAME}!A2:D1000`);
+    const data = await getSheetsData(SHEET_ID, `${SHEET_NAME}!A2:E1000`);
 
     if (!data || data.length === 0) return NextResponse.json([]);
 
@@ -18,9 +18,10 @@ export async function GET() {
         timestamp: row[0] || '',
         project: row[1] || '',
         category: row[2] || '',
-        planDate: row[3] || '',
+        planStartDate: row[3] || '',
+        planEndDate: row[4] || '',
       };
-    }).filter((t: any) => t.project && t.category);
+    }).filter((t: { project: string; category: string }) => t.project && t.category);
 
     return NextResponse.json(items);
   } catch (error: unknown) {
@@ -33,10 +34,13 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { project, category, planDate } = body;
+    const { project, category, planStartDate, planEndDate } = body;
 
-    if (!project || !category || !planDate) {
-      return NextResponse.json({ error: 'Project, Category, and Plan Date are required.' }, { status: 400 });
+    if (!project || !category) {
+      return NextResponse.json(
+        { error: 'Project and Category are required.' },
+        { status: 400 }
+      );
     }
 
     const timestamp = new Date().toISOString();
@@ -45,7 +49,8 @@ export async function POST(request: NextRequest) {
       timestamp,
       project,
       category,
-      planDate
+      planStartDate || '',
+      planEndDate || '',
     ];
 
     await appendSheetsData(SHEET_ID, `${SHEET_NAME}!A2`, [newRow]);
@@ -67,10 +72,13 @@ export async function PUT(request: NextRequest) {
     const rowIndex = parseInt(rowIndexStr);
 
     const body = await request.json();
-    const { project, category, planDate } = body;
+    const { project, category, planStartDate, planEndDate } = body;
 
-    if (!project || !category || !planDate) {
-      return NextResponse.json({ error: 'Project, Category, and Plan Date are required.' }, { status: 400 });
+    if (!project || !category) {
+      return NextResponse.json(
+        { error: 'Project and Category are required.' },
+        { status: 400 }
+      );
     }
 
     const timestamp = new Date().toISOString();
@@ -79,10 +87,11 @@ export async function PUT(request: NextRequest) {
       timestamp,
       project,
       category,
-      planDate
+      planStartDate || '',
+      planEndDate || '',
     ];
 
-    await updateSheetRow(SHEET_ID, `${SHEET_NAME}!A${rowIndex}:D${rowIndex}`, [updatedRow]);
+    await updateSheetRow(SHEET_ID, `${SHEET_NAME}!A${rowIndex}:E${rowIndex}`, [updatedRow]);
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {

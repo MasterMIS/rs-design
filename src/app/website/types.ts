@@ -99,7 +99,8 @@ export interface DrawingTemplate {
 export interface DrawingScheduleItem {
   project: string;
   drawingNo: string;
-  actualDate: string;
+  actualStartDate: string;
+  actualEndDate: string;
   revisionNo: string;
   drawingImage: string;
   rsDesignStatus: string;
@@ -109,7 +110,8 @@ export interface DrawingScheduleItem {
 export interface DrawingPlannedDate {
   project: string;
   category: string;
-  planDate: string;
+  planStartDate: string;
+  planEndDate: string;
 }
 
 export interface TrackerTemplate {
@@ -156,8 +158,10 @@ export interface MergedDrawingRow {
   drawingName: string;
   areaName: string;
   category: string;
-  planDate: string;
-  actualDate: string;
+  planStartDate: string;
+  planEndDate: string;
+  actualStartDate: string;
+  actualEndDate: string;
   rsDesignStatus: string;
   clientStatus: string;
   drawingImage: string;

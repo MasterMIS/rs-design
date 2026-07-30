@@ -54,7 +54,8 @@ export default function Dashboard() {
     Array<{
       project?: string;
       drawingNo: string;
-      actualDate?: string;
+      actualStartDate?: string;
+      actualEndDate?: string;
       clientStatus?: string;
     }>
   >([]);
@@ -85,7 +86,8 @@ export default function Dashboard() {
           fetchJson<{
             project?: string;
             drawingNo: string;
-            actualDate?: string;
+            actualStartDate?: string;
+            actualEndDate?: string;
             clientStatus?: string;
           }>('/api/drawings'),
           fetchJson<{ trackerId: string; category: string }>(

@@ -426,6 +426,42 @@
   border-radius: 20px;
   display: flex;
   align-items: center;
+  gap: 4px;
+}
+
+.sidebarItemLabel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.missingDateDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #ef4444;
+  flex-shrink: 0;
+  margin-left: auto;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.25);
+  animation: blinkDateDot 1.2s ease-in-out infinite;
+}
+
+.sidebarItem.active .missingDateDot {
+  background-color: #fecaca;
+  box-shadow: 0 0 8px rgba(254, 202, 202, 0.9);
+}
+
+@keyframes blinkDateDot {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.3;
+    transform: scale(0.8);
+  }
 }
 
 .sidebarItem:hover {

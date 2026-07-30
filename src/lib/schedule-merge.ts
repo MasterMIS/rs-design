@@ -14,7 +14,8 @@ export interface DrawingTemplateRow {
 export interface DrawingScheduleRow {
   project?: string;
   drawingNo: string;
-  actualDate?: string;
+  actualStartDate?: string;
+  actualEndDate?: string;
   clientStatus?: string;
 }
 
@@ -50,7 +51,8 @@ export function buildDrawingProgressItems(
       items.push({
         category: tpl.category,
         completed: isDrawingCompleted({
-          actualDate: row?.actualDate,
+          actualStartDate: row?.actualStartDate,
+          actualEndDate: row?.actualEndDate,
           clientStatus: row?.clientStatus,
         }),
       });

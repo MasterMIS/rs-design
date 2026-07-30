@@ -247,6 +247,52 @@
   background-color: rgba(79, 70, 229, 0.1);
 }
 
+.markDateBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: 10px;
+  border: 2px dashed #0d9488;
+  background: rgba(13, 148, 136, 0.08);
+  color: #0f766e;
+  font-weight: 700;
+  font-size: 0.88rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.markDateBtn:hover {
+  background: rgba(13, 148, 136, 0.14);
+  border-color: #0d9488;
+  transform: translateY(-1px);
+}
+
+.markDateBtnEnd {
+  border-color: #4f46e5;
+  background: rgba(79, 70, 229, 0.08);
+  color: #4338ca;
+}
+
+.markDateBtnEnd:hover {
+  background: rgba(79, 70, 229, 0.14);
+  border-color: #4f46e5;
+}
+
+.markDateHint,
+.markDateComplete {
+  margin: 0 0 10px;
+  font-size: 0.82rem;
+  color: var(--text-light);
+}
+
+.markDateComplete strong,
+.markDateHint strong {
+  color: var(--text-heading);
+}
+
 .modalBody {
   padding: 16px 20px;
 }
@@ -426,6 +472,42 @@
   border-radius: 20px;
   display: flex;
   align-items: center;
+  gap: 4px;
+}
+
+.sidebarItemLabel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.missingDateDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #ef4444;
+  flex-shrink: 0;
+  margin-left: auto;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.25);
+  animation: blinkDateDot 1.2s ease-in-out infinite;
+}
+
+.sidebarItem.active .missingDateDot {
+  background-color: #fecaca;
+  box-shadow: 0 0 8px rgba(254, 202, 202, 0.9);
+}
+
+@keyframes blinkDateDot {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.3;
+    transform: scale(0.8);
+  }
 }
 
 .sidebarItem:hover {

@@ -36,8 +36,10 @@ interface DrawingScheduleItem {
   drawingName: string;
   resourceName: string;
   doerName: string;
-  planDate: string;
-  actualDate: string;
+  planStartDate: string;
+  planEndDate: string;
+  actualStartDate: string;
+  actualEndDate: string;
   category: string;
   revisionNo: string;
   lastUpdated: string;
@@ -52,7 +54,8 @@ interface CategoryPlannedDate {
   rowIndex?: number;
   project: string;
   category: string;
-  planDate: string;
+  planStartDate: string;
+  planEndDate: string;
 }
 
 const getCategoryIcon = (name: string, size = 16) => {
@@ -103,6 +106,7 @@ export default function DrawingsPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [uploadingImageFor, setUploadingImageFor] = useState<string | null>(null);
   const [stagedFile, setStagedFile] = useState<File | null>(null);
+  const [workAction, setWorkAction] = useState<'start' | 'work_end' | ''>('');
 
   // History Sidebar State removed per user request
 
@@ -117,6 +121,8 @@ export default function DrawingsPage() {
     const year = String(d.getFullYear()).slice(-2);
     return `${day} ${month} ${year}`;
   };
+
+  const getTodayIsoDate = () => new Date().toISOString().split('T')[0];
 
   useEffect(() => {
     fetchData();
@@ -139,7 +145,8 @@ export default function DrawingsPage() {
       const existingEntries = projectSchedules.filter(s => s.drawingNo === tpl.drawingNo);
       
       const catPlan = plannedDates.find(p => p.project === activeProjectName && p.category === tpl.category);
-      const calculatedPlanDate = catPlan ? catPlan.planDate : '';
+      const planStartDate = catPlan?.planStartDate || '';
+      const planEndDate = catPlan?.planEndDate || '';
 
       if (existingEntries.length > 0) {
         const firstEntry = existingEntries[0];
@@ -147,8 +154,8 @@ export default function DrawingsPage() {
 
         merged[tpl.id] = { 
           ...lastEntry,
-          // Extract actual date from first entry to keep the original submission date
-          actualDate: firstEntry.actualDate,
+          actualStartDate: firstEntry.actualStartDate,
+          actualEndDate: lastEntry.actualEndDate,
           
           // Re-inject template static fields
           areaName: tpl.areaName,
@@ -156,8 +163,9 @@ export default function DrawingsPage() {
           resourceName: tpl.resourceName,
           doerName: tpl.doerName,
           category: tpl.category,
-          planDate: calculatedPlanDate,
-          id: lastEntry.id, // Keep existing ID
+          planStartDate,
+          planEndDate,
+          id: lastEntry.id,
           tplId: tpl.id
         };
       } else {
@@ -171,8 +179,10 @@ export default function DrawingsPage() {
           resourceName: tpl.resourceName,
           doerName: tpl.doerName,
           category: tpl.category,
-          planDate: calculatedPlanDate,
-          actualDate: '',
+          planStartDate,
+          planEndDate,
+          actualStartDate: '',
+          actualEndDate: '',
           revisionNo: '0',
           lastUpdated: '',
           drawingImage: '',
@@ -225,6 +235,14 @@ export default function DrawingsPage() {
     ? selectedCategory
     : uniqueCategories[0] || null;
 
+  const categoryHasPlanDates = (category: string) => {
+    if (!activeProjectName) return true;
+    const plan = plannedDates.find(
+      (p) => p.project === activeProjectName && p.category === category
+    );
+    return !!(plan?.planStartDate?.trim() && plan?.planEndDate?.trim());
+  };
+
   // ---- SCHEDULE HANDLERS ----
   const handleScheduleChange = (tplId: string, field: keyof DrawingScheduleItem, value: any) => {
     setLocalSchedule(prev => {
@@ -242,7 +260,11 @@ export default function DrawingsPage() {
     setHasUnsavedChanges(true);
   };
 
-  const handleSaveCategoryPlan = async (category: string, planDate: string) => {
+  const handleSaveCategoryPlan = async (
+    category: string,
+    field: 'planStartDate' | 'planEndDate',
+    value: string
+  ) => {
     if (!activeProjectName) return;
     try {
       setSubmitting(true);
@@ -250,16 +272,23 @@ export default function DrawingsPage() {
       const url = existingPlan?.rowIndex ? `/api/drawings/planned?rowIndex=${existingPlan.rowIndex}` : '/api/drawings/planned';
       const method = existingPlan?.rowIndex ? 'PUT' : 'POST';
 
+      const payload = {
+        project: activeProjectName,
+        category,
+        planStartDate: field === 'planStartDate' ? value : (existingPlan?.planStartDate || ''),
+        planEndDate: field === 'planEndDate' ? value : (existingPlan?.planEndDate || ''),
+      };
+
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ project: activeProjectName, category, planDate })
+        body: JSON.stringify(payload),
       });
 
       if (res.ok) {
         await fetchData();
       } else {
-        alert('Failed to save planned date for category.');
+        alert('Failed to save planned dates for category.');
       }
     } catch (err) {
       console.error(err);
@@ -286,7 +315,15 @@ export default function DrawingsPage() {
           itemsToPut.push(item);
         } else {
           // Only post if it has some data filled
-          if (item.planDate || item.actualDate || item.drawingImage || item.rsDesignStatus !== 'Pending' || item.clientStatus !== 'Pending') {
+          if (
+            item.planStartDate ||
+            item.planEndDate ||
+            item.actualStartDate ||
+            item.actualEndDate ||
+            item.drawingImage ||
+            item.rsDesignStatus !== 'Pending' ||
+            item.clientStatus !== 'Pending'
+          ) {
             itemsToPost.push(item);
           }
         }
@@ -443,16 +480,27 @@ export default function DrawingsPage() {
             <div className={styles.templateSidebar}>
               <h3 className={styles.sidebarTitle}>Categories</h3>
               <div className={styles.sidebarList}>
-                {uniqueCategories.map(cat => (
+                {uniqueCategories.map(cat => {
+                  const missingPlanDate =
+                    activeTab === 'schedule' &&
+                    activeProjectName &&
+                    !categoryHasPlanDates(cat);
+
+                  return (
                   <button
                     key={cat}
                     className={`${styles.sidebarItem} ${activeCategory === cat ? styles.active : ''}`}
                     onClick={() => setSelectedCategory(cat)}
+                    title={missingPlanDate ? 'Planned start or end date not set for this category' : undefined}
                   >
                     {getCategoryIcon(cat)}
-                    {cat}
+                    <span className={styles.sidebarItemLabel}>{cat}</span>
+                    {missingPlanDate && (
+                      <span className={styles.missingDateDot} aria-label="Planned dates not set" />
+                    )}
                   </button>
-                ))}
+                  );
+                })}
                 {uniqueCategories.length === 0 && (
                   <p className={styles.emptySidebar}>No categories found.</p>
                 )}
@@ -469,24 +517,38 @@ export default function DrawingsPage() {
                 );
                 
                 const currentCategoryPlan = activeCategory ? plannedDates.find(p => p.project === activeProjectName && p.category === activeCategory) : null;
-                const currentPlanDate = currentCategoryPlan?.planDate || '';
+                const currentPlanStartDate = currentCategoryPlan?.planStartDate || '';
+                const currentPlanEndDate = currentCategoryPlan?.planEndDate || '';
 
                 return (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                     {activeCategory && activeTab === 'schedule' && activeProjectName && (
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px', backgroundColor: 'var(--bg-main)', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px', backgroundColor: 'var(--bg-main)', borderRadius: '12px', border: '1px solid var(--border-color)', flexWrap: 'wrap', gap: '12px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <Calendar size={18} color="var(--primary)" />
-                          <strong style={{ fontSize: '0.95rem', color: 'var(--text-heading)' }}>{activeCategory} Planned Date:</strong>
+                          <strong style={{ fontSize: '0.95rem', color: 'var(--text-heading)' }}>{activeCategory} Planned Dates:</strong>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <input 
-                            type="date" 
-                            className={styles.customDateInput}
-                            value={currentPlanDate}
-                            onChange={(e) => handleSaveCategoryPlan(activeCategory, e.target.value)}
-                            disabled={submitting}
-                          />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-light)' }}>Start:</span>
+                            <input
+                              type="date"
+                              className={styles.customDateInput}
+                              value={currentPlanStartDate}
+                              onChange={(e) => handleSaveCategoryPlan(activeCategory, 'planStartDate', e.target.value)}
+                              disabled={submitting}
+                            />
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-light)' }}>End:</span>
+                            <input
+                              type="date"
+                              className={styles.customDateInput}
+                              value={currentPlanEndDate}
+                              onChange={(e) => handleSaveCategoryPlan(activeCategory, 'planEndDate', e.target.value)}
+                              disabled={submitting}
+                            />
+                          </div>
                         </div>
                       </div>
                     )}
@@ -578,13 +640,23 @@ export default function DrawingsPage() {
 
                               {/* Right Section: Controls */}
                               {activeTab === 'schedule' ? (
-                                <div style={{ flex: '0 0 340px', display: 'flex', alignItems: 'center', gap: '15px' }}>
+                                <div style={{ flex: '0 0 380px', display: 'flex', alignItems: 'center', gap: '15px' }}>
                                   <div className={styles.datesCol} style={{ flex: 1, paddingLeft: '15px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                    <div style={{ fontSize: '0.8rem', color: '#312e81', fontWeight: 600 }}>
-                                      <strong style={{ color: '#4f46e5', marginRight: '4px' }}>Plan:</strong> {formatDate(scheduleItem?.planDate) === 'N/A' ? '' : formatDate(scheduleItem?.planDate)}
+                                    <div style={{ fontSize: '0.75rem', color: '#312e81', fontWeight: 600 }}>
+                                      <strong style={{ color: '#4f46e5', marginRight: '4px' }}>Plan Start:</strong>{' '}
+                                      {formatDate(scheduleItem?.planStartDate) === 'N/A' ? '—' : formatDate(scheduleItem?.planStartDate)}
                                     </div>
-                                    <div style={{ fontSize: '0.8rem', color: '#134e4a', fontWeight: 600 }}>
-                                      <strong style={{ color: '#0d9488', marginRight: '4px' }}>Actual:</strong> {formatDate(scheduleItem?.actualDate) === 'N/A' ? '' : formatDate(scheduleItem?.actualDate)}
+                                    <div style={{ fontSize: '0.75rem', color: '#312e81', fontWeight: 600 }}>
+                                      <strong style={{ color: '#4f46e5', marginRight: '4px' }}>Plan End:</strong>{' '}
+                                      {formatDate(scheduleItem?.planEndDate) === 'N/A' ? '—' : formatDate(scheduleItem?.planEndDate)}
+                                    </div>
+                                    <div style={{ fontSize: '0.75rem', color: '#134e4a', fontWeight: 600 }}>
+                                      <strong style={{ color: '#0d9488', marginRight: '4px' }}>Actual Start:</strong>{' '}
+                                      {formatDate(scheduleItem?.actualStartDate) === 'N/A' ? '—' : formatDate(scheduleItem?.actualStartDate)}
+                                    </div>
+                                    <div style={{ fontSize: '0.75rem', color: '#134e4a', fontWeight: 600 }}>
+                                      <strong style={{ color: '#0d9488', marginRight: '4px' }}>Actual End:</strong>{' '}
+                                      {formatDate(scheduleItem?.actualEndDate) === 'N/A' ? '—' : formatDate(scheduleItem?.actualEndDate)}
                                     </div>
                                   </div>
                                   
@@ -602,6 +674,7 @@ export default function DrawingsPage() {
                                       className={styles.controlBtn} 
                                       onClick={() => {
                                         setStagedFile(null);
+                                        setWorkAction('');
                                         setUpdatingItem({ ...scheduleItem, tplId: item.id } as any);
                                         setIsUpdateModalOpen(true);
                                       }}
@@ -746,32 +819,73 @@ export default function DrawingsPage() {
             
             <div className={styles.bottomModalBody}>
               <div className={styles.updateGrid}>
-                <div className={styles.formGroup}>
-                  <label>RS Status</label>
-                  <select 
-                    className={styles.formSelect}
-                    value={updatingItem.rsDesignStatus || 'Pending'}
-                    onChange={(e) => setUpdatingItem({ ...updatingItem, rsDesignStatus: e.target.value })}
-                  >
-                    <option value="Pending">Pending</option>
-                    <option value="In Progress">In Progress</option>
-                    <option value="Approved">Approved</option>
-                    <option value="Rejected">Rejected</option>
-                  </select>
-                </div>
-                <div className={styles.formGroup}>
-                  <label>Client Status</label>
-                  <select 
-                    className={styles.formSelect}
-                    value={updatingItem.clientStatus || 'Pending'}
-                    onChange={(e) => setUpdatingItem({ ...updatingItem, clientStatus: e.target.value })}
-                  >
-                    <option value="Pending">Pending</option>
-                    <option value="Approved">Approved</option>
-                    <option value="Rejected">Rejected</option>
-                  </select>
-                </div>
-                
+                {(() => {
+                  const workPhase = !updatingItem.actualStartDate?.trim()
+                    ? 'start'
+                    : !updatingItem.actualEndDate?.trim()
+                      ? 'end'
+                      : 'complete';
+
+                  return (
+                    <>
+                      {workPhase === 'start' && (
+                        <div className={styles.formGroup}>
+                          <label>Start</label>
+                          <select
+                            className={styles.formSelect}
+                            value={workAction}
+                            onChange={(e) => setWorkAction(e.target.value as 'start' | '')}
+                          >
+                            <option value="">Select to start work...</option>
+                            <option value="start">Start — record today as work started</option>
+                          </select>
+                        </div>
+                      )}
+
+                      {workPhase === 'end' && (
+                        <div className={styles.formGroup}>
+                          <label>Work End</label>
+                          <select
+                            className={styles.formSelect}
+                            value={workAction}
+                            onChange={(e) => setWorkAction(e.target.value as 'work_end' | '')}
+                          >
+                            <option value="">Select to end work...</option>
+                            <option value="work_end">Work End — record today as work ended</option>
+                          </select>
+                          <p className={styles.markDateHint}>
+                            Work started: <strong>{formatDate(updatingItem.actualStartDate)}</strong>
+                          </p>
+                        </div>
+                      )}
+
+                      {workPhase === 'complete' && (
+                        <div className={styles.formGroup}>
+                          <label>Work Status</label>
+                          <p className={styles.markDateComplete}>
+                            Started: <strong>{formatDate(updatingItem.actualStartDate)}</strong>
+                            {' · '}
+                            Ended: <strong>{formatDate(updatingItem.actualEndDate)}</strong>
+                          </p>
+                        </div>
+                      )}
+
+                      <div className={styles.formGroup}>
+                        <label>Client Status</label>
+                        <select
+                          className={styles.formSelect}
+                          value={updatingItem.clientStatus || 'Pending'}
+                          onChange={(e) => setUpdatingItem({ ...updatingItem, clientStatus: e.target.value })}
+                        >
+                          <option value="Pending">Pending</option>
+                          <option value="Approved">Approved</option>
+                          <option value="Rejected">Rejected</option>
+                        </select>
+                      </div>
+                    </>
+                  );
+                })()}
+
                 <div className={styles.formGroup} style={{ gridColumn: '1 / -1' }}>
                   <label>Upload Revision</label>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
@@ -834,24 +948,37 @@ export default function DrawingsPage() {
                   
                     const currentItem = localSchedule[tplId];
                     let newRev = parseInt(updatingItem.revisionNo || '0');
-                    
-                    const rsChanged = updatingItem.rsDesignStatus !== currentItem.rsDesignStatus;
-                    const clientChanged = updatingItem.clientStatus !== currentItem.clientStatus;
 
-                    if (rsChanged || clientChanged || stagedFile) {
+                    const today = getTodayIsoDate();
+                    let actualStartDate = updatingItem.actualStartDate || '';
+                    let actualEndDate = updatingItem.actualEndDate || '';
+                    let rsDesignStatus = updatingItem.rsDesignStatus || 'Pending';
+
+                    if (workAction === 'start' && !actualStartDate) {
+                      actualStartDate = today;
+                      rsDesignStatus = 'In Progress';
+                    }
+
+                    if (workAction === 'work_end' && actualStartDate && !actualEndDate) {
+                      actualEndDate = today;
+                      rsDesignStatus = 'Approved';
+                    }
+
+                    const rsChanged = rsDesignStatus !== currentItem.rsDesignStatus;
+                    const clientChanged = updatingItem.clientStatus !== currentItem.clientStatus;
+                    const datesChanged = workAction === 'start' || workAction === 'work_end';
+
+                    if (rsChanged || clientChanged || stagedFile || datesChanged) {
                       newRev++;
                     }
-                    
-                    // Always keep the original actual date if it exists
-                    const newActualDate = updatingItem.actualDate && updatingItem.actualDate !== 'N/A' 
-                      ? updatingItem.actualDate 
-                      : new Date().toISOString().split('T')[0];
 
-                    const updatedItemToSave = { 
-                      ...updatingItem, 
+                    const updatedItemToSave = {
+                      ...updatingItem,
                       drawingImage: fileUrl,
                       revisionNo: newRev.toString(),
-                      actualDate: newActualDate
+                      actualStartDate,
+                      actualEndDate,
+                      rsDesignStatus,
                     };
 
                     setLocalSchedule(prev => ({
@@ -878,6 +1005,7 @@ export default function DrawingsPage() {
                     setUploadingImageFor(null);
                     setSubmitting(false);
                     setStagedFile(null);
+                    setWorkAction('');
                     setIsUpdateModalOpen(false);
                   }
                 }}

@@ -23,10 +23,11 @@ export function isTrackerCompleted(actualDate?: string) {
 }
 
 export function isDrawingCompleted(row: {
-  actualDate?: string;
+  actualStartDate?: string;
+  actualEndDate?: string;
   clientStatus?: string;
 }) {
-  if (row.actualDate?.trim()) return true;
+  if (row.actualEndDate?.trim()) return true;
   const status = row.clientStatus?.toLowerCase() || '';
   return status.includes('approved') || status.includes('complete');
 }

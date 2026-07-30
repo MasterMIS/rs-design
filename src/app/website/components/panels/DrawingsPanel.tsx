@@ -29,8 +29,10 @@ export function DrawingsPanel({ items }: { items: MergedDrawingRow[] }) {
                 <tr>
                   <th>Drawing</th>
                   <th>Category</th>
-                  <th>Planned</th>
-                  <th>Actual</th>
+                  <th>Plan Start</th>
+                  <th>Plan End</th>
+                  <th>Actual Start</th>
+                  <th>Actual End</th>
                   <th>RS Status</th>
                   <th>Client Status</th>
                   <th>File</th>
@@ -44,8 +46,10 @@ export function DrawingsPanel({ items }: { items: MergedDrawingRow[] }) {
                       <span className={styles.tableSub}>{item.drawingNo}</span>
                     </td>
                     <td>{item.category}</td>
-                    <td>{formatDate(item.planDate)}</td>
-                    <td>{formatDate(item.actualDate)}</td>
+                    <td>{formatDate(item.planStartDate)}</td>
+                    <td>{formatDate(item.planEndDate)}</td>
+                    <td>{formatDate(item.actualStartDate)}</td>
+                    <td>{formatDate(item.actualEndDate)}</td>
                     <td><StatusBadge label={item.rsDesignStatus} tone="info" /></td>
                     <td><StatusBadge label={item.clientStatus} tone="warning" /></td>
                     <td>

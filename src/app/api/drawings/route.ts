@@ -7,7 +7,7 @@ const SHEET_NAME = CONFIG.DRAWING_SCHEDULE.SUBMISSIONS_SHEET;
 
 export async function GET() {
   try {
-    const data = await getSheetsData(SHEET_ID, `${SHEET_NAME}!A2:N1000`);
+    const data = await getSheetsData(SHEET_ID, `${SHEET_NAME}!A2:I1000`);
 
     if (!data || data.length === 0) return NextResponse.json([]);
 
@@ -15,16 +15,17 @@ export async function GET() {
       return {
         rowIndex: index + 2,
         id: `DS-${index + 2}`,
-        project: row[1] || '',
         drawingNo: row[0] || '',
-        actualDate: row[2] || '',
-        revisionNo: row[3] || '0',
-        lastUpdated: row[4] || '',
-        drawingImage: row[5] || '',
-        rsDesignStatus: row[6] || 'Pending',
-        clientStatus: row[7] || 'Pending',
+        project: row[1] || '',
+        actualStartDate: row[2] || '',
+        actualEndDate: row[3] || '',
+        revisionNo: row[4] || '0',
+        lastUpdated: row[5] || '',
+        drawingImage: row[6] || '',
+        rsDesignStatus: row[7] || 'Pending',
+        clientStatus: row[8] || 'Pending',
       };
-    }).filter((t: any) => t.project && t.drawingNo);
+    }).filter((t: { project: string; drawingNo: string }) => t.project && t.drawingNo);
 
     return NextResponse.json(items);
   } catch (error: unknown) {
@@ -47,16 +48,16 @@ export async function POST(request: NextRequest) {
     const rowsToAppend: string[][] = [];
 
     for (const item of items) {
-      // Add new row for this project
       rowsToAppend.push([
         item.drawingNo || '',
         project,
-        item.actualDate || '',
+        item.actualStartDate || '',
+        item.actualEndDate || '',
         item.revisionNo || '0',
         timestamp,
         item.drawingImage || '',
         item.rsDesignStatus || 'Pending',
-        item.clientStatus || 'Pending'
+        item.clientStatus || 'Pending',
       ]);
     }
 
@@ -86,15 +87,16 @@ export async function PUT(request: NextRequest) {
     const updatedRow = [
       body.drawingNo || '',
       body.project || '',
-      body.actualDate || '',
+      body.actualStartDate || '',
+      body.actualEndDate || '',
       body.revisionNo || '0',
       timestamp,
       body.drawingImage || '',
       body.rsDesignStatus || 'Pending',
-      body.clientStatus || 'Pending'
+      body.clientStatus || 'Pending',
     ];
 
-    await updateSheetRow(SHEET_ID, `${SHEET_NAME}!A${rowIndex}:H${rowIndex}`, [updatedRow]);
+    await updateSheetRow(SHEET_ID, `${SHEET_NAME}!A${rowIndex}:I${rowIndex}`, [updatedRow]);
 
     return NextResponse.json({ success: true, timestamp });
   } catch (error: unknown) {
