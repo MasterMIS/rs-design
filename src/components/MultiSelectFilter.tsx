@@ -7,9 +7,10 @@ interface MultiSelectFilterProps {
   options: string[];
   selectedValues: string[];
   onChange: (selected: string[]) => void;
+  fullWidth?: boolean;
 }
 
-export default function MultiSelectFilter({ label, options, selectedValues, onChange }: MultiSelectFilterProps) {
+export default function MultiSelectFilter({ label, options, selectedValues, onChange, fullWidth = false }: MultiSelectFilterProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -55,7 +56,7 @@ export default function MultiSelectFilter({ label, options, selectedValues, onCh
   };
 
   return (
-    <div className={styles.wrapper} ref={wrapperRef}>
+    <div className={`${styles.wrapper} ${fullWidth ? styles.fullWidth : ''}`} ref={wrapperRef}>
       <button 
         className={`${styles.triggerBtn} ${selectedValues.length > 0 ? styles.active : ''}`}
         onClick={() => setIsOpen(!isOpen)}

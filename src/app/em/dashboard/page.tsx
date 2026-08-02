@@ -2,12 +2,15 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, CheckCircle2, Clock, AlertCircle, Trophy, TrendingDown, Globe, PenTool, Hammer, LineChart as LineChartIcon, Briefcase, FileText, User, Calendar, Activity, LayoutGrid } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Clock, AlertCircle, Trophy, TrendingDown, Globe, PenTool, Hammer, LineChart as LineChartIcon, Briefcase, FileText, User, Calendar, Activity, LayoutGrid, Filter } from 'lucide-react';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, LineChart, Line, CartesianGrid, LabelList } from 'recharts';
 import styles from './dashboard.module.css';
 import GlobalLoading from '@/components/GlobalLoading';
 import MultiSelectFilter from '@/components/MultiSelectFilter';
+import Modal from '@/components/Modal';
+import PeriodDateFilter from '@/components/PeriodDateFilter';
 import { useAuth } from '@/context/AuthContext';
+import { getPeriodRange, matchQuickDatePreset, getQuickDatePeriod, type DatePeriodValue, type QuickDatePreset } from '@/lib/date-period';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#ec4899', '#14b8a6', '#f97316'];
 const STATUS_COLORS = { 'Completed': '#10b981', 'Pending': '#3b82f6', 'Delayed': '#ef4444' };
@@ -32,12 +35,15 @@ export default function EMDashboard() {
   const [loading, setLoading] = useState(true);
 
   const [activeTab, setActiveTab] = useState<'All' | 'Design' | 'Execution'>('All');
-  const [dateFilterType, setDateFilterType] = useState<'All' | 'Today' | 'This Week' | 'This Month' | 'Custom'>('All');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const [datePeriod, setDatePeriod] = useState<DatePeriodValue>({
+    active: false,
+    period: 'month',
+    anchorDate: new Date(),
+  });
   const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
   const [selectedDoers, setSelectedDoers] = useState<string[]>([]);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
+  const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -65,6 +71,31 @@ export default function EMDashboard() {
   const allDoers = Array.from(new Set([...designTasks, ...executionTasks].map(t => t.doer_name || t.supervisor_name).filter(Boolean))).sort();
   const allStatuses = ['Completed', 'Pending', 'Hold', 'Cancelled'];
 
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (selectedProjects.length > 0) count += 1;
+    if (selectedDoers.length > 0) count += 1;
+    if (selectedStatuses.length > 0) count += 1;
+    if (datePeriod.active) count += 1;
+    return count;
+  }, [selectedProjects, selectedDoers, selectedStatuses, datePeriod.active]);
+
+  const handleClearAllFilters = () => {
+    setSelectedProjects([]);
+    setSelectedDoers([]);
+    setSelectedStatuses([]);
+    setDatePeriod(getQuickDatePeriod('all'));
+  };
+
+  const activeQuickDatePreset = useMemo(
+    () => matchQuickDatePreset(datePeriod),
+    [datePeriod]
+  );
+
+  const handleQuickDatePreset = (preset: QuickDatePreset) => {
+    setDatePeriod(getQuickDatePeriod(preset));
+  };
+
   const filteredData = useMemo(() => {
     let rawData: any[] = [];
     if (activeTab === 'All') {
@@ -74,11 +105,6 @@ export default function EMDashboard() {
     } else {
       rawData = [...executionTasks];
     }
-
-    const today = getStartOfDay(new Date());
-    const weekStart = new Date(today);
-    weekStart.setDate(today.getDate() - today.getDay()); 
-    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
 
     return rawData.filter(t => {
       const allowedRoles = ['Admin', 'EA', 'PC', 'MIS'];
@@ -93,22 +119,16 @@ export default function EMDashboard() {
       if (selectedStatuses.length > 0 && !selectedStatuses.includes(t.status || 'Pending')) return false;
 
       const pDate = parseDate(t.planned_date || t.work_to);
-      
-      if (dateFilterType === 'Today') {
-        if (!pDate || pDate.getTime() !== today.getTime()) return false;
-      } else if (dateFilterType === 'This Week') {
-        if (!pDate || pDate < weekStart || pDate > today) return false;
-      } else if (dateFilterType === 'This Month') {
-        if (!pDate || pDate < monthStart || pDate > today) return false;
-      } else if (dateFilterType === 'Custom' && (startDate || endDate)) {
+
+      if (datePeriod.active) {
         if (!pDate) return false;
-        if (startDate && pDate < new Date(startDate)) return false;
-        if (endDate && pDate > new Date(endDate)) return false;
+        const { start, end } = getPeriodRange(datePeriod.period, datePeriod.anchorDate);
+        if (pDate < start || pDate > end) return false;
       }
 
       return true;
     });
-  }, [designTasks, executionTasks, activeTab, dateFilterType, startDate, endDate, selectedProjects, selectedDoers, selectedStatuses, user]);
+  }, [designTasks, executionTasks, activeTab, datePeriod, selectedProjects, selectedDoers, selectedStatuses, user]);
 
   // Helpers
   const today = getStartOfDay(new Date());
@@ -321,36 +341,94 @@ export default function EMDashboard() {
             <span className="current">Deep Analytics</span>
           </div>
         </div>
-        
-        <div className={styles.slicersContainer}>
-          <div className={styles.slicersRow}>
-            <MultiSelectFilter options={allProjects as string[]} selectedValues={selectedProjects} onChange={setSelectedProjects} label="Project Filter" />
-            <MultiSelectFilter options={allDoers as string[]} selectedValues={selectedDoers} onChange={setSelectedDoers} label="Doer Filter" />
-            <MultiSelectFilter options={allStatuses as string[]} selectedValues={selectedStatuses} onChange={setSelectedStatuses} label="Status Filter" />
-            
-            <div className={styles.dateFilterBox}>
-              <select value={dateFilterType} onChange={e => setDateFilterType(e.target.value as any)} className={styles.dateSelect}>
-                <option value="All">All Dates</option>
-                <option value="Today">Today</option>
-                <option value="This Week">This Week</option>
-                <option value="This Month">This Month</option>
-                <option value="Custom">Custom</option>
-              </select>
-              {dateFilterType === 'Custom' && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className={styles.dateInput} />
-                  <span style={{color: '#94a3b8'}}>-</span>
-                  <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className={styles.dateInput} />
-                </div>
-              )}
-            </div>
-            
-            <Link href="/em" className={styles.backButton}>
-              <ArrowLeft size={16} /> Back
-            </Link>
-          </div>
+
+        <div className={styles.headerActions}>
+          <button
+            type="button"
+            className={`${styles.quickFilterBtn} ${
+              activeQuickDatePreset === 'lastWeek' ? styles.quickFilterBtnActive : ''
+            }`}
+            onClick={() =>
+              handleQuickDatePreset(activeQuickDatePreset === 'lastWeek' ? 'all' : 'lastWeek')
+            }
+          >
+            Last Week
+          </button>
+          <button
+            type="button"
+            className={`${styles.filterButton} ${activeFilterCount > 0 ? styles.filterButtonActive : ''}`}
+            onClick={() => setIsFilterModalOpen(true)}
+            aria-label="Open filters"
+          >
+            <Filter size={18} />
+            {activeFilterCount > 0 && (
+              <span className={styles.filterBadge}>{activeFilterCount}</span>
+            )}
+          </button>
+          <Link href="/em" className={styles.backButton}>
+            <ArrowLeft size={16} /> Back
+          </Link>
         </div>
       </div>
+      
+      <Modal
+        isOpen={isFilterModalOpen}
+        onClose={() => setIsFilterModalOpen(false)}
+        title="Dashboard Filters"
+        width="720px"
+      >
+        <div className={styles.filterModalContent}>
+          <div className={styles.filterModalSection}>
+            <h4 className={styles.filterModalSectionTitle}>Project & Team</h4>
+            <div className={styles.filterModalGrid}>
+              <MultiSelectFilter
+                options={allProjects as string[]}
+                selectedValues={selectedProjects}
+                onChange={setSelectedProjects}
+                label="Project Filter"
+                fullWidth
+              />
+              <MultiSelectFilter
+                options={allDoers as string[]}
+                selectedValues={selectedDoers}
+                onChange={setSelectedDoers}
+                label="Doer Filter"
+                fullWidth
+              />
+              <MultiSelectFilter
+                options={allStatuses as string[]}
+                selectedValues={selectedStatuses}
+                onChange={setSelectedStatuses}
+                label="Status Filter"
+                fullWidth
+              />
+            </div>
+          </div>
+
+          <div className={styles.filterModalSection}>
+            <h4 className={styles.filterModalSectionTitle}>Date Range</h4>
+            <PeriodDateFilter value={datePeriod} onChange={setDatePeriod} />
+          </div>
+
+          <div className={styles.filterModalFooter}>
+            <button
+              type="button"
+              className={styles.clearFiltersBtn}
+              onClick={handleClearAllFilters}
+              disabled={activeFilterCount === 0}
+            >
+              Clear All
+            </button>
+            <button
+              type="button"
+              className={styles.applyFiltersBtn}
+              onClick={() => setIsFilterModalOpen(false)}
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      </Modal>
       
       <div className={styles.tabsContainer}>
         <button className={`${styles.tab} ${activeTab === 'All' ? styles.active : ''}`} onClick={() => setActiveTab('All')}><Globe size={18} /> All Modules</button>

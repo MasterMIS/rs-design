@@ -15,9 +15,10 @@ import {
   CartesianGrid,
 } from 'recharts';
 import type { ProgressStats } from '@/lib/progressStats';
+import { formatProgressPercent } from '@/lib/progressStats';
 import styles from './ProgressCharts.module.css';
 
-const PIE_COLORS = ['#10b981', '#cbd5e1'];
+const PIE_COLORS = ['#10b981', '#f59e0b', '#cbd5e1'];
 
 interface ProgressChartsProps {
   title: string;
@@ -72,12 +73,17 @@ export function ProgressCharts({
               </PieChart>
             </ResponsiveContainer>
             <div className={styles.pieCenter}>
-              <strong>{stats.percent}%</strong>
+              <strong>
+                {formatProgressPercent(stats.completed, stats.total, stats.percent)}
+              </strong>
               <span>Complete</span>
             </div>
           </div>
           <p className={styles.caption}>
-            {stats.completed} completed · {stats.pending} pending · {stats.total} total
+            {stats.completed} completed
+            {stats.inProgress > 0 ? ` · ${stats.inProgress} in progress` : ''}
+            {stats.pending > 0 ? ` · ${stats.pending} pending` : ''}
+            {' · '}{stats.total} total
           </p>
         </div>
 

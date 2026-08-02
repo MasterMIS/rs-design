@@ -39,9 +39,10 @@ interface TrackerScheduleItem {
   rowIndex?: number;
   project: string;
   trackerId: string;
-  actualDate: string;
+  actualStartDate: string;
+  actualEndDate: string;
   tplId?: string;
-  isCompleting?: boolean;
+  isSaving?: boolean;
 }
 
 const getCategoryIcon = (name: string, size = 16) => {
@@ -92,6 +93,16 @@ export default function PMSTrackerPage() {
     return `${day} ${month} ${year}`;
   };
 
+  const displayDate = (dateStr?: string) =>
+    !dateStr?.trim() || formatDate(dateStr) === 'N/A' ? '—' : formatDate(dateStr);
+
+  const isDoerMissing = (doerName?: string) => {
+    const value = doerName?.trim().toLowerCase() || '';
+    return !value || value === 'unassigned';
+  };
+
+  const getTodayIsoDate = () => new Date().toISOString().split('T')[0];
+
   useEffect(() => {
     fetchData();
   }, [user]);
@@ -120,7 +131,8 @@ export default function PMSTrackerPage() {
           tplId: tpl.id,
           project: activeProjectName,
           trackerId: tpl.trackerId,
-          actualDate: ''
+          actualStartDate: '',
+          actualEndDate: '',
         };
       }
     });
@@ -191,40 +203,64 @@ export default function PMSTrackerPage() {
   };
 
   // ---- SCHEDULE HANDLERS ----
-  const handleMarkComplete = async (tplId: string, trackerId: string) => {
+  const handleMarkWorkStep = async (tplId: string, trackerId: string) => {
     if (!activeProjectName) return;
-    
-    try {
-      setLocalSchedule(prev => ({ ...prev, [tplId]: { ...prev[tplId], isCompleting: true } }));
 
-      const today = new Date().toISOString().split('T')[0];
-      const existing = localSchedule[tplId];
-      
+    const existing = localSchedule[tplId];
+    const today = getTodayIsoDate();
+    let actualStartDate = existing?.actualStartDate || '';
+    let actualEndDate = existing?.actualEndDate || '';
+
+    if (!actualStartDate) {
+      actualStartDate = today;
+    } else if (!actualEndDate) {
+      actualEndDate = today;
+    } else {
+      return;
+    }
+
+    try {
+      setLocalSchedule((prev) => ({
+        ...prev,
+        [tplId]: { ...prev[tplId], isSaving: true },
+      }));
+
       const payload = {
         trackerId,
         project: activeProjectName,
-        actualDate: today
+        actualStartDate,
+        actualEndDate,
       };
 
-      const url = existing?.rowIndex ? `/api/pms-tracker?rowIndex=${existing.rowIndex}` : '/api/pms-tracker';
+      const url = existing?.rowIndex
+        ? `/api/pms-tracker?rowIndex=${existing.rowIndex}`
+        : '/api/pms-tracker';
       const method = existing?.rowIndex ? 'PUT' : 'POST';
 
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(existing?.rowIndex ? payload : { project: activeProjectName, items: [payload] })
+        body: JSON.stringify(
+          existing?.rowIndex ? payload : { project: activeProjectName, items: [payload] }
+        ),
       });
 
       if (res.ok) {
-        await fetchData(); 
+        await fetchData();
       } else {
-        alert('Failed to mark task as complete.');
-        setLocalSchedule(prev => ({ ...prev, [tplId]: { ...prev[tplId], isCompleting: false } }));
+        alert('Failed to save work dates.');
+        setLocalSchedule((prev) => ({
+          ...prev,
+          [tplId]: { ...prev[tplId], isSaving: false },
+        }));
       }
     } catch (err) {
       console.error(err);
-      alert('Error marking task as complete.');
-      setLocalSchedule(prev => ({ ...prev, [tplId]: { ...prev[tplId], isCompleting: false } }));
+      alert('Error saving work dates.');
+      setLocalSchedule((prev) => ({
+        ...prev,
+        [tplId]: { ...prev[tplId], isSaving: false },
+      }));
     }
   };
 
@@ -278,7 +314,7 @@ export default function PMSTrackerPage() {
         if (item.rowIndex) {
           itemsToPut.push(item);
         } else {
-          if (item.actualDate) {
+          if (item.actualStartDate || item.actualEndDate) {
             itemsToPost.push(item);
           }
         }
@@ -482,17 +518,17 @@ export default function PMSTrackerPage() {
 
                 return (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    {activeCategory && activeTab === 'templates' && activeProjectName && (
+                    {activeCategory && activeTab === 'schedule' && activeProjectName && (
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px', backgroundColor: 'var(--bg-main)', borderRadius: '12px', border: '1px solid var(--border-color)', flexWrap: 'wrap', gap: '10px', marginBottom: '16px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <Calendar size={18} color="var(--primary)" />
-                          <strong style={{ fontSize: '0.95rem', color: 'var(--text-heading)' }}>{activeCategory} Timeline:</strong>
+                          <strong style={{ fontSize: '0.95rem', color: 'var(--text-heading)' }}>{activeCategory} Planned Dates:</strong>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-light)' }}>Start Date:</span>
-                            <input 
-                              type="date" 
+                            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-light)' }}>Start:</span>
+                            <input
+                              type="date"
                               className={styles.customDateInput}
                               value={currentStartDate}
                               onChange={(e) => handleSaveCategoryPlan(activeCategory, 'startDate', e.target.value)}
@@ -500,9 +536,9 @@ export default function PMSTrackerPage() {
                             />
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-light)' }}>End Date:</span>
-                            <input 
-                              type="date" 
+                            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-light)' }}>End:</span>
+                            <input
+                              type="date"
                               className={styles.customDateInput}
                               value={currentEndDate}
                               onChange={(e) => handleSaveCategoryPlan(activeCategory, 'endDate', e.target.value)}
@@ -518,17 +554,6 @@ export default function PMSTrackerPage() {
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                         {items.map(item => {
                           const scheduleItem = localSchedule[item.id];
-                          
-                          // Calculate planned date based on category start date + task TAT
-                          let calculatedPlanDateStr = '';
-                          if (currentStartDate && activeTab === 'schedule') {
-                            const sd = new Date(currentStartDate);
-                            const tatDays = parseInt(item.tat || '0') || 0;
-                            if (!isNaN(sd.getTime())) {
-                              sd.setDate(sd.getDate() + tatDays);
-                              calculatedPlanDateStr = sd.toISOString().split('T')[0];
-                            }
-                          }
 
                           return (
                             <div key={item.rowIndex} style={{
@@ -537,65 +562,96 @@ export default function PMSTrackerPage() {
                               background: activeTab === 'schedule' ? 'linear-gradient(135deg, rgba(255,255,255,1) 0%, rgba(246,248,255,1) 100%)' : 'var(--bg-card)',
                               borderLeft: activeTab === 'schedule' ? '4px solid var(--primary-color)' : 'none',
                               boxShadow: activeTab === 'schedule' ? '0 6px 16px rgba(0,0,0,0.08)' : '0 4px 12px rgba(0,0,0,0.06)',
-                              borderRadius: '100px',
-                              padding: '12px 20px',
-                              gap: '20px',
+                              borderRadius: activeTab === 'schedule' ? '20px' : '100px',
+                              padding: '14px 20px',
+                              gap: '16px',
                               alignItems: 'center'
                             }}>
-                              {/* Left Section: Task Details */}
-                              <div style={{ flex: '0 0 30%', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                <div className={styles.drawingTitleRow} style={{ marginBottom: 0 }}>
-                                  <span className={styles.drawingNo} style={{ color: '#2563eb', fontWeight: 700, padding: '4px 0', whiteSpace: 'nowrap' }}>{item.trackerId || 'N/A'}</span>
-                                  <strong className={styles.drawingName} style={{ color: '#1e293b', fontSize: '0.95rem' }}>{item.taskName}</strong>
+                              {/* Task info: name row + meta row */}
+                              <div className={styles.taskInfoCol}>
+                                <div className={styles.taskTitleRow}>
+                                  <span className={styles.trackerIdBadge}>{item.trackerId || 'N/A'}</span>
+                                  <strong className={styles.taskName}>{item.taskName}</strong>
+                                  {isDoerMissing(item.doerName) && (
+                                    <span className={styles.missingDoerDot} title="Doer not assigned" aria-label="Doer not assigned" />
+                                  )}
                                 </div>
-                              </div>
-                              
-                              {/* Middle Section: Meta Info */}
-                              <div style={{ flex: '1', display: 'flex', alignItems: 'center', justifyContent: 'space-around', padding: '0 15px', flexWrap: 'wrap', gap: '10px' }}>
-                                <span className={styles.metaTag} style={{ color: '#0369a1', fontWeight: 600, fontSize: '0.85rem' }}><Grid size={14} /> {item.areaName || 'No Area'}</span>
-                                <span className={styles.metaTag} style={{ color: '#047857', fontWeight: 600, fontSize: '0.85rem' }}><User size={14} /> {item.resourceName || 'Unassigned'}</span>
-                                <span className={styles.metaTag} style={{ color: '#0f766e', fontWeight: 600, fontSize: '0.85rem' }}>Doer: {item.doerName || 'Unassigned'}</span>
-                                {activeTab === 'templates' && (
-                                  <span className={styles.metaTag} style={{ color: '#9a3412', fontWeight: 700, fontSize: '0.85rem' }}>TAT: {item.tat || '0'} Days</span>
-                                )}
+                                <div className={styles.taskMetaRow}>
+                                  <span className={styles.metaTag}>
+                                    <Grid size={14} /> {item.areaName || 'No Area'}
+                                  </span>
+                                  <span className={styles.metaTag}>
+                                    <User size={14} /> {item.resourceName || 'Unassigned'}
+                                  </span>
+                                  <span className={styles.metaTag}>
+                                    Doer: {item.doerName || 'Unassigned'}
+                                  </span>
+                                  {activeTab === 'templates' && (
+                                    <span className={`${styles.metaTag} ${styles.metaTagTat}`}>
+                                      TAT: {item.tat || '0'} Days
+                                    </span>
+                                  )}
+                                </div>
                               </div>
 
                               {/* Right Section: Controls */}
                               {activeTab === 'schedule' ? (
-                                <div style={{ flex: '0 0 250px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '15px' }}>
-                                  <div className={styles.datesCol} style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end' }}>
-                                    <div style={{ fontSize: '0.8rem', color: '#312e81', fontWeight: 600 }}>
-                                      <strong style={{ color: '#4f46e5', marginRight: '4px' }}>Plan:</strong> {formatDate(calculatedPlanDateStr)}
+                                <div className={styles.scheduleRightCol}>
+                                  <div className={styles.datesCol}>
+                                    <div className={`${styles.dateRow} ${styles.dateRowPlan}`}>
+                                      <span className={styles.datePart}>
+                                        <strong>Plan Start:</strong> {displayDate(currentStartDate)}
+                                      </span>
+                                      <span className={styles.dateDivider}>|</span>
+                                      <span className={`${styles.datePart} ${styles.datePartEnd}`}>
+                                        <strong>Plan End:</strong> {displayDate(currentEndDate)}
+                                      </span>
                                     </div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                      <strong style={{ fontSize: '0.8rem', color: '#0d9488', fontWeight: 600 }}>Actual:</strong>
-                                      {scheduleItem?.actualDate ? (
-                                        <span style={{ fontSize: '0.85rem', color: '#047857', fontWeight: 700 }}>
-                                          <CheckSquare size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
-                                          {formatDate(scheduleItem.actualDate)}
-                                        </span>
-                                      ) : (
-                                        <button 
-                                          disabled={scheduleItem?.isCompleting}
-                                          onClick={() => handleMarkComplete(item.id, item.trackerId)}
-                                          style={{
-                                            display: 'inline-flex', alignItems: 'center', gap: '6px',
-                                            padding: '6px 12px', borderRadius: '6px', border: 'none',
-                                            backgroundColor: scheduleItem?.isCompleting ? '#e2e8f0' : '#10b981',
-                                            color: scheduleItem?.isCompleting ? '#64748b' : '#fff',
-                                            fontSize: '0.8rem', fontWeight: 600, cursor: scheduleItem?.isCompleting ? 'not-allowed' : 'pointer',
-                                            transition: 'all 0.2s ease'
-                                          }}
-                                        >
-                                          {scheduleItem?.isCompleting ? (
-                                            <Loader2 size={14} style={{ animation: 'spin 2s linear infinite' }} />
-                                          ) : (
-                                            <CheckSquare size={14} />
-                                          )}
-                                          {scheduleItem?.isCompleting ? 'Saving...' : 'Complete'}
-                                        </button>
-                                      )}
+                                    <div className={`${styles.dateRow} ${styles.dateRowActual}`}>
+                                      <span className={styles.datePart}>
+                                        <strong>Actual Start:</strong> {displayDate(scheduleItem?.actualStartDate)}
+                                      </span>
+                                      <span className={styles.dateDivider}>|</span>
+                                      <span className={`${styles.datePart} ${styles.datePartEnd}`}>
+                                        <strong>Actual End:</strong> {displayDate(scheduleItem?.actualEndDate)}
+                                      </span>
                                     </div>
+                                  </div>
+
+                                  <div className={styles.trackerActionCol}>
+                                    {!scheduleItem?.actualStartDate?.trim() ? (
+                                      <button
+                                        type="button"
+                                        disabled={scheduleItem?.isSaving}
+                                        onClick={() => handleMarkWorkStep(item.id, item.trackerId)}
+                                        className={styles.workStartBtn}
+                                      >
+                                        {scheduleItem?.isSaving ? (
+                                          <Loader2 size={14} className={styles.spinIcon} />
+                                        ) : (
+                                          <CheckSquare size={14} />
+                                        )}
+                                        {scheduleItem?.isSaving ? 'Saving...' : 'Start'}
+                                      </button>
+                                    ) : !scheduleItem?.actualEndDate?.trim() ? (
+                                      <button
+                                        type="button"
+                                        disabled={scheduleItem?.isSaving}
+                                        onClick={() => handleMarkWorkStep(item.id, item.trackerId)}
+                                        className={styles.workEndBtn}
+                                      >
+                                        {scheduleItem?.isSaving ? (
+                                          <Loader2 size={14} className={styles.spinIcon} />
+                                        ) : (
+                                          <CheckSquare size={14} />
+                                        )}
+                                        {scheduleItem?.isSaving ? 'Saving...' : 'Work End'}
+                                      </button>
+                                    ) : (
+                                      <span className={styles.workDoneBadge}>
+                                        <CheckSquare size={14} /> Done
+                                      </span>
+                                    )}
                                   </div>
                                 </div>
                               ) : (

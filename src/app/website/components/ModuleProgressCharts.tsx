@@ -16,8 +16,9 @@ import {
 } from 'recharts';
 import styles from '../website.module.css';
 import type { ProgressStats } from '../utils/progressStats';
+import { formatProgressPercent } from '@/lib/progressStats';
 
-const PIE_COLORS = ['#10b981', '#cbd5e1'];
+const PIE_COLORS = ['#10b981', '#f59e0b', '#cbd5e1'];
 
 interface ModuleProgressChartsProps {
   title: string;
@@ -44,7 +45,9 @@ export function ModuleProgressCharts({
       <div className={styles.progressCompactCard}>
         <div className={styles.progressCompactHeader}>
           <h4>{title}</h4>
-          <span className={styles.progressCompactPercent}>{stats.percent}%</span>
+          <span className={styles.progressCompactPercent}>
+            {formatProgressPercent(stats.completed, stats.total, stats.percent)}
+          </span>
         </div>
         <div className={styles.progressCompactChart}>
           <ResponsiveContainer width="100%" height="100%">
@@ -76,6 +79,7 @@ export function ModuleProgressCharts({
         </div>
         <p className={styles.progressCompactMeta}>
           {stats.completed} of {stats.total} completed
+          {stats.inProgress > 0 ? ` · ${stats.inProgress} in progress` : ''}
         </p>
       </div>
     );
@@ -116,12 +120,17 @@ export function ModuleProgressCharts({
               </PieChart>
             </ResponsiveContainer>
             <div className={styles.progressPieCenter}>
-              <strong>{stats.percent}%</strong>
+              <strong>
+                {formatProgressPercent(stats.completed, stats.total, stats.percent)}
+              </strong>
               <span>Complete</span>
             </div>
           </div>
           <p className={styles.progressChartCaption}>
-            {stats.completed} completed · {stats.pending} pending · {stats.total} total
+            {stats.completed} completed
+            {stats.inProgress > 0 ? ` · ${stats.inProgress} in progress` : ''}
+            {stats.pending > 0 ? ` · ${stats.pending} pending` : ''}
+            {' · '}{stats.total} total
           </p>
         </div>
 

@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { 
   Plus, Edit2, Trash2, CheckCircle, Clock, Search, ArrowLeft, 
-  CheckCircle2, AlertCircle, Briefcase, User, CalendarDays, FileText, Download
+  CheckCircle2, AlertCircle, Briefcase, User, CalendarDays, FileText, Download, PenTool
 } from 'lucide-react';
 import { exportToCSV } from '@/utils/exportCsv';
 import styles from '../em.module.css';
@@ -13,6 +13,7 @@ import MultiSelectFilter from '@/components/MultiSelectFilter';
 import SearchableSelect from '@/components/SearchableSelect';
 import { useAuth } from '@/context/AuthContext';
 import { filterProjectsForUser } from '@/lib/project-access';
+import { DrawingScheduleTasksSection } from './DrawingScheduleTasksSection';
 
 export default function DesignPage() {
   const { user } = useAuth();
@@ -38,6 +39,7 @@ export default function DesignPage() {
   const [formProject, setFormProject] = useState('');
   const [formWorkType, setFormWorkType] = useState('');
   const [formDoer, setFormDoer] = useState('');
+  const [activeTaskTab, setActiveTaskTab] = useState<'design' | 'drawing'>('design');
 
   const workTypeOptions = [
     '2D Drawing', '3D Drawing', 'Architectal Drawing', 
@@ -262,6 +264,7 @@ export default function DesignPage() {
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+        {activeTaskTab === 'design' && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-light)' }} />
             <input 
@@ -272,17 +275,40 @@ export default function DesignPage() {
               style={{ padding: '10px 16px 10px 36px', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-card)', color: 'var(--text-main)', outline: 'none' }}
             />
           </div>
+        )}
+          {activeTaskTab === 'design' && (
+          <>
           <button onClick={() => exportToCSV(filteredTasks, 'Design_Tasks')} style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: 'var(--bg-card)', color: 'var(--text-main)', padding: '10px 16px', borderRadius: '8px', border: '1px solid var(--border-color)', cursor: 'pointer', fontWeight: 600 }}>
             <Download size={16} /> Export CSV
           </button>
           <button onClick={handleOpenCreate} style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: 'var(--primary)', color: 'white', padding: '10px 16px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
             <Plus size={16} /> Add Task
           </button>
+          </>
+          )}
         </div>
       </div>
 
-      <div style={{ backgroundColor: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
-        {/* Filter and Pagination Bar */}
+      <section className={styles.sectionCard}>
+        <div className={styles.taskTabBar}>
+          <button
+            type="button"
+            className={`${styles.taskTab} ${activeTaskTab === 'design' ? styles.taskTabActive : ''}`}
+            onClick={() => setActiveTaskTab('design')}
+          >
+            <FileText size={18} /> Design Tasks
+          </button>
+          <button
+            type="button"
+            className={`${styles.taskTab} ${activeTaskTab === 'drawing' ? styles.taskTabActive : ''}`}
+            onClick={() => setActiveTaskTab('drawing')}
+          >
+            <PenTool size={18} /> Drawing Schedule Tasks
+          </button>
+        </div>
+
+        {activeTaskTab === 'design' ? (
+        <>
         <div style={{ padding: '12px 16px', display: 'flex', flexWrap: 'wrap', gap: '16px', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', backgroundColor: 'var(--bg-main)' }}>
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
             <MultiSelectFilter label="Project Name" options={uniqueProjects} selectedValues={projFilter} onChange={(v) => { setProjFilter(v); setCurrentPage(1); }} />
@@ -410,7 +436,11 @@ export default function DesignPage() {
             </table>
           </div>
         )}
-      </div>
+        </>
+        ) : (
+          <DrawingScheduleTasksSection embedded onToast={showToast} />
+        )}
+      </section>
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingTask ? "Edit Design Task" : "Add Design Task"}>
         <form onSubmit={handleSubmit} className={styles.formGrid}>

@@ -21,6 +21,7 @@ import {
 } from '@/lib/schedule-merge';
 import {
   computeAverageProjectPercent,
+  formatProgressPercent,
 } from '@/lib/progressStats';
 import GlobalLoading from '@/components/GlobalLoading';
 import SearchableSelect from '@/components/SearchableSelect';
@@ -63,7 +64,7 @@ export default function Dashboard() {
     Array<{ trackerId: string; category: string }>
   >([]);
   const [trackerSchedule, setTrackerSchedule] = useState<
-    Array<{ project?: string; trackerId: string; actualDate?: string }>
+    Array<{ project?: string; trackerId: string; actualStartDate?: string; actualEndDate?: string }>
   >([]);
 
   useEffect(() => {
@@ -93,7 +94,7 @@ export default function Dashboard() {
           fetchJson<{ trackerId: string; category: string }>(
             '/api/pms-tracker/templates'
           ),
-          fetchJson<{ project?: string; trackerId: string; actualDate?: string }>(
+          fetchJson<{ project?: string; trackerId: string; actualStartDate?: string; actualEndDate?: string }>(
             '/api/pms-tracker'
           ),
         ]);
@@ -291,9 +292,12 @@ export default function Dashboard() {
             </div>
           </div>
           <div className={styles.statBody}>
-            <h3>{trackerProgress.percent}%</h3>
+            <h3>{formatProgressPercent(trackerProgress.completed, trackerProgress.total, trackerProgress.percent)}</h3>
             <span className={`${styles.statChange} ${styles.neutral}`}>
-              Cumulative completion
+              {trackerProgress.completed} of {trackerProgress.total} completed
+              {trackerProgress.inProgress > 0
+                ? ` · ${trackerProgress.inProgress} in progress`
+                : ''}
             </span>
           </div>
         </div>
@@ -311,7 +315,7 @@ export default function Dashboard() {
           <div className={styles.statBody}>
             <h3>{trackerAveragePercent}%</h3>
             <span className={`${styles.statChange} ${styles.up}`}>
-              {trackerProgress.completed} / {trackerProgress.total} items done
+              {trackerProgress.completed} / {trackerProgress.total} completed
             </span>
           </div>
         </div>
@@ -327,9 +331,12 @@ export default function Dashboard() {
             </div>
           </div>
           <div className={styles.statBody}>
-            <h3>{drawingProgress.percent}%</h3>
+            <h3>{formatProgressPercent(drawingProgress.completed, drawingProgress.total, drawingProgress.percent)}</h3>
             <span className={`${styles.statChange} ${styles.neutral}`}>
-              Cumulative completion
+              {drawingProgress.completed} of {drawingProgress.total} completed
+              {drawingProgress.inProgress > 0
+                ? ` · ${drawingProgress.inProgress} in progress`
+                : ''}
             </span>
           </div>
         </div>
@@ -347,7 +354,7 @@ export default function Dashboard() {
           <div className={styles.statBody}>
             <h3>{drawingAveragePercent}%</h3>
             <span className={`${styles.statChange} ${styles.up}`}>
-              {drawingProgress.completed} / {drawingProgress.total} items done
+              {drawingProgress.completed} / {drawingProgress.total} completed
             </span>
           </div>
         </div>

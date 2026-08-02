@@ -2,6 +2,10 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { filterProjectsForUser } from '@/lib/project-access';
+import {
+  mergeDrawingScheduleEntries,
+  mergeTrackerScheduleEntries,
+} from '@/lib/schedule-merge';
 import { filterByProject } from '../utils/filterByProject';
 import {
   computeDrawingProgress,
@@ -162,9 +166,10 @@ export function useClientPortalData(user: AuthUser) {
 
   const mergedDrawings = useMemo((): MergedDrawingRow[] => {
     return data.drawingTemplates.map((tpl) => {
-      const schedule = filtered.drawingSchedule.find(
+      const entries = filtered.drawingSchedule.filter(
         (s) => s.drawingNo === tpl.drawingNo
       );
+      const schedule = mergeDrawingScheduleEntries(entries);
       const catPlan = filtered.drawingPlanned.find(
         (p) => p.category === tpl.category
       );
@@ -187,9 +192,10 @@ export function useClientPortalData(user: AuthUser) {
 
   const mergedTracker = useMemo((): MergedTrackerRow[] => {
     return data.trackerTemplates.map((tpl) => {
-      const schedule = filtered.trackerSchedule.find(
+      const entries = filtered.trackerSchedule.filter(
         (s) => s.trackerId === tpl.trackerId
       );
+      const schedule = mergeTrackerScheduleEntries(entries);
       const catPlan = filtered.trackerPlanned.find(
         (p) => p.category === tpl.category
       );
@@ -200,9 +206,10 @@ export function useClientPortalData(user: AuthUser) {
         areaName: tpl.areaName,
         category: tpl.category,
         tat: tpl.tat,
-        startDate: catPlan?.startDate || '',
-        endDate: catPlan?.endDate || '',
-        actualDate: schedule?.actualDate || '',
+        planStartDate: catPlan?.startDate || '',
+        planEndDate: catPlan?.endDate || '',
+        actualStartDate: schedule?.actualStartDate || '',
+        actualEndDate: schedule?.actualEndDate || '',
       };
     });
   }, [data.trackerTemplates, filtered.trackerSchedule, filtered.trackerPlanned]);

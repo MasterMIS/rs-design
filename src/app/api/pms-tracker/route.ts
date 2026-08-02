@@ -7,7 +7,7 @@ const SHEET_NAME = CONFIG.PMS_TRACKER.SUBMISSIONS_SHEET;
 
 export async function GET() {
   try {
-    const data = await getSheetsData(SHEET_ID, `${SHEET_NAME}!A2:C1000`);
+    const data = await getSheetsData(SHEET_ID, `${SHEET_NAME}!A2:D1000`);
 
     if (!data || data.length === 0) return NextResponse.json([]);
 
@@ -17,9 +17,10 @@ export async function GET() {
         id: `PMS-SCH-${index + 2}`,
         trackerId: row[0] || '',
         project: row[1] || '',
-        actualDate: row[2] || '',
+        actualStartDate: row[2] || '',
+        actualEndDate: row[3] || '',
       };
-    }).filter((t: any) => t.project && t.trackerId);
+    }).filter((t: { project: string; trackerId: string }) => t.project && t.trackerId);
 
     return NextResponse.json(items);
   } catch (error: unknown) {
@@ -41,11 +42,12 @@ export async function POST(request: NextRequest) {
     const rowsToAppend: string[][] = [];
 
     for (const item of items) {
-      if (item.actualDate) {
+      if (item.actualStartDate || item.actualEndDate) {
         rowsToAppend.push([
           item.trackerId || '',
           project,
-          item.actualDate || ''
+          item.actualStartDate || '',
+          item.actualEndDate || '',
         ]);
       }
     }
@@ -75,10 +77,11 @@ export async function PUT(request: NextRequest) {
     const updatedRow = [
       body.trackerId || '',
       body.project || '',
-      body.actualDate || ''
+      body.actualStartDate || '',
+      body.actualEndDate || '',
     ];
 
-    await updateSheetRow(SHEET_ID, `${SHEET_NAME}!A${rowIndex}:C${rowIndex}`, [updatedRow]);
+    await updateSheetRow(SHEET_ID, `${SHEET_NAME}!A${rowIndex}:D${rowIndex}`, [updatedRow]);
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {

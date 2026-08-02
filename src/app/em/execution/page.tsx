@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { 
   Plus, Edit2, Trash2, CheckCircle, Clock, Search, ArrowLeft, 
-  CheckCircle2, AlertCircle, Briefcase, User, CalendarDays, FileText, Download
+  CheckCircle2, AlertCircle, Briefcase, User, CalendarDays, FileText, Download, Activity
 } from 'lucide-react';
 import { exportToCSV } from '@/utils/exportCsv';
 import styles from '../em.module.css';
@@ -13,6 +13,7 @@ import MultiSelectFilter from '@/components/MultiSelectFilter';
 import SearchableSelect from '@/components/SearchableSelect';
 import { useAuth } from '@/context/AuthContext';
 import { filterProjectsForUser } from '@/lib/project-access';
+import { ProjectTrackerTasksSection } from './ProjectTrackerTasksSection';
 
 export default function ExecutionPage() {
   const { user } = useAuth();
@@ -37,6 +38,7 @@ export default function ExecutionPage() {
 
   const [formProject, setFormProject] = useState('');
   const [formSupervisor, setFormSupervisor] = useState('');
+  const [activeTaskTab, setActiveTaskTab] = useState<'execution' | 'tracker'>('execution');
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -256,6 +258,7 @@ export default function ExecutionPage() {
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          {activeTaskTab === 'execution' && (
           <div style={{ position: 'relative' }}>
             <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-light)' }} />
             <input 
@@ -266,17 +269,40 @@ export default function ExecutionPage() {
               style={{ padding: '10px 16px 10px 36px', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-card)', color: 'var(--text-main)', outline: 'none' }}
             />
           </div>
+          )}
+          {activeTaskTab === 'execution' && (
+          <>
           <button onClick={() => exportToCSV(filteredTasks, 'Execution_Tasks')} style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: 'var(--bg-card)', color: 'var(--text-main)', padding: '10px 16px', borderRadius: '8px', border: '1px solid var(--border-color)', cursor: 'pointer', fontWeight: 600 }}>
             <Download size={16} /> Export CSV
           </button>
           <button onClick={handleOpenCreate} style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: 'var(--primary)', color: 'white', padding: '10px 16px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
             <Plus size={16} /> Add Task
           </button>
+          </>
+          )}
         </div>
       </div>
 
-      <div style={{ backgroundColor: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
-        {/* Filter and Pagination Bar */}
+      <section className={styles.sectionCard}>
+        <div className={styles.taskTabBar}>
+          <button
+            type="button"
+            className={`${styles.taskTab} ${activeTaskTab === 'execution' ? styles.taskTabActive : ''}`}
+            onClick={() => setActiveTaskTab('execution')}
+          >
+            <FileText size={18} /> Execution Tasks
+          </button>
+          <button
+            type="button"
+            className={`${styles.taskTab} ${activeTaskTab === 'tracker' ? styles.taskTabActive : ''}`}
+            onClick={() => setActiveTaskTab('tracker')}
+          >
+            <Activity size={18} /> Project Tracker Tasks
+          </button>
+        </div>
+
+        {activeTaskTab === 'execution' ? (
+        <>
         <div style={{ padding: '12px 16px', display: 'flex', flexWrap: 'wrap', gap: '16px', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', backgroundColor: 'var(--bg-main)' }}>
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
             <MultiSelectFilter label="Project Name" options={uniqueProjects} selectedValues={projFilter} onChange={(v) => { setProjFilter(v); setCurrentPage(1); }} />
@@ -410,7 +436,11 @@ export default function ExecutionPage() {
             </table>
           </div>
         )}
-      </div>
+        </>
+        ) : (
+          <ProjectTrackerTasksSection embedded onToast={showToast} />
+        )}
+      </section>
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingTask ? "Edit Execution Task" : "Add Execution Task"}>
         <form onSubmit={handleSubmit} className={styles.formGrid}>

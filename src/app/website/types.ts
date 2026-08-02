@@ -126,7 +126,8 @@ export interface TrackerTemplate {
 export interface TrackerScheduleItem {
   project: string;
   trackerId: string;
-  actualDate: string;
+  actualStartDate: string;
+  actualEndDate: string;
 }
 
 export interface TrackerPlannedDate {
@@ -174,9 +175,10 @@ export interface MergedTrackerRow {
   areaName: string;
   category: string;
   tat: string;
-  startDate: string;
-  endDate: string;
-  actualDate: string;
+  planStartDate: string;
+  planEndDate: string;
+  actualStartDate: string;
+  actualEndDate: string;
 }
 
 export interface ModuleCounts {

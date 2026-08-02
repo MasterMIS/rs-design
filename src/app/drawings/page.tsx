@@ -122,6 +122,14 @@ export default function DrawingsPage() {
     return `${day} ${month} ${year}`;
   };
 
+  const displayDate = (dateStr?: string) =>
+    !dateStr?.trim() || formatDate(dateStr) === 'N/A' ? '—' : formatDate(dateStr);
+
+  const isDoerMissing = (doerName?: string) => {
+    const value = doerName?.trim().toLowerCase() || '';
+    return !value || value === 'unassigned';
+  };
+
   const getTodayIsoDate = () => new Date().toISOString().split('T')[0];
 
   useEffect(() => {
@@ -572,20 +580,24 @@ export default function DrawingsPage() {
                               alignItems: 'center'
                             }}>
                               {/* Left Section: Drawing Details */}
-                              <div style={{ flex: activeTab === 'schedule' ? '0 0 30%' : '0 0 35%', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                              <div style={{ flex: activeTab === 'schedule' ? '0 0 22%' : '0 0 35%', display: 'flex', flexDirection: 'column', gap: '6px', minWidth: 0 }}>
                                 <div className={styles.drawingTitleRow} style={{ marginBottom: 0 }}>
                                   <span className={styles.drawingNo} style={{ color: '#2563eb', fontWeight: 700, padding: '4px 0', whiteSpace: 'nowrap' }}>{item.drawingNo || 'N/A'}</span>
                                   <strong className={styles.drawingName} style={{ color: '#1e293b', fontSize: '0.95rem' }}>{item.drawingName}</strong>
+                                  {isDoerMissing(item.doerName) && (
+                                    <span className={styles.missingDoerDot} title="Doer not assigned" aria-label="Doer not assigned" />
+                                  )}
                                 </div>
                                 <div className={styles.drawingMetaRow} style={{ marginTop: '4px' }}>
                                   <span className={styles.metaTag} style={{ color: '#0369a1', fontWeight: 600 }}><Grid size={12} /> {item.areaName || 'No Area'}</span>
                                   <span className={styles.metaTag} style={{ color: '#047857', fontWeight: 600 }}><User size={12} /> {item.resourceName || 'Unassigned'}</span>
+                                  <span className={styles.metaTag} style={{ color: '#0f766e', fontWeight: 600 }}>Doer: {item.doerName || 'Unassigned'}</span>
                                 </div>
                               </div>
                               
                               {/* Middle Section: History Files (Schedule) OR Meta Details (Templates) */}
                               {activeTab === 'schedule' ? (
-                                <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '8px', padding: '0 15px', flexWrap: 'wrap', borderLeft: '1px dashed var(--border-color)', borderRight: '1px dashed var(--border-color)', minHeight: '40px' }}>
+                                <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: '8px', padding: '0 15px', flexWrap: 'wrap', borderLeft: '1px dashed var(--border-color)', borderRight: '1px dashed var(--border-color)', minHeight: '40px' }}>
                                   {(() => {
                                     const itemHistory = schedules
                                       .filter(s => s.project === activeProjectName && s.drawingNo === item.drawingNo && s.drawingImage)
@@ -640,27 +652,29 @@ export default function DrawingsPage() {
 
                               {/* Right Section: Controls */}
                               {activeTab === 'schedule' ? (
-                                <div style={{ flex: '0 0 380px', display: 'flex', alignItems: 'center', gap: '15px' }}>
-                                  <div className={styles.datesCol} style={{ flex: 1, paddingLeft: '15px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                    <div style={{ fontSize: '0.75rem', color: '#312e81', fontWeight: 600 }}>
-                                      <strong style={{ color: '#4f46e5', marginRight: '4px' }}>Plan Start:</strong>{' '}
-                                      {formatDate(scheduleItem?.planStartDate) === 'N/A' ? '—' : formatDate(scheduleItem?.planStartDate)}
+                                <div className={styles.scheduleRightCol}>
+                                  <div className={styles.datesCol}>
+                                    <div className={`${styles.dateRow} ${styles.dateRowPlan}`}>
+                                      <span className={styles.datePart}>
+                                        <strong>Plan Start:</strong> {displayDate(scheduleItem?.planStartDate)}
+                                      </span>
+                                      <span className={styles.dateDivider}>|</span>
+                                      <span className={`${styles.datePart} ${styles.datePartEnd}`}>
+                                        <strong>Plan End:</strong> {displayDate(scheduleItem?.planEndDate)}
+                                      </span>
                                     </div>
-                                    <div style={{ fontSize: '0.75rem', color: '#312e81', fontWeight: 600 }}>
-                                      <strong style={{ color: '#4f46e5', marginRight: '4px' }}>Plan End:</strong>{' '}
-                                      {formatDate(scheduleItem?.planEndDate) === 'N/A' ? '—' : formatDate(scheduleItem?.planEndDate)}
-                                    </div>
-                                    <div style={{ fontSize: '0.75rem', color: '#134e4a', fontWeight: 600 }}>
-                                      <strong style={{ color: '#0d9488', marginRight: '4px' }}>Actual Start:</strong>{' '}
-                                      {formatDate(scheduleItem?.actualStartDate) === 'N/A' ? '—' : formatDate(scheduleItem?.actualStartDate)}
-                                    </div>
-                                    <div style={{ fontSize: '0.75rem', color: '#134e4a', fontWeight: 600 }}>
-                                      <strong style={{ color: '#0d9488', marginRight: '4px' }}>Actual End:</strong>{' '}
-                                      {formatDate(scheduleItem?.actualEndDate) === 'N/A' ? '—' : formatDate(scheduleItem?.actualEndDate)}
+                                    <div className={`${styles.dateRow} ${styles.dateRowActual}`}>
+                                      <span className={styles.datePart}>
+                                        <strong>Actual Start:</strong> {displayDate(scheduleItem?.actualStartDate)}
+                                      </span>
+                                      <span className={styles.dateDivider}>|</span>
+                                      <span className={`${styles.datePart} ${styles.datePartEnd}`}>
+                                        <strong>Actual End:</strong> {displayDate(scheduleItem?.actualEndDate)}
+                                      </span>
                                     </div>
                                   </div>
-                                  
-                                  <div className={styles.statusCol} style={{ flex: '0 0 120px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+
+                                  <div className={styles.statusCol} style={{ flex: '0 0 110px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                     <div className={`${styles.statusSelect} ${styles[scheduleItem?.rsDesignStatus?.replace(/\s+/g, '') || 'Pending']}`} style={{ display: 'inline-block', textAlign: 'center', pointerEvents: 'none', width: '100%', padding: '4px', fontWeight: 700 }}>
                                       RS: {scheduleItem?.rsDesignStatus || 'Pending'}
                                     </div>
