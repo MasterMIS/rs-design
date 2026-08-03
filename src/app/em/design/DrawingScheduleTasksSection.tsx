@@ -15,6 +15,7 @@ import {
 import { useAuth } from '@/context/AuthContext';
 import { useProject } from '@/context/ProjectContext';
 import { filterProjectsForUser } from '@/lib/project-access';
+import { canViewAllEmTasks, getDoerLabel, isTaskAssignedToUser, matchesPlanDateRange } from '@/lib/em-access';
 import {
   buildDrawingDoerTasks,
   type DrawingPlannedRow,
@@ -25,22 +26,16 @@ import {
 import MultiSelectFilter from '@/components/MultiSelectFilter';
 import styles from '../em.module.css';
 
-const PRIVILEGED_ROLES = ['Admin', 'EA', 'PC', 'MIS'];
+interface DrawingScheduleTasksSectionProps {
+  onToast: (message: string) => void;
+  embedded?: boolean;
+}
 
 function formatDisplayDate(dateStr?: string) {
   if (!dateStr?.trim()) return '—';
   const d = new Date(dateStr);
   if (Number.isNaN(d.getTime())) return dateStr;
   return d.toLocaleDateString('en-GB');
-}
-
-function namesMatch(a?: string, b?: string) {
-  return a?.trim().toLowerCase() === b?.trim().toLowerCase();
-}
-
-interface DrawingScheduleTasksSectionProps {
-  onToast: (message: string) => void;
-  embedded?: boolean;
 }
 
 export function DrawingScheduleTasksSection({ onToast, embedded = false }: DrawingScheduleTasksSectionProps) {
@@ -57,7 +52,10 @@ export function DrawingScheduleTasksSection({ onToast, embedded = false }: Drawi
 
   const [searchTerm, setSearchTerm] = useState('');
   const [projectFilter, setProjectFilter] = useState<string[]>([]);
+  const [doerFilter, setDoerFilter] = useState<string[]>([]);
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
+  const [startDateFilter, setStartDateFilter] = useState('');
+  const [endDateFilter, setEndDateFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
 
@@ -103,9 +101,8 @@ export function DrawingScheduleTasksSection({ onToast, embedded = false }: Drawi
   );
 
   const roleFilteredRows = useMemo(() => {
-    const isPrivileged = user?.role && PRIVILEGED_ROLES.includes(user.role);
-    if (isPrivileged) return allRows;
-    return allRows.filter((row) => namesMatch(row.doerName, user?.name));
+    if (canViewAllEmTasks(user?.role)) return allRows;
+    return allRows.filter((row) => isTaskAssignedToUser({ doerName: row.doerName }, user?.name));
   }, [allRows, user]);
 
   const filteredRows = useMemo(() => {
@@ -124,12 +121,20 @@ export function DrawingScheduleTasksSection({ onToast, embedded = false }: Drawi
 
       const matchesProject =
         projectFilter.length === 0 || projectFilter.includes(row.project);
+      const matchesDoer =
+        doerFilter.length === 0 || doerFilter.includes(getDoerLabel(row.doerName));
       const matchesStatus =
         statusFilter.length === 0 || statusFilter.includes(status);
+      const matchesDate = matchesPlanDateRange(
+        row.planStartDate,
+        row.planEndDate,
+        startDateFilter,
+        endDateFilter
+      );
 
-      return matchesSearch && matchesProject && matchesStatus;
+      return matchesSearch && matchesProject && matchesDoer && matchesStatus && matchesDate;
     });
-  }, [roleFilteredRows, searchTerm, projectFilter, statusFilter]);
+  }, [roleFilteredRows, searchTerm, projectFilter, doerFilter, statusFilter, startDateFilter, endDateFilter]);
 
   const totalPages = Math.ceil(filteredRows.length / itemsPerPage) || 1;
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -137,6 +142,12 @@ export function DrawingScheduleTasksSection({ onToast, embedded = false }: Drawi
 
   const uniqueProjects = useMemo(
     () => Array.from(new Set(roleFilteredRows.map((r) => r.project))).sort(),
+    [roleFilteredRows]
+  );
+
+  const uniqueDoers = useMemo(
+    () =>
+      Array.from(new Set(roleFilteredRows.map((r) => getDoerLabel(r.doerName)))).sort(),
     [roleFilteredRows]
   );
 
@@ -261,6 +272,15 @@ export function DrawingScheduleTasksSection({ onToast, embedded = false }: Drawi
             }}
           />
           <MultiSelectFilter
+            label="Doer"
+            options={uniqueDoers}
+            selectedValues={doerFilter}
+            onChange={(values) => {
+              setDoerFilter(values);
+              setCurrentPage(1);
+            }}
+          />
+          <MultiSelectFilter
             label="Status"
             options={['Pending', 'In Progress', 'Completed']}
             selectedValues={statusFilter}
@@ -269,6 +289,42 @@ export function DrawingScheduleTasksSection({ onToast, embedded = false }: Drawi
               setCurrentPage(1);
             }}
           />
+          <div className={styles.sectionDateFilter}>
+            <span className={styles.sectionDateFilterLabel}>Plan Date:</span>
+            <input
+              type="date"
+              value={startDateFilter}
+              onChange={(e) => {
+                setStartDateFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className={styles.sectionDateInput}
+            />
+            <span className={styles.sectionDateDivider}>to</span>
+            <input
+              type="date"
+              value={endDateFilter}
+              onChange={(e) => {
+                setEndDateFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className={styles.sectionDateInput}
+            />
+            {(startDateFilter || endDateFilter) && (
+              <button
+                type="button"
+                className={styles.sectionDateClear}
+                onClick={() => {
+                  setStartDateFilter('');
+                  setEndDateFilter('');
+                  setCurrentPage(1);
+                }}
+                title="Clear dates"
+              >
+                &times;
+              </button>
+            )}
+          </div>
         </div>
 
         <div className={styles.sectionPagination}>

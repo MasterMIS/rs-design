@@ -11,6 +11,7 @@ import Modal from '@/components/Modal';
 import PeriodDateFilter from '@/components/PeriodDateFilter';
 import { useAuth } from '@/context/AuthContext';
 import { getPeriodRange, matchQuickDatePreset, getQuickDatePeriod, type DatePeriodValue, type QuickDatePreset } from '@/lib/date-period';
+import { canViewAllEmTasks, isTaskAssignedToUser } from '@/lib/em-access';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#ec4899', '#14b8a6', '#f97316'];
 const STATUS_COLORS = { 'Completed': '#10b981', 'Pending': '#3b82f6', 'Delayed': '#ef4444' };
@@ -107,10 +108,8 @@ export default function EMDashboard() {
     }
 
     return rawData.filter(t => {
-      const allowedRoles = ['Admin', 'EA', 'PC', 'MIS'];
-      if (user?.role && !allowedRoles.includes(user.role)) {
-        const doer = t.doer_name || t.supervisor_name || t.doer;
-        if (doer !== user.name) return false;
+      if (user && !canViewAllEmTasks(user.role)) {
+        if (!isTaskAssignedToUser(t, user.name)) return false;
       }
 
       if (selectedProjects.length > 0 && !selectedProjects.includes(t.project_name)) return false;

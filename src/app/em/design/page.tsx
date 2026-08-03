@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { 
   Plus, Edit2, Trash2, CheckCircle, Clock, Search, ArrowLeft, 
@@ -13,7 +13,42 @@ import MultiSelectFilter from '@/components/MultiSelectFilter';
 import SearchableSelect from '@/components/SearchableSelect';
 import { useAuth } from '@/context/AuthContext';
 import { filterProjectsForUser } from '@/lib/project-access';
+import { canViewAllEmTasks, isTaskAssignedToUser } from '@/lib/em-access';
 import { DrawingScheduleTasksSection } from './DrawingScheduleTasksSection';
+
+type DesignTaskDraft = {
+  id: string;
+  project_name: string;
+  work_type: string;
+  work_name: string;
+  doer_name: string;
+  planned_date: string;
+};
+
+function createTaskRowId() {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function formatDateForSheet(isoDate: string) {
+  if (!isoDate) return '';
+  const [year, month, day] = isoDate.split('-');
+  if (!year || !month || !day) return isoDate;
+  return `${day}/${month}/${year}`;
+}
+
+function isTaskRowEmpty(row: DesignTaskDraft) {
+  return !row.project_name && !row.work_type && !row.work_name && !row.planned_date;
+}
+
+function isTaskRowComplete(row: DesignTaskDraft) {
+  return Boolean(
+    row.project_name &&
+      row.work_type &&
+      row.work_name.trim() &&
+      row.doer_name &&
+      row.planned_date
+  );
+}
 
 export default function DesignPage() {
   const { user } = useAuth();
@@ -39,12 +74,34 @@ export default function DesignPage() {
   const [formProject, setFormProject] = useState('');
   const [formWorkType, setFormWorkType] = useState('');
   const [formDoer, setFormDoer] = useState('');
+  const [taskRows, setTaskRows] = useState<DesignTaskDraft[]>([]);
   const [activeTaskTab, setActiveTaskTab] = useState<'design' | 'drawing'>('design');
 
   const workTypeOptions = [
     '2D Drawing', '3D Drawing', 'Architectal Drawing', 
     'MEP Drawing', 'Selection', 'Design Demo', 'Office Work', 'BOQ'
   ];
+
+  const projectOptions = useMemo(
+    () => projectsList.map((p: any) => p.basicInfo?.name).filter(Boolean),
+    [projectsList]
+  );
+
+  const doerOptions = useMemo(
+    () => usersList.map((u: any) => u.name).filter(Boolean),
+    [usersList]
+  );
+
+  const defaultDoerName = !canViewAllEmTasks(user?.role) ? user?.name || '' : '';
+
+  const createEmptyTaskRow = (): DesignTaskDraft => ({
+    id: createTaskRowId(),
+    project_name: '',
+    work_type: '',
+    work_name: '',
+    doer_name: defaultDoerName,
+    planned_date: '',
+  });
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -83,8 +140,8 @@ export default function DesignPage() {
     setEditingTask(null);
     setFormProject('');
     setFormWorkType('');
-    const allowedRoles = ['Admin', 'EA', 'PC', 'MIS'];
-    setFormDoer(!allowedRoles.includes(user?.role || '') ? user?.name || '' : '');
+    setFormDoer(defaultDoerName);
+    setTaskRows([createEmptyTaskRow(), createEmptyTaskRow(), createEmptyTaskRow()]);
     setIsModalOpen(true);
   };
 
@@ -93,7 +150,20 @@ export default function DesignPage() {
     setFormProject(task.project_name || '');
     setFormWorkType(task.work_type || '');
     setFormDoer(task.doer_name || '');
+    setTaskRows([]);
     setIsModalOpen(true);
+  };
+
+  const updateTaskRow = (id: string, field: keyof Omit<DesignTaskDraft, 'id'>, value: string) => {
+    setTaskRows((rows) => rows.map((row) => (row.id === id ? { ...row, [field]: value } : row)));
+  };
+
+  const addTaskRow = () => {
+    setTaskRows((rows) => [...rows, createEmptyTaskRow()]);
+  };
+
+  const removeTaskRow = (id: string) => {
+    setTaskRows((rows) => (rows.length <= 1 ? rows : rows.filter((row) => row.id !== id)));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -106,34 +176,75 @@ export default function DesignPage() {
       work_type: formData.get('work_type'),
       work_name: formData.get('work_name'),
       doer_name: formData.get('doer_name'),
-      planned_date: formData.get('planned_date'),
+      planned_date: formatDateForSheet(String(formData.get('planned_date') || '')),
       actual_date: editingTask ? editingTask.actual_date : '',
       status: editingTask ? editingTask.status : 'Pending',
     };
 
     setIsSaving(true);
     try {
-      let res;
-      if (editingTask) {
-        res = await fetch(`/api/em/design?rowIndex=${editingTask.rowIndex}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...payload, timestamp: editingTask.timestamp }),
-        });
-      } else {
-        res = await fetch('/api/em/design', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-      }
+      const res = await fetch(`/api/em/design?rowIndex=${editingTask.rowIndex}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...payload, timestamp: editingTask.timestamp }),
+      });
 
       if (res.ok) {
         setIsModalOpen(false);
-        showToast(editingTask ? 'Task updated successfully!' : 'Task added successfully!');
+        showToast('Task updated successfully!');
         fetchTasks(true);
       } else {
         alert('Failed to save task.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('An error occurred while saving.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleBulkSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const completeRows = taskRows.filter(isTaskRowComplete);
+    const partialRows = taskRows.filter((row) => !isTaskRowEmpty(row) && !isTaskRowComplete(row));
+
+    if (partialRows.length > 0) {
+      alert('Please complete all fields in each row, or remove incomplete rows.');
+      return;
+    }
+
+    if (completeRows.length === 0) {
+      alert('Add at least one complete task.');
+      return;
+    }
+
+    const tasks = completeRows.map((row) => ({
+      project_name: row.project_name,
+      work_type: row.work_type,
+      work_name: row.work_name.trim(),
+      doer_name: row.doer_name,
+      planned_date: formatDateForSheet(row.planned_date),
+      actual_date: '',
+      status: 'Pending',
+    }));
+
+    setIsSaving(true);
+    try {
+      const res = await fetch('/api/em/design', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tasks }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setIsModalOpen(false);
+        showToast(`${data.count || completeRows.length} task(s) added successfully!`);
+        fetchTasks(true);
+      } else {
+        alert('Failed to save tasks.');
       }
     } catch (err) {
       console.error(err);
@@ -199,9 +310,8 @@ export default function DesignPage() {
     const matchesStatus = statusFilter.length === 0 || statusFilter.includes(taskStatus);
     
     let userMatches = true;
-    const allowedRoles = ['Admin', 'EA', 'PC', 'MIS'];
-    if (user?.role && !allowedRoles.includes(user.role)) {
-      userMatches = t.doer_name === user?.name;
+    if (user && !canViewAllEmTasks(user.role)) {
+      userMatches = isTaskAssignedToUser(t, user.name);
     }
 
     let matchesDate = true;
@@ -442,7 +552,13 @@ export default function DesignPage() {
         )}
       </section>
 
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingTask ? "Edit Design Task" : "Add Design Task"}>
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title={editingTask ? 'Edit Design Task' : 'Add Design Tasks'}
+        width={editingTask ? undefined : '960px'}
+      >
+        {editingTask ? (
         <form onSubmit={handleSubmit} className={styles.formGrid}>
           <div className={styles.formRow}>
             <div className={styles.fieldGroup}>
@@ -450,7 +566,7 @@ export default function DesignPage() {
                 name="project_name" 
                 value={formProject} 
                 onChange={setFormProject} 
-                options={projectsList.map((p: any) => p.basicInfo?.name).filter(Boolean)} 
+                options={projectOptions} 
                 placeholder="Select Project" 
                 icon={<Briefcase size={18} />}
               />
@@ -483,7 +599,7 @@ export default function DesignPage() {
                 name="doer_name" 
                 value={formDoer} 
                 onChange={setFormDoer} 
-                options={usersList.map((u: any) => u.name).filter(Boolean)} 
+                options={doerOptions} 
                 placeholder="Select Doer" 
                 icon={<User size={18} />}
               />
@@ -507,6 +623,112 @@ export default function DesignPage() {
             </button>
           </div>
         </form>
+        ) : (
+        <form onSubmit={handleBulkSubmit}>
+          <div className={styles.bulkTaskToolbar}>
+            <span className={styles.bulkTaskHint}>
+              Fill each row to add multiple tasks at once. Empty rows are ignored.
+            </span>
+            <button type="button" className={styles.bulkAddRowBtn} onClick={addTaskRow}>
+              <Plus size={16} /> Add Row
+            </button>
+          </div>
+
+          <div className={styles.bulkTaskTableWrap}>
+            <table className={styles.bulkTaskTable}>
+              <thead>
+                <tr>
+                  <th>Project Name</th>
+                  <th>Work Type</th>
+                  <th>Work / Drawing Name</th>
+                  <th>Doer Name</th>
+                  <th>Planned Date</th>
+                  <th style={{ width: 48, textAlign: 'center' }}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {taskRows.map((row, index) => (
+                  <tr key={row.id}>
+                    <td>
+                      <select
+                        className={styles.bulkTaskInput}
+                        value={row.project_name}
+                        onChange={(e) => updateTaskRow(row.id, 'project_name', e.target.value)}
+                      >
+                        <option value="">Select Project</option>
+                        {projectOptions.map((project) => (
+                          <option key={project} value={project}>{project}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td>
+                      <select
+                        className={styles.bulkTaskInput}
+                        value={row.work_type}
+                        onChange={(e) => updateTaskRow(row.id, 'work_type', e.target.value)}
+                      >
+                        <option value="">Select Work Type</option>
+                        {workTypeOptions.map((type) => (
+                          <option key={type} value={type}>{type}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td>
+                      <input
+                        type="text"
+                        className={styles.bulkTaskInput}
+                        value={row.work_name}
+                        onChange={(e) => updateTaskRow(row.id, 'work_name', e.target.value)}
+                        placeholder="Work / drawing name"
+                      />
+                    </td>
+                    <td>
+                      <select
+                        className={styles.bulkTaskInput}
+                        value={row.doer_name}
+                        onChange={(e) => updateTaskRow(row.id, 'doer_name', e.target.value)}
+                      >
+                        <option value="">Select Doer</option>
+                        {doerOptions.map((doer) => (
+                          <option key={doer} value={doer}>{doer}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td>
+                      <input
+                        type="date"
+                        className={styles.bulkTaskInput}
+                        value={row.planned_date}
+                        onChange={(e) => updateTaskRow(row.id, 'planned_date', e.target.value)}
+                      />
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
+                      <button
+                        type="button"
+                        className={styles.bulkRemoveRowBtn}
+                        onClick={() => removeTaskRow(row.id)}
+                        disabled={taskRows.length <= 1}
+                        title={`Remove row ${index + 1}`}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '16px' }}>
+            <button type="button" onClick={() => setIsModalOpen(false)} style={{ padding: '10px 16px', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'transparent', color: 'var(--text-main)', cursor: 'pointer', fontWeight: 600 }}>
+              Cancel
+            </button>
+            <button type="submit" disabled={isSaving} style={{ padding: '10px 16px', borderRadius: '8px', border: 'none', backgroundColor: 'var(--primary)', color: 'white', cursor: 'pointer', fontWeight: 600, opacity: isSaving ? 0.7 : 1 }}>
+              {isSaving ? 'Saving...' : 'Save All Tasks'}
+            </button>
+          </div>
+        </form>
+        )}
       </Modal>
     </div>
   );

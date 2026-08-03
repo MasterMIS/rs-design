@@ -41,22 +41,25 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const timestamp = new Date().toLocaleString('en-GB');
+    const tasks = Array.isArray(body.tasks) ? body.tasks : [body];
 
-    const newRow = [
-      timestamp,
-      body.project_name || '',
-      body.work_type || '',
-      body.work_name || '',
-      body.doer_name || '',
-      body.planned_date || '',
-      body.actual_date || '',
-      body.status || 'Pending',
-    ];
+    const newRows = tasks.map((task: Record<string, string>) => {
+      const timestamp = new Date().toLocaleString('en-GB');
+      return [
+        timestamp,
+        task.project_name || '',
+        task.work_type || '',
+        task.work_name || '',
+        task.doer_name || '',
+        task.planned_date || '',
+        task.actual_date || '',
+        task.status || 'Pending',
+      ];
+    });
 
-    await appendSheetsData(SHEET_ID, `${SHEET_NAME}!A2`, [newRow]);
+    await appendSheetsData(SHEET_ID, `${SHEET_NAME}!A2`, newRows);
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, count: newRows.length });
   } catch (error: unknown) {
     const err = error as Error;
     console.error('API Error (POST EM Design):', err);

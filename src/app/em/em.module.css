@@ -289,6 +289,49 @@
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
+  align-items: center;
+}
+
+.sectionDateFilter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 4px 8px;
+  background-color: var(--bg-card);
+}
+
+.sectionDateFilterLabel {
+  font-size: 0.8rem;
+  color: var(--text-light);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.sectionDateInput {
+  border: none;
+  background: none;
+  font-size: 0.85rem;
+  color: var(--text-main);
+  outline: none;
+  padding: 0;
+}
+
+.sectionDateDivider {
+  color: var(--text-light);
+  font-size: 0.8rem;
+}
+
+.sectionDateClear {
+  background: none;
+  border: none;
+  color: var(--text-light);
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  line-height: 1;
 }
 
 .sectionPagination {
@@ -447,4 +490,115 @@
 
 .sectionFootnote a:hover {
   text-decoration: underline;
+}
+
+.bulkTaskTableWrap {
+  overflow: auto;
+  max-height: 420px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  margin-bottom: 12px;
+}
+
+.bulkTaskTable {
+  width: 100%;
+  min-width: 860px;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.bulkTaskTable thead tr {
+  background: var(--bg-main);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.bulkTaskTable th {
+  padding: 10px 8px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-light);
+  border-bottom: 1px solid var(--border-color);
+  white-space: nowrap;
+}
+
+.bulkTaskTable td {
+  padding: 8px;
+  border-bottom: 1px solid var(--border-color);
+  vertical-align: middle;
+}
+
+.bulkTaskTable tr:last-child td {
+  border-bottom: none;
+}
+
+.bulkTaskInput {
+  width: 100%;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-main);
+  color: var(--text-heading);
+  font-size: 0.85rem;
+  outline: none;
+}
+
+.bulkTaskInput:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(59, 175, 218, 0.15);
+}
+
+.bulkTaskToolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  gap: 12px;
+}
+
+.bulkTaskHint {
+  font-size: 0.82rem;
+  color: var(--text-light);
+}
+
+.bulkAddRowBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px dashed var(--border-color);
+  background: transparent;
+  color: var(--primary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.bulkAddRowBtn:hover {
+  border-color: var(--primary);
+  background: rgba(59, 175, 218, 0.08);
+}
+
+.bulkRemoveRowBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #f1556c;
+  cursor: pointer;
+}
+
+.bulkRemoveRowBtn:hover {
+  background: rgba(241, 85, 108, 0.1);
+}
+
+.bulkRemoveRowBtn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
 }
