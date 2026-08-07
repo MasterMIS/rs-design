@@ -5,6 +5,7 @@ import { filterProjectsForUser } from '@/lib/project-access';
 import {
   mergeDrawingScheduleEntries,
   mergeTrackerScheduleEntries,
+  findTrackerPlannedDates,
 } from '@/lib/schedule-merge';
 import { filterByProject } from '../utils/filterByProject';
 import {
@@ -196,8 +197,12 @@ export function useClientPortalData(user: AuthUser) {
         (s) => s.trackerId === tpl.trackerId
       );
       const schedule = mergeTrackerScheduleEntries(entries);
-      const catPlan = filtered.trackerPlanned.find(
-        (p) => p.category === tpl.category
+      const taskPlan = findTrackerPlannedDates(
+        filtered.trackerPlanned,
+        selectedProjectName,
+        tpl.category,
+        tpl.trackerId,
+        tpl.taskName
       );
       return {
         id: tpl.id,
@@ -206,13 +211,13 @@ export function useClientPortalData(user: AuthUser) {
         areaName: tpl.areaName,
         category: tpl.category,
         tat: tpl.tat,
-        planStartDate: catPlan?.startDate || '',
-        planEndDate: catPlan?.endDate || '',
+        planStartDate: taskPlan.startDate || '',
+        planEndDate: taskPlan.endDate || '',
         actualStartDate: schedule?.actualStartDate || '',
         actualEndDate: schedule?.actualEndDate || '',
       };
     });
-  }, [data.trackerTemplates, filtered.trackerSchedule, filtered.trackerPlanned]);
+  }, [data.trackerTemplates, filtered.trackerSchedule, filtered.trackerPlanned, selectedProjectName]);
 
   const moduleCounts = useMemo<ModuleCounts>(
     () => ({

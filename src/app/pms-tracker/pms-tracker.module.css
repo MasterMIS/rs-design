@@ -995,3 +995,80 @@
     grid-template-columns: 1fr;
   }
 }
+
+.templatePlanHint {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-main);
+  color: var(--text-light);
+  font-size: 0.88rem;
+}
+
+.templatePlanHint strong {
+  color: var(--text-heading);
+}
+
+.templateRightCol {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+.templatePlanDates {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.templatePlanField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 130px;
+}
+
+.templatePlanField span {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-light);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.templateActions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.savePlanBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: none;
+  border-radius: 999px;
+  background: var(--primary);
+  color: white;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.2s ease;
+}
+
+.savePlanBtn:hover:not(:disabled) {
+  opacity: 0.92;
+}
+
+.savePlanBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

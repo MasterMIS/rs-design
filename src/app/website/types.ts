@@ -133,6 +133,7 @@ export interface TrackerScheduleItem {
 export interface TrackerPlannedDate {
   project: string;
   category: string;
+  trackerId?: string;
   startDate: string;
   endDate: string;
 }

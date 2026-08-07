@@ -86,6 +86,7 @@ export interface TrackerTemplateFull extends TrackerTemplateRow {
 export interface TrackerPlannedRow {
   project?: string;
   category: string;
+  trackerId?: string;
   startDate?: string;
   endDate?: string;
 }
@@ -111,6 +112,44 @@ export interface MergedTrackerDoerTask {
 
 function matchesProjectName(a?: string, b?: string) {
   return a?.trim().toLowerCase() === b?.trim().toLowerCase();
+}
+
+export function findTrackerPlannedDates(
+  planned: TrackerPlannedRow[],
+  projectName: string,
+  category: string,
+  trackerId: string,
+  taskName?: string
+) {
+  const normalizedTrackerId = trackerId.trim().toLowerCase();
+  const normalizedTaskName = taskName?.trim().toLowerCase() || '';
+
+  const taskPlan = planned.find(
+    (p) =>
+      matchesProjectName(p.project, projectName) &&
+      p.category === category &&
+      p.trackerId?.trim() &&
+      (p.trackerId.trim().toLowerCase() === normalizedTrackerId ||
+        (normalizedTaskName &&
+          p.trackerId.trim().toLowerCase() === normalizedTaskName))
+  );
+  if (taskPlan) {
+    return {
+      startDate: taskPlan.startDate || '',
+      endDate: taskPlan.endDate || '',
+    };
+  }
+
+  const legacyCategoryPlan = planned.find(
+    (p) =>
+      matchesProjectName(p.project, projectName) &&
+      p.category === category &&
+      !p.trackerId?.trim()
+  );
+  return {
+    startDate: legacyCategoryPlan?.startDate || '',
+    endDate: legacyCategoryPlan?.endDate || '',
+  };
 }
 
 function firstNonEmptyDate(
@@ -314,10 +353,12 @@ export function buildTrackerDoerTasks(
           s.trackerId === tpl.trackerId
       );
       const merged = mergeTrackerScheduleEntries(entries);
-      const catPlan = planned.find(
-        (p) =>
-          matchesProjectName(p.project, projectName) &&
-          p.category === tpl.category
+      const taskPlan = findTrackerPlannedDates(
+        planned,
+        projectName,
+        tpl.category,
+        tpl.trackerId,
+        tpl.taskName
       );
 
       const statusRow = {
@@ -336,8 +377,8 @@ export function buildTrackerDoerTasks(
         resourceName: tpl.resourceName || '',
         doerName: tpl.doerName || '',
         tat: tpl.tat || '',
-        planStartDate: catPlan?.startDate || '',
-        planEndDate: catPlan?.endDate || '',
+        planStartDate: taskPlan.startDate || '',
+        planEndDate: taskPlan.endDate || '',
         actualStartDate: merged?.actualStartDate || '',
         actualEndDate: merged?.actualEndDate || '',
         rowIndex: merged?.rowIndex,

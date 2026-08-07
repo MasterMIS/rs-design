@@ -11,6 +11,7 @@ import Modal from '@/components/Modal';
 import { useProject } from '@/context/ProjectContext';
 import { useAuth } from '@/context/AuthContext';
 import { filterProjectsForUser } from '@/lib/project-access';
+import { findTrackerPlannedDates } from '@/lib/schedule-merge';
 import Link from 'next/link';
 
 interface TrackerTemplate {
@@ -25,11 +26,17 @@ interface TrackerTemplate {
   tat: string;
 }
 
-interface CategoryPlannedDate {
+interface TaskPlannedDate {
   id: string;
   rowIndex?: number;
   project: string;
   category: string;
+  trackerId: string;
+  startDate: string;
+  endDate: string;
+}
+
+interface PlanDateDraft {
   startDate: string;
   endDate: string;
 }
@@ -55,7 +62,7 @@ export default function PMSTrackerPage() {
   const { user } = useAuth();
   const [templates, setTemplates] = useState<TrackerTemplate[]>([]);
   const [schedules, setSchedules] = useState<TrackerScheduleItem[]>([]);
-  const [plannedDates, setPlannedDates] = useState<CategoryPlannedDate[]>([]);
+  const [plannedDates, setPlannedDates] = useState<TaskPlannedDate[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -80,8 +87,36 @@ export default function PMSTrackerPage() {
   // State for project schedule
   const [localSchedule, setLocalSchedule] = useState<Record<string, TrackerScheduleItem>>({});
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [localPlanDrafts, setLocalPlanDrafts] = useState<Record<string, PlanDateDraft>>({});
+  const [savingPlanKey, setSavingPlanKey] = useState<string | null>(null);
 
   const activeProjectName = activeProject?.name || '';
+
+  const getPlanDraftKey = (category: string, trackerId: string) =>
+    `${activeProjectName}|${category}|${trackerId}`;
+
+  const findTaskSpecificPlan = (category: string, trackerId: string, taskName?: string) => {
+    const byTrackerId = plannedDates.find(
+      (p) =>
+        p.project === activeProjectName &&
+        p.category === category &&
+        p.trackerId?.trim() &&
+        p.trackerId.trim().toLowerCase() === trackerId.trim().toLowerCase()
+    );
+    if (byTrackerId) return byTrackerId;
+
+    if (taskName?.trim()) {
+      return plannedDates.find(
+        (p) =>
+          p.project === activeProjectName &&
+          p.category === category &&
+          p.trackerId?.trim() &&
+          p.trackerId.trim().toLowerCase() === taskName.trim().toLowerCase()
+      );
+    }
+
+    return undefined;
+  };
 
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return 'N/A';
@@ -106,6 +141,10 @@ export default function PMSTrackerPage() {
   useEffect(() => {
     fetchData();
   }, [user]);
+
+  useEffect(() => {
+    setLocalPlanDrafts({});
+  }, [activeProjectName]);
 
   useEffect(() => {
     if (!activeProjectName || templates.length === 0) {
@@ -194,12 +233,17 @@ export default function PMSTrackerPage() {
     ? selectedCategory
     : uniqueCategories[0] || null;
 
+  const getTaskPlan = (category: string, trackerId: string, taskName?: string) =>
+    findTrackerPlannedDates(plannedDates, activeProjectName, category, trackerId, taskName);
+
   const categoryHasPlanDates = (category: string) => {
     if (!activeProjectName) return true;
-    const plan = plannedDates.find(
-      (p) => p.project === activeProjectName && p.category === category
-    );
-    return !!(plan?.startDate?.trim() && plan?.endDate?.trim());
+    const tasks = groupedByCategory[category] || [];
+    if (tasks.length === 0) return true;
+    return tasks.every((task) => {
+      const plan = getTaskPlan(category, task.trackerId, task.taskName);
+      return !!(plan.startDate?.trim() && plan.endDate?.trim());
+    });
   };
 
   // ---- SCHEDULE HANDLERS ----
@@ -264,37 +308,68 @@ export default function PMSTrackerPage() {
     }
   };
 
-  const handleSaveCategoryPlan = async (category: string, field: 'startDate' | 'endDate', value: string) => {
-    if (!activeProjectName) return;
+  const updatePlanDraft = (
+    category: string,
+    trackerId: string,
+    taskName: string,
+    field: 'startDate' | 'endDate',
+    value: string
+  ) => {
+    const key = getPlanDraftKey(category, trackerId);
+    setLocalPlanDrafts((prev) => {
+      const saved = getTaskPlan(category, trackerId, taskName);
+      const current = prev[key] ?? { startDate: saved.startDate, endDate: saved.endDate };
+      return { ...prev, [key]: { ...current, [field]: value } };
+    });
+  };
+
+  const submitTaskPlan = async (category: string, trackerId: string, taskName: string) => {
+    if (!activeProjectName || !trackerId) return;
+
+    const key = getPlanDraftKey(category, trackerId);
+    const draft = localPlanDrafts[key];
+    if (!draft?.startDate?.trim() || !draft?.endDate?.trim()) return;
+
+    setSavingPlanKey(key);
     try {
-      setSubmitting(true);
-      const existingPlan = plannedDates.find(p => p.project === activeProjectName && p.category === category);
-      
-      const payload = { 
-        project: activeProjectName, 
-        category, 
-        startDate: field === 'startDate' ? value : (existingPlan?.startDate || ''),
-        endDate: field === 'endDate' ? value : (existingPlan?.endDate || '')
+      const existingPlan = findTaskSpecificPlan(category, trackerId, taskName);
+      const payload = {
+        project: activeProjectName,
+        category,
+        trackerId,
+        startDate: draft.startDate,
+        endDate: draft.endDate,
       };
 
-      const url = existingPlan?.rowIndex ? `/api/pms-tracker/planned?rowIndex=${existingPlan.rowIndex}` : '/api/pms-tracker/planned';
+      const url = existingPlan?.rowIndex
+        ? `/api/pms-tracker/planned?rowIndex=${existingPlan.rowIndex}`
+        : '/api/pms-tracker/planned';
       const method = existingPlan?.rowIndex ? 'PUT' : 'POST';
 
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
       });
 
       if (res.ok) {
-        await fetchData();
+        const planRes = await fetch('/api/pms-tracker/planned');
+        if (planRes.ok) {
+          setPlannedDates(await planRes.json());
+        }
+        setLocalPlanDrafts((prev) => {
+          const next = { ...prev };
+          delete next[key];
+          return next;
+        });
       } else {
-        alert('Failed to save planned dates for category.');
+        alert('Failed to save planned dates for task.');
       }
     } catch (err) {
       console.error(err);
+      alert('Failed to save planned dates for task.');
     } finally {
-      setSubmitting(false);
+      setSavingPlanKey(null);
     }
   };
 
@@ -478,7 +553,6 @@ export default function PMSTrackerPage() {
               <div className={styles.sidebarList}>
                 {uniqueCategories.map(cat => {
                   const missingPlanDates =
-                    activeTab === 'schedule' &&
                     activeProjectName &&
                     !categoryHasPlanDates(cat);
 
@@ -511,41 +585,21 @@ export default function PMSTrackerPage() {
                   item.taskName.toLowerCase().includes(searchItemName.toLowerCase()) || 
                   item.trackerId.toLowerCase().includes(searchItemName.toLowerCase())
                 );
-                
-                const currentCategoryPlan = activeCategory ? plannedDates.find(p => p.project === activeProjectName && p.category === activeCategory) : null;
-                const currentStartDate = currentCategoryPlan?.startDate || '';
-                const currentEndDate = currentCategoryPlan?.endDate || '';
 
                 return (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    {activeCategory && activeTab === 'schedule' && activeProjectName && (
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px', backgroundColor: 'var(--bg-main)', borderRadius: '12px', border: '1px solid var(--border-color)', flexWrap: 'wrap', gap: '10px', marginBottom: '16px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <Calendar size={18} color="var(--primary)" />
-                          <strong style={{ fontSize: '0.95rem', color: 'var(--text-heading)' }}>{activeCategory} Planned Dates:</strong>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-light)' }}>Start:</span>
-                            <input
-                              type="date"
-                              className={styles.customDateInput}
-                              value={currentStartDate}
-                              onChange={(e) => handleSaveCategoryPlan(activeCategory, 'startDate', e.target.value)}
-                              disabled={submitting}
-                            />
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-light)' }}>End:</span>
-                            <input
-                              type="date"
-                              className={styles.customDateInput}
-                              value={currentEndDate}
-                              onChange={(e) => handleSaveCategoryPlan(activeCategory, 'endDate', e.target.value)}
-                              disabled={submitting}
-                            />
-                          </div>
-                        </div>
+                    {activeTab === 'templates' && activeProjectName && (
+                      <div className={styles.templatePlanHint}>
+                        <Calendar size={16} />
+                        <span>
+                          Set planned start and end dates for each task below for <strong>{activeProjectName}</strong>.
+                        </span>
+                      </div>
+                    )}
+                    {activeTab === 'templates' && !activeProjectName && (
+                      <div className={styles.templatePlanHint}>
+                        <Calendar size={16} />
+                        <span>Select a project from the portfolio to set task-wise planned dates.</span>
                       </div>
                     )}
 
@@ -554,6 +608,18 @@ export default function PMSTrackerPage() {
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                         {items.map(item => {
                           const scheduleItem = localSchedule[item.id];
+                          const savedPlan = getTaskPlan(activeCategory, item.trackerId, item.taskName);
+                          const planDraftKey = getPlanDraftKey(activeCategory, item.trackerId);
+                          const planDraft = localPlanDrafts[planDraftKey];
+                          const displayPlan = planDraft ?? savedPlan;
+                          const isSavingPlan = savingPlanKey === planDraftKey;
+                          const showSavePlanBtn = Boolean(planDraft?.startDate?.trim());
+                          const canSavePlan =
+                            Boolean(planDraft?.startDate?.trim() && planDraft?.endDate?.trim()) &&
+                            !isSavingPlan;
+                          const missingTaskPlan =
+                            activeProjectName &&
+                            (!savedPlan.startDate?.trim() || !savedPlan.endDate?.trim());
 
                           return (
                             <div key={item.rowIndex} style={{
@@ -575,6 +641,9 @@ export default function PMSTrackerPage() {
                                   {isDoerMissing(item.doerName) && (
                                     <span className={styles.missingDoerDot} title="Doer not assigned" aria-label="Doer not assigned" />
                                   )}
+                                  {missingTaskPlan && (
+                                    <span className={styles.missingDateDot} title="Planned dates not set" aria-label="Planned dates not set" />
+                                  )}
                                 </div>
                                 <div className={styles.taskMetaRow}>
                                   <span className={styles.metaTag}>
@@ -586,11 +655,6 @@ export default function PMSTrackerPage() {
                                   <span className={styles.metaTag}>
                                     Doer: {item.doerName || 'Unassigned'}
                                   </span>
-                                  {activeTab === 'templates' && (
-                                    <span className={`${styles.metaTag} ${styles.metaTagTat}`}>
-                                      TAT: {item.tat || '0'} Days
-                                    </span>
-                                  )}
                                 </div>
                               </div>
 
@@ -600,11 +664,11 @@ export default function PMSTrackerPage() {
                                   <div className={styles.datesCol}>
                                     <div className={`${styles.dateRow} ${styles.dateRowPlan}`}>
                                       <span className={styles.datePart}>
-                                        <strong>Plan Start:</strong> {displayDate(currentStartDate)}
+                                        <strong>Plan Start:</strong> {displayDate(savedPlan.startDate)}
                                       </span>
                                       <span className={styles.dateDivider}>|</span>
                                       <span className={`${styles.datePart} ${styles.datePartEnd}`}>
-                                        <strong>Plan End:</strong> {displayDate(currentEndDate)}
+                                        <strong>Plan End:</strong> {displayDate(savedPlan.endDate)}
                                       </span>
                                     </div>
                                     <div className={`${styles.dateRow} ${styles.dateRowActual}`}>
@@ -655,9 +719,59 @@ export default function PMSTrackerPage() {
                                   </div>
                                 </div>
                               ) : (
-                                <div style={{ flex: '0 0 100px', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                                  <button className={styles.controlBtn} onClick={() => handleEditTemplate(item)}><Edit2 size={13} /></button>
-                                  <button className={`${styles.controlBtn} ${styles.delete}`} onClick={() => { setItemToDelete(item); setIsDeleteModalOpen(true); }}><Trash2 size={13} /></button>
+                                <div className={styles.templateRightCol}>
+                                  {activeProjectName ? (
+                                    <div className={styles.templatePlanDates}>
+                                      <div className={styles.templatePlanField}>
+                                        <span>Plan Start</span>
+                                        <input
+                                          type="date"
+                                          className={styles.customDateInput}
+                                          value={displayPlan.startDate}
+                                          onChange={(e) =>
+                                            updatePlanDraft(activeCategory, item.trackerId, item.taskName, 'startDate', e.target.value)
+                                          }
+                                          disabled={isSavingPlan}
+                                        />
+                                      </div>
+                                      <div className={styles.templatePlanField}>
+                                        <span>Plan End</span>
+                                        <input
+                                          type="date"
+                                          className={styles.customDateInput}
+                                          value={displayPlan.endDate}
+                                          onChange={(e) =>
+                                            updatePlanDraft(activeCategory, item.trackerId, item.taskName, 'endDate', e.target.value)
+                                          }
+                                          disabled={isSavingPlan}
+                                        />
+                                      </div>
+                                      {showSavePlanBtn && (
+                                        <button
+                                          type="button"
+                                          className={styles.savePlanBtn}
+                                          disabled={!canSavePlan}
+                                          onClick={() => submitTaskPlan(activeCategory, item.trackerId, item.taskName)}
+                                        >
+                                          {isSavingPlan ? (
+                                            <>
+                                              <Loader2 size={14} className={styles.spinIcon} />
+                                              Saving...
+                                            </>
+                                          ) : (
+                                            <>
+                                              <CheckSquare size={14} />
+                                              Save Dates
+                                            </>
+                                          )}
+                                        </button>
+                                      )}
+                                    </div>
+                                  ) : null}
+                                  <div className={styles.templateActions}>
+                                    <button className={styles.controlBtn} onClick={() => handleEditTemplate(item)}><Edit2 size={13} /></button>
+                                    <button className={`${styles.controlBtn} ${styles.delete}`} onClick={() => { setItemToDelete(item); setIsDeleteModalOpen(true); }}><Trash2 size={13} /></button>
+                                  </div>
                                 </div>
                               )}
                             </div>
@@ -762,15 +876,6 @@ export default function PMSTrackerPage() {
                 <option key={u.id} value={u.name}>{u.name}</option>
               ))}
             </datalist>
-          </div>
-          <div className={styles.formGroup}>
-            <label>Turnaround Time (TAT) in Days</label>
-            <input 
-              type="number" 
-              min="0"
-              value={tplForm.tat} 
-              onChange={e => setTplForm({...tplForm, tat: e.target.value})} 
-            />
           </div>
           <div className={styles.modalActions}>
             <button type="button" className={styles.cancelBtn} onClick={() => setIsTplModalOpen(false)}>Cancel</button>
