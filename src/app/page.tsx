@@ -2,31 +2,58 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+  AlertTriangle,
   BriefcaseBusiness,
-  Layers,
-  BarChart3,
-  Users as UsersIcon,
-  Activity,
-  PenTool,
-  Filter,
+  CheckCircle2,
+  Clock,
+  FileCheck,
+  FileText,
+  FolderOpen,
 } from 'lucide-react';
-import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { filterProjectsForUser } from '@/lib/project-access';
 import {
-  buildDrawingProgressItems,
-  buildTrackerProgressItemsFromProjects,
-  getDrawingProgressForProjects,
-  getTrackerProgressFromProjectSheets,
+  buildDrawingDoerTasksFromProjects,
+  buildTrackerDoerTasksFromProjects,
+  type DrawingProjectBundle,
   type TrackerProjectBundle,
 } from '@/lib/schedule-merge';
 import {
-  computeAverageProjectPercent,
-  formatProgressPercent,
-} from '@/lib/progressStats';
+  buildCategorySummaryRowsFromDrawingTasks,
+  buildCategorySummaryRowsFromTrackerTasks,
+  buildDashboardKpis,
+  buildNeedsAttentionRows,
+  buildProjectHealthRows,
+  buildProjectSummaryRowsFromDrawingTasks,
+  buildProjectSummaryRowsFromTrackerTasks,
+  buildTeamWorkloadRows,
+  buildTodayPlanCounts,
+  buildUpcoming7DayCounts,
+  buildZoneSummaryRowsFromDrawingTasks,
+  buildZoneSummaryRowsFromTrackerTasks,
+  type MomRecord,
+  type QuotationRecord,
+  type SiteVisitRecord,
+} from '@/lib/dashboard-analytics';
+import {
+  buildPcDashboardTasks,
+  filterPcTasksForUser,
+  type EmDesignTask,
+  type EmExecutionTask,
+  type HrmsCandidate,
+  type SalesLead,
+} from '@/lib/pc-dashboard';
 import GlobalLoading from '@/components/GlobalLoading';
 import SearchableSelect from '@/components/SearchableSelect';
-import { ProgressCharts } from '@/components/ProgressCharts';
+import { DashboardKpiGrid } from '@/components/dashboard/DashboardKpiGrid';
+import { DrawingTrackerSummaryGrid } from '@/components/dashboard/DrawingTrackerSummaryGrid';
+import { NeedsAttentionTable } from '@/components/dashboard/NeedsAttentionTable';
+import { ProjectHealthTable } from '@/components/dashboard/ProjectHealthTable';
+import { TodayPlanCard } from '@/components/dashboard/TodayPlanCard';
+import { UpcomingCard } from '@/components/dashboard/UpcomingCard';
+import { TeamWorkloadTable } from '@/components/dashboard/TeamWorkloadTable';
+import DashboardNavSidebar from '@/components/AppNavSidebar';
+import dashboardStyles from '@/components/dashboard/dashboard.module.css';
 import styles from './page.module.css';
 
 const ALL_PROJECTS = 'All Projects';
@@ -42,6 +69,25 @@ async function fetchJson<T>(url: string): Promise<T[]> {
   }
 }
 
+function filterByProjectNames<T extends { project?: string }>(
+  items: T[],
+  projectNames: string[]
+): T[] {
+  const allow = new Set(projectNames.map((n) => n.trim().toLowerCase()));
+  return items.filter((item) => {
+    const project = item.project?.trim().toLowerCase();
+    return project ? allow.has(project) : false;
+  });
+}
+
+function filterBundlesByProjects<T extends { project: string }>(
+  bundles: T[],
+  projectNames: string[]
+): T[] {
+  const allow = new Set(projectNames.map((n) => n.trim().toLowerCase()));
+  return bundles.filter((b) => allow.has(b.project.trim().toLowerCase()));
+}
+
 export default function Dashboard() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
@@ -49,19 +95,15 @@ export default function Dashboard() {
   const [projectsList, setProjectsList] = useState<
     Array<{ basicInfo?: { name?: string } }>
   >([]);
-  const [drawingTemplates, setDrawingTemplates] = useState<
-    Array<{ drawingNo: string; category: string }>
-  >([]);
-  const [drawingSchedule, setDrawingSchedule] = useState<
-    Array<{
-      project?: string;
-      drawingNo: string;
-      actualStartDate?: string;
-      actualEndDate?: string;
-      clientStatus?: string;
-    }>
-  >([]);
+  const [drawingBundles, setDrawingBundles] = useState<DrawingProjectBundle[]>([]);
   const [trackerBundles, setTrackerBundles] = useState<TrackerProjectBundle[]>([]);
+  const [siteVisits, setSiteVisits] = useState<SiteVisitRecord[]>([]);
+  const [momRecords, setMomRecords] = useState<MomRecord[]>([]);
+  const [quotations, setQuotations] = useState<QuotationRecord[]>([]);
+  const [emDesignTasks, setEmDesignTasks] = useState<EmDesignTask[]>([]);
+  const [emExecutionTasks, setEmExecutionTasks] = useState<EmExecutionTask[]>([]);
+  const [salesLeads, setSalesLeads] = useState<SalesLead[]>([]);
+  const [hrmsCandidates, setHrmsCandidates] = useState<HrmsCandidate[]>([]);
 
   useEffect(() => {
     if (!user) return;
@@ -71,32 +113,46 @@ export default function Dashboard() {
       try {
         const [
           projectsRaw,
-          drawingTpl,
-          drawingSched,
+          drawingAll,
           trackerAll,
+          siteVisitsRaw,
+          momRaw,
+          quotationsRaw,
+          emDesignRaw,
+          emExecutionRaw,
+          salesRaw,
+          hrmsRaw,
         ] = await Promise.all([
           fetchJson<{ basicInfo?: { name?: string } }>('/api/projects'),
-          fetchJson<{ drawingNo: string; category: string }>(
-            '/api/drawings/templates'
-          ),
-          fetchJson<{
-            project?: string;
-            drawingNo: string;
-            actualStartDate?: string;
-            actualEndDate?: string;
-            clientStatus?: string;
-          }>('/api/drawings'),
+          fetch('/api/drawings?all=1').then(async (res) => {
+            if (!res.ok) return [] as DrawingProjectBundle[];
+            const data = await res.json();
+            return Array.isArray(data) ? (data as DrawingProjectBundle[]) : [];
+          }),
           fetch('/api/pms-tracker?all=1').then(async (res) => {
             if (!res.ok) return [] as TrackerProjectBundle[];
             const data = await res.json();
             return Array.isArray(data) ? (data as TrackerProjectBundle[]) : [];
           }),
+          fetchJson<SiteVisitRecord>('/api/site-visits'),
+          fetchJson<MomRecord>('/api/mom'),
+          fetchJson<QuotationRecord>('/api/quotations'),
+          fetchJson<EmDesignTask>('/api/em/design'),
+          fetchJson<EmExecutionTask>('/api/em/execution'),
+          fetchJson<SalesLead>('/api/sales'),
+          fetchJson<HrmsCandidate>('/api/hrms'),
         ]);
 
         setProjectsList(filterProjectsForUser(projectsRaw, user));
-        setDrawingTemplates(drawingTpl);
-        setDrawingSchedule(drawingSched);
+        setDrawingBundles(drawingAll);
         setTrackerBundles(trackerAll);
+        setSiteVisits(siteVisitsRaw);
+        setMomRecords(momRaw);
+        setQuotations(quotationsRaw);
+        setEmDesignTasks(emDesignRaw);
+        setEmExecutionTasks(emExecutionRaw);
+        setSalesLeads(salesRaw);
+        setHrmsCandidates(hrmsRaw);
       } finally {
         setLoading(false);
       }
@@ -125,247 +181,217 @@ export default function Dashboard() {
     );
   }, [selectedProject, projectNames]);
 
-  const trackerProgress = useMemo(
-    () =>
-      getTrackerProgressFromProjectSheets(trackerBundles, activeProjectNames),
-    [activeProjectNames, trackerBundles]
+  const scopedDrawingBundles = useMemo(
+    () => filterBundlesByProjects(drawingBundles, activeProjectNames),
+    [drawingBundles, activeProjectNames]
   );
 
-  const drawingProgress = useMemo(
-    () =>
-      getDrawingProgressForProjects(
-        activeProjectNames,
-        drawingTemplates,
-        drawingSchedule
+  const scopedTrackerBundles = useMemo(
+    () => filterBundlesByProjects(trackerBundles, activeProjectNames),
+    [trackerBundles, activeProjectNames]
+  );
+
+  const scopedQuotations = useMemo(
+    () => filterByProjectNames(quotations, activeProjectNames),
+    [quotations, activeProjectNames]
+  );
+
+  const scopedSiteVisits = useMemo(
+    () => filterByProjectNames(siteVisits, activeProjectNames),
+    [siteVisits, activeProjectNames]
+  );
+
+  const scopedMomRecords = useMemo(
+    () => filterByProjectNames(momRecords, activeProjectNames),
+    [momRecords, activeProjectNames]
+  );
+
+  const pcTasks = useMemo(() => {
+    const tasks = buildPcDashboardTasks({
+      drawingBundles: scopedDrawingBundles,
+      trackerBundles: scopedTrackerBundles,
+      emDesignTasks: emDesignTasks.filter((t) =>
+        activeProjectNames.some(
+          (name) =>
+            t.project_name?.trim().toLowerCase() === name.trim().toLowerCase()
+        )
       ),
-    [activeProjectNames, drawingTemplates, drawingSchedule]
+      emExecutionTasks: emExecutionTasks.filter((t) =>
+        activeProjectNames.some(
+          (name) =>
+            t.project_name?.trim().toLowerCase() === name.trim().toLowerCase()
+        )
+      ),
+      salesLeads,
+      hrmsCandidates,
+    });
+    return filterPcTasksForUser(tasks, user);
+  }, [
+    scopedDrawingBundles,
+    scopedTrackerBundles,
+    emDesignTasks,
+    emExecutionTasks,
+    salesLeads,
+    hrmsCandidates,
+    activeProjectNames,
+    user,
+  ]);
+
+  const kpis = useMemo(
+    () => buildDashboardKpis(activeProjectNames, pcTasks, scopedQuotations),
+    [activeProjectNames, pcTasks, scopedQuotations]
   );
 
-  const trackerAveragePercent = useMemo(() => {
-    if (selectedProject !== ALL_PROJECTS) return trackerProgress.percent;
-    return computeAverageProjectPercent(projectNames, (projectName) =>
-      buildTrackerProgressItemsFromProjects(trackerBundles, [projectName])
-    );
-  }, [
-    selectedProject,
-    trackerProgress.percent,
-    projectNames,
-    trackerBundles,
-  ]);
+  const needsAttentionRows = useMemo(
+    () => buildNeedsAttentionRows(pcTasks, 10),
+    [pcTasks]
+  );
 
-  const drawingAveragePercent = useMemo(() => {
-    if (selectedProject !== ALL_PROJECTS) return drawingProgress.percent;
-    return computeAverageProjectPercent(projectNames, (projectName) =>
-      buildDrawingProgressItems([projectName], drawingTemplates, drawingSchedule)
-    );
-  }, [
-    selectedProject,
-    drawingProgress.percent,
-    projectNames,
-    drawingTemplates,
-    drawingSchedule,
-  ]);
+  const healthRows = useMemo(
+    () =>
+      buildProjectHealthRows(
+        activeProjectNames,
+        scopedDrawingBundles,
+        scopedTrackerBundles,
+        scopedSiteVisits
+      ),
+    [activeProjectNames, scopedDrawingBundles, scopedTrackerBundles, scopedSiteVisits]
+  );
 
-  const scopeLabel =
-    selectedProject === ALL_PROJECTS
-      ? `All Projects — Cumulative (${projectNames.length} projects)`
-      : selectedProject;
+  const drawingTasks = useMemo(
+    () => buildDrawingDoerTasksFromProjects(scopedDrawingBundles, activeProjectNames),
+    [scopedDrawingBundles, activeProjectNames]
+  );
+
+  const trackerTasks = useMemo(
+    () => buildTrackerDoerTasksFromProjects(scopedTrackerBundles, activeProjectNames),
+    [scopedTrackerBundles, activeProjectNames]
+  );
+
+  const todayPlanCounts = useMemo(
+    () =>
+      buildTodayPlanCounts(
+        scopedSiteVisits,
+        scopedMomRecords,
+        activeProjectNames,
+        drawingTasks,
+        trackerTasks
+      ),
+    [scopedSiteVisits, scopedMomRecords, activeProjectNames, drawingTasks, trackerTasks]
+  );
+
+  const summaryData = useMemo(
+    () => ({
+      drawingByProject: buildProjectSummaryRowsFromDrawingTasks(drawingTasks),
+      trackerByProject: buildProjectSummaryRowsFromTrackerTasks(trackerTasks),
+      drawingByCategory: buildCategorySummaryRowsFromDrawingTasks(drawingTasks),
+      trackerByCategory: buildCategorySummaryRowsFromTrackerTasks(trackerTasks),
+      drawingByZone: buildZoneSummaryRowsFromDrawingTasks(drawingTasks),
+      trackerByZone: buildZoneSummaryRowsFromTrackerTasks(trackerTasks),
+    }),
+    [drawingTasks, trackerTasks]
+  );
+
+  const teamWorkloadRows = useMemo(
+    () => buildTeamWorkloadRows(drawingTasks, trackerTasks),
+    [drawingTasks, trackerTasks]
+  );
+
+  const upcomingCounts = useMemo(
+    () => buildUpcoming7DayCounts(drawingTasks, trackerTasks),
+    [drawingTasks, trackerTasks]
+  );
+
+  const kpiItems = useMemo(
+    () => [
+      {
+        label: 'Active Projects',
+        value: kpis.activeProjects,
+        icon: <FolderOpen size={18} />,
+        iconBg: '#dbeafe',
+        iconColor: '#2563eb',
+        viewAllHref: '/projects',
+      },
+      {
+        label: 'On Track',
+        value: kpis.onTrack,
+        icon: <CheckCircle2 size={18} />,
+        iconBg: '#dcfce7',
+        iconColor: '#16a34a',
+      },
+      {
+        label: 'Delayed Projects',
+        value: kpis.delayedProjects,
+        icon: <Clock size={18} />,
+        iconBg: '#fee2e2',
+        iconColor: '#dc2626',
+        viewAllHref: '/pc-dashboard',
+      },
+      {
+        label: 'Overdue Tasks',
+        value: kpis.overdueTasks,
+        icon: <AlertTriangle size={18} />,
+        iconBg: '#ffedd5',
+        iconColor: '#ea580c',
+        viewAllHref: '/pc-dashboard',
+      },
+      {
+        label: 'Approvals Pending',
+        value: kpis.approvalsPending,
+        icon: <FileCheck size={18} />,
+        iconBg: '#ede9fe',
+        iconColor: '#7c3aed',
+      },
+      {
+        label: 'Drawings Overdue',
+        value: kpis.drawingsOverdue,
+        icon: <FileText size={18} />,
+        iconBg: '#ccfbf1',
+        iconColor: '#0d9488',
+        viewAllHref: '/drawings',
+      },
+    ],
+    [kpis]
+  );
 
   if (loading) {
     return <GlobalLoading show text="Loading dashboard..." />;
   }
 
   return (
-    <div className={styles.dashboard}>
-      <div className={styles.pageHeader}>
-        <div>
+    <div className={styles.dashboardShell}>
+      <DashboardNavSidebar />
+      <div className={styles.dashboardMain}>
+        <div className={styles.pageHeader}>
           <h2 className={styles.pageTitle}>Dashboard</h2>
+          <div className={styles.headerFilter}>
+            <SearchableSelect
+              options={projectOptions}
+              value={selectedProject}
+              onChange={setSelectedProject}
+              placeholder="All Projects"
+              icon={<BriefcaseBusiness size={16} />}
+            />
+          </div>
         </div>
-        <div className={styles.actionButtons}>
-          <Link
-            href="/sales"
-            className={styles.usersBtn}
-            style={{
-              background: 'linear-gradient(to right, #ff9966, #ff5e62)',
-              color: 'white',
-              marginRight: '10px',
-              border: 'none',
-            }}
-          >
-            <BarChart3 size={18} />
-            Sales
-          </Link>
-          <Link
-            href="/em"
-            className={styles.usersBtn}
-            style={{
-              background: 'linear-gradient(to right, #8a2387, #e94057, #f27121)',
-              color: 'white',
-              marginRight: '10px',
-              border: 'none',
-            }}
-          >
-            <Layers size={18} />
-            EM
-          </Link>
-          <Link
-            href="/hrms"
-            className={styles.usersBtn}
-            style={{
-              background: 'linear-gradient(to right, #00c6ff, #0072ff)',
-              color: 'white',
-              marginRight: '10px',
-              border: 'none',
-            }}
-          >
-            <UsersIcon size={18} />
-            HRMS
-          </Link>
-          {user?.role === 'Admin' && (
-            <Link
-              href="/users"
-              className={styles.usersBtn}
-              style={{
-                background: 'linear-gradient(to right, #11998e, #38ef7d)',
-                color: 'white',
-                marginRight: '10px',
-                border: 'none',
-              }}
-            >
-              <UsersIcon size={18} />
-              Users
-            </Link>
-          )}
-          <Link
-            href="/projects"
-            className={styles.portfolioBtn}
-            style={{
-              background: 'linear-gradient(to right, #4b6cb7, #182848)',
-              color: 'white',
-              border: 'none',
-            }}
-          >
-            <BriefcaseBusiness size={18} />
-            Go to Project Portfolio
-          </Link>
-        </div>
-      </div>
 
-      <div className={styles.filterBar}>
-        <div className={styles.filterLabel}>
-          <Filter size={16} />
-          <span>Project Filter</span>
-        </div>
-        <div className={styles.filterSelect}>
-          <SearchableSelect
-            options={projectOptions}
-            value={selectedProject}
-            onChange={setSelectedProject}
-            placeholder="Select project"
-            icon={<BriefcaseBusiness size={16} />}
+        <DashboardKpiGrid items={kpiItems} />
+
+        <div className={dashboardStyles.middleRow}>
+          <NeedsAttentionTable rows={needsAttentionRows} />
+          <ProjectHealthTable
+            rows={healthRows}
+            onSelectProject={setSelectedProject}
           />
         </div>
-        <span className={styles.filterScope}>{scopeLabel}</span>
-      </div>
 
-      <div className={styles.statsGrid}>
-        <div className={styles.statCard}>
-          <div className={styles.statHeader}>
-            <span className={styles.statTitle}>PROJECT TRACKER</span>
-            <div
-              className={styles.statIconBg}
-              style={{ backgroundColor: '#3bafda15', color: '#3bafda' }}
-            >
-              <Activity size={20} />
-            </div>
-          </div>
-          <div className={styles.statBody}>
-            <h3>{formatProgressPercent(trackerProgress.completed, trackerProgress.total, trackerProgress.percent)}</h3>
-            <span className={`${styles.statChange} ${styles.neutral}`}>
-              {trackerProgress.completed} of {trackerProgress.total} completed
-              {trackerProgress.inProgress > 0
-                ? ` · ${trackerProgress.inProgress} in progress`
-                : ''}
-            </span>
-          </div>
+        <div className={dashboardStyles.bottomRow}>
+          <TodayPlanCard counts={todayPlanCounts} />
+          <UpcomingCard counts={upcomingCounts} />
+          <TeamWorkloadTable rows={teamWorkloadRows} />
         </div>
 
-        <div className={styles.statCard}>
-          <div className={styles.statHeader}>
-            <span className={styles.statTitle}>TRACKER AVG / PROJECT</span>
-            <div
-              className={styles.statIconBg}
-              style={{ backgroundColor: '#1abc9c15', color: '#1abc9c' }}
-            >
-              <Activity size={20} />
-            </div>
-          </div>
-          <div className={styles.statBody}>
-            <h3>{trackerAveragePercent}%</h3>
-            <span className={`${styles.statChange} ${styles.up}`}>
-              {trackerProgress.completed} / {trackerProgress.total} completed
-            </span>
-          </div>
-        </div>
-
-        <div className={styles.statCard}>
-          <div className={styles.statHeader}>
-            <span className={styles.statTitle}>DRAWING SCHEDULE</span>
-            <div
-              className={styles.statIconBg}
-              style={{ backgroundColor: '#8a2be215', color: '#8a2be2' }}
-            >
-              <PenTool size={20} />
-            </div>
-          </div>
-          <div className={styles.statBody}>
-            <h3>{formatProgressPercent(drawingProgress.completed, drawingProgress.total, drawingProgress.percent)}</h3>
-            <span className={`${styles.statChange} ${styles.neutral}`}>
-              {drawingProgress.completed} of {drawingProgress.total} completed
-              {drawingProgress.inProgress > 0
-                ? ` · ${drawingProgress.inProgress} in progress`
-                : ''}
-            </span>
-          </div>
-        </div>
-
-        <div className={styles.statCard}>
-          <div className={styles.statHeader}>
-            <span className={styles.statTitle}>DRAWINGS AVG / PROJECT</span>
-            <div
-              className={styles.statIconBg}
-              style={{ backgroundColor: '#f7b84b15', color: '#f7b84b' }}
-            >
-              <PenTool size={20} />
-            </div>
-          </div>
-          <div className={styles.statBody}>
-            <h3>{drawingAveragePercent}%</h3>
-            <span className={`${styles.statChange} ${styles.up}`}>
-              {drawingProgress.completed} / {drawingProgress.total} completed
-            </span>
-          </div>
-        </div>
-      </div>
-
-      <div className={styles.moduleSection}>
-        <div className={styles.moduleSectionHeader}>
-          <Activity size={20} color="#3bafda" />
-          <h4>Project Tracker</h4>
-        </div>
-        <ProgressCharts title="Project Tracker" stats={trackerProgress} barColor="#3bafda" />
-      </div>
-
-      <div className={styles.moduleSection}>
-        <div className={styles.moduleSectionHeader}>
-          <PenTool size={20} color="#8a2be2" />
-          <h4>Drawing Schedule</h4>
-        </div>
-        <ProgressCharts
-          title="Drawing Schedule"
-          stats={drawingProgress}
-          barColor="#8a2be2"
-        />
+        <DrawingTrackerSummaryGrid data={summaryData} />
       </div>
     </div>
   );

@@ -154,6 +154,24 @@ export interface TrackerProjectTask {
   actualEndDate?: string;
 }
 
+/** Installed project-sheet drawing (dates/status on the row). */
+export interface DrawingProjectTask {
+  id: string;
+  rowIndex?: number;
+  drawingNo: string;
+  zone?: string;
+  areaName: string;
+  drawingName: string;
+  category: string;
+  plannedStartDate?: string;
+  plannedEndDate?: string;
+  actualStartDate?: string;
+  actualEndDate?: string;
+  revisionNo?: string;
+  lastUpdated?: string;
+  drawingImage?: string;
+}
+
 export interface ClientPortalData {
   projectsList: Project[];
   requirements: Requirement[];
@@ -162,9 +180,7 @@ export interface ClientPortalData {
   directory: DirectoryEntry[];
   quotations: Quotation[];
   audits: Audit[];
-  drawingTemplates: DrawingTemplate[];
-  drawingSchedule: DrawingScheduleItem[];
-  drawingPlanned: DrawingPlannedDate[];
+  drawingTasks: DrawingProjectTask[];
   trackerTasks: TrackerProjectTask[];
 }
 
@@ -172,14 +188,13 @@ export interface MergedDrawingRow {
   id: string;
   drawingNo: string;
   drawingName: string;
+  zone?: string;
   areaName: string;
   category: string;
   planStartDate: string;
   planEndDate: string;
   actualStartDate: string;
   actualEndDate: string;
-  rsDesignStatus: string;
-  clientStatus: string;
   drawingImage: string;
 }
 

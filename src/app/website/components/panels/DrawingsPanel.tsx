@@ -5,7 +5,7 @@ import { PenTool, Link2 } from 'lucide-react';
 import { getModuleConfig } from '../../constants/clientModules';
 import { computeDrawingProgress } from '../../utils/progressStats';
 import { ModuleProgressCharts } from '../ModuleProgressCharts';
-import { PanelShell, EmptyState, StatusBadge, formatDate } from '../PanelShell';
+import { PanelShell, EmptyState, formatDate } from '../PanelShell';
 import styles from '../../website.module.css';
 import type { MergedDrawingRow } from '../../types';
 
@@ -28,13 +28,13 @@ export function DrawingsPanel({ items }: { items: MergedDrawingRow[] }) {
               <thead>
                 <tr>
                   <th>Drawing</th>
+                  <th>Zone</th>
+                  <th>Area</th>
                   <th>Category</th>
                   <th>Plan Start</th>
                   <th>Plan End</th>
                   <th>Actual Start</th>
                   <th>Actual End</th>
-                  <th>RS Status</th>
-                  <th>Client Status</th>
                   <th>File</th>
                 </tr>
               </thead>
@@ -45,13 +45,13 @@ export function DrawingsPanel({ items }: { items: MergedDrawingRow[] }) {
                       <strong>{item.drawingName}</strong>
                       <span className={styles.tableSub}>{item.drawingNo}</span>
                     </td>
+                    <td>{item.zone || '—'}</td>
+                    <td>{item.areaName || '—'}</td>
                     <td>{item.category}</td>
                     <td>{formatDate(item.planStartDate)}</td>
                     <td>{formatDate(item.planEndDate)}</td>
                     <td>{formatDate(item.actualStartDate)}</td>
                     <td>{formatDate(item.actualEndDate)}</td>
-                    <td><StatusBadge label={item.rsDesignStatus} tone="info" /></td>
-                    <td><StatusBadge label={item.clientStatus} tone="warning" /></td>
                     <td>
                       {item.drawingImage ? (
                         <a

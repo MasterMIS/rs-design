@@ -2,8 +2,6 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { filterProjectsForUser } from '@/lib/project-access';
-import { mergeDrawingScheduleEntries } from '@/lib/schedule-merge';
-import { filterByProject } from '../utils/filterByProject';
 import {
   computeDrawingProgress,
   computeTrackerProgress,
@@ -12,9 +10,7 @@ import type {
   Audit,
   ClientPortalData,
   DirectoryEntry,
-  DrawingPlannedDate,
-  DrawingScheduleItem,
-  DrawingTemplate,
+  DrawingProjectTask,
   MergedDrawingRow,
   MergedTrackerRow,
   ModuleCounts,
@@ -51,9 +47,7 @@ const emptyData: ClientPortalData = {
   directory: [],
   quotations: [],
   audits: [],
-  drawingTemplates: [],
-  drawingSchedule: [],
-  drawingPlanned: [],
+  drawingTasks: [],
   trackerTasks: [],
 };
 
@@ -76,9 +70,6 @@ export function useClientPortalData(user: AuthUser) {
           directory,
           quotations,
           audits,
-          drawingTemplates,
-          drawingSchedule,
-          drawingPlanned,
         ] = await Promise.all([
           fetchJson<Project>('/api/projects'),
           fetchJson<Requirement>('/api/requirements'),
@@ -87,9 +78,6 @@ export function useClientPortalData(user: AuthUser) {
           fetchJson<DirectoryEntry>('/api/directory'),
           fetchJson<Quotation>('/api/quotations'),
           fetchJson<Audit>('/api/audits'),
-          fetchJson<DrawingTemplate>('/api/drawings/templates'),
-          fetchJson<DrawingScheduleItem>('/api/drawings'),
-          fetchJson<DrawingPlannedDate>('/api/drawings/planned'),
         ]);
 
         const projectsList = filterProjectsForUser(projectsRaw, user);
@@ -101,11 +89,17 @@ export function useClientPortalData(user: AuthUser) {
           initialProject = projectsList[0].basicInfo?.name || '';
         }
 
+        let drawingTasks: DrawingProjectTask[] = [];
         let trackerTasks: TrackerProjectTask[] = [];
         if (initialProject) {
-          const trackerRes = await fetch(
-            `/api/pms-tracker?project=${encodeURIComponent(initialProject)}`
-          );
+          const [drawingRes, trackerRes] = await Promise.all([
+            fetch(`/api/drawings?project=${encodeURIComponent(initialProject)}`),
+            fetch(`/api/pms-tracker?project=${encodeURIComponent(initialProject)}`),
+          ]);
+          if (drawingRes.ok) {
+            const drawingData = await drawingRes.json();
+            drawingTasks = Array.isArray(drawingData.drawings) ? drawingData.drawings : [];
+          }
           if (trackerRes.ok) {
             const trackerData = await trackerRes.json();
             trackerTasks = Array.isArray(trackerData.tasks) ? trackerData.tasks : [];
@@ -120,9 +114,7 @@ export function useClientPortalData(user: AuthUser) {
           directory,
           quotations,
           audits,
-          drawingTemplates,
-          drawingSchedule,
-          drawingPlanned,
+          drawingTasks,
           trackerTasks,
         });
         setSelectedProjectName(initialProject);
@@ -138,29 +130,35 @@ export function useClientPortalData(user: AuthUser) {
 
   useEffect(() => {
     if (!selectedProjectName) {
-      setData((prev) => ({ ...prev, trackerTasks: [] }));
+      setData((prev) => ({ ...prev, drawingTasks: [], trackerTasks: [] }));
       return;
     }
 
     let cancelled = false;
     (async () => {
       try {
-        const trackerRes = await fetch(
-          `/api/pms-tracker?project=${encodeURIComponent(selectedProjectName)}`
-        );
+        const [drawingRes, trackerRes] = await Promise.all([
+          fetch(`/api/drawings?project=${encodeURIComponent(selectedProjectName)}`),
+          fetch(`/api/pms-tracker?project=${encodeURIComponent(selectedProjectName)}`),
+        ]);
         if (cancelled) return;
+
+        let drawingTasks: DrawingProjectTask[] = [];
+        let trackerTasks: TrackerProjectTask[] = [];
+
+        if (drawingRes.ok) {
+          const drawingData = await drawingRes.json();
+          drawingTasks = Array.isArray(drawingData.drawings) ? drawingData.drawings : [];
+        }
         if (trackerRes.ok) {
           const trackerData = await trackerRes.json();
-          setData((prev) => ({
-            ...prev,
-            trackerTasks: Array.isArray(trackerData.tasks) ? trackerData.tasks : [],
-          }));
-        } else {
-          setData((prev) => ({ ...prev, trackerTasks: [] }));
+          trackerTasks = Array.isArray(trackerData.tasks) ? trackerData.tasks : [];
         }
+
+        setData((prev) => ({ ...prev, drawingTasks, trackerTasks }));
       } catch {
         if (!cancelled) {
-          setData((prev) => ({ ...prev, trackerTasks: [] }));
+          setData((prev) => ({ ...prev, drawingTasks: [], trackerTasks: [] }));
         }
       }
     })();
@@ -181,44 +179,45 @@ export function useClientPortalData(user: AuthUser) {
 
   const filtered = useMemo(
     () => ({
-      requirements: filterByProject(data.requirements, selectedProjectName),
-      selections: filterByProject(data.selections, selectedProjectName),
-      momList: filterByProject(data.momList, selectedProjectName),
-      directory: filterByProject(data.directory, selectedProjectName),
-      quotations: filterByProject(data.quotations, selectedProjectName),
-      audits: filterByProject(data.audits, selectedProjectName),
-      drawingSchedule: filterByProject(data.drawingSchedule, selectedProjectName),
-      drawingPlanned: filterByProject(data.drawingPlanned, selectedProjectName),
+      requirements: data.requirements.filter(
+        (r) => r.project?.toLowerCase() === selectedProjectName.toLowerCase()
+      ),
+      selections: data.selections.filter(
+        (s) => s.project?.toLowerCase() === selectedProjectName.toLowerCase()
+      ),
+      momList: data.momList.filter(
+        (m) => m.project?.toLowerCase() === selectedProjectName.toLowerCase()
+      ),
+      directory: data.directory.filter(
+        (d) => d.project?.toLowerCase() === selectedProjectName.toLowerCase()
+      ),
+      quotations: data.quotations.filter(
+        (q) => q.project?.toLowerCase() === selectedProjectName.toLowerCase()
+      ),
+      audits: data.audits.filter(
+        (a) => a.project?.toLowerCase() === selectedProjectName.toLowerCase()
+      ),
+      drawingTasks: data.drawingTasks,
       trackerTasks: data.trackerTasks,
     }),
     [data, selectedProjectName]
   );
 
   const mergedDrawings = useMemo((): MergedDrawingRow[] => {
-    return data.drawingTemplates.map((tpl) => {
-      const entries = filtered.drawingSchedule.filter(
-        (s) => s.drawingNo === tpl.drawingNo
-      );
-      const schedule = mergeDrawingScheduleEntries(entries);
-      const catPlan = filtered.drawingPlanned.find(
-        (p) => p.category === tpl.category
-      );
-      return {
-        id: tpl.id,
-        drawingNo: tpl.drawingNo,
-        drawingName: tpl.drawingName,
-        areaName: tpl.areaName,
-        category: tpl.category,
-        planStartDate: catPlan?.planStartDate || '',
-        planEndDate: catPlan?.planEndDate || '',
-        actualStartDate: schedule?.actualStartDate || '',
-        actualEndDate: schedule?.actualEndDate || '',
-        rsDesignStatus: schedule?.rsDesignStatus || 'Pending',
-        clientStatus: schedule?.clientStatus || 'Pending',
-        drawingImage: schedule?.drawingImage || '',
-      };
-    });
-  }, [data.drawingTemplates, filtered.drawingSchedule, filtered.drawingPlanned]);
+    return filtered.drawingTasks.map((task) => ({
+      id: task.id,
+      drawingNo: task.drawingNo,
+      drawingName: task.drawingName,
+      zone: task.zone,
+      areaName: task.areaName,
+      category: task.category,
+      planStartDate: task.plannedStartDate || '',
+      planEndDate: task.plannedEndDate || '',
+      actualStartDate: task.actualStartDate || '',
+      actualEndDate: task.actualEndDate || '',
+      drawingImage: task.drawingImage || '',
+    }));
+  }, [filtered.drawingTasks]);
 
   const mergedTracker = useMemo((): MergedTrackerRow[] => {
     return filtered.trackerTasks.map((task) => ({

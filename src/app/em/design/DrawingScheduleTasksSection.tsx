@@ -17,10 +17,9 @@ import { useProject } from '@/context/ProjectContext';
 import { filterProjectsForUser } from '@/lib/project-access';
 import { canViewAllEmTasks, getDoerLabel, isTaskAssignedToUser, matchesPlanDateRange } from '@/lib/em-access';
 import {
-  buildDrawingDoerTasks,
-  type DrawingPlannedRow,
-  type DrawingScheduleRow,
-  type DrawingTemplateFull,
+  buildDrawingDoerTasksFromProjects,
+  type DrawingProjectBundle,
+  type DrawingProjectTask,
   type MergedDrawingDoerTask,
 } from '@/lib/schedule-merge';
 import MultiSelectFilter from '@/components/MultiSelectFilter';
@@ -45,9 +44,7 @@ export function DrawingScheduleTasksSection({ onToast, embedded = false }: Drawi
 
   const [loading, setLoading] = useState(true);
   const [savingKey, setSavingKey] = useState<string | null>(null);
-  const [templates, setTemplates] = useState<DrawingTemplateFull[]>([]);
-  const [schedule, setSchedule] = useState<DrawingScheduleRow[]>([]);
-  const [planned, setPlanned] = useState<DrawingPlannedRow[]>([]);
+  const [bundles, setBundles] = useState<DrawingProjectBundle[]>([]);
   const [projectNames, setProjectNames] = useState<string[]>([]);
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -62,28 +59,27 @@ export function DrawingScheduleTasksSection({ onToast, embedded = false }: Drawi
   const fetchDrawingData = async () => {
     setLoading(true);
     try {
-      const [tplRes, schRes, planRes, projRes] = await Promise.all([
-        fetch('/api/drawings/templates'),
-        fetch('/api/drawings'),
-        fetch('/api/drawings/planned'),
+      const [allRes, projRes] = await Promise.all([
+        fetch('/api/drawings?all=1'),
         fetch('/api/projects'),
       ]);
 
-      const tplData = tplRes.ok ? await tplRes.json() : [];
-      const schData = schRes.ok ? await schRes.json() : [];
-      const planData = planRes.ok ? await planRes.json() : [];
+      const allData = allRes.ok ? await allRes.json() : [];
       const projData = projRes.ok ? await projRes.json() : [];
 
-      setTemplates(Array.isArray(tplData) ? tplData : []);
-      setSchedule(Array.isArray(schData) ? schData : []);
-      setPlanned(Array.isArray(planData) ? planData : []);
-
       const accessible = filterProjectsForUser(Array.isArray(projData) ? projData : [], user);
-      setProjectNames(
-        accessible
-          .map((p: { basicInfo?: { name?: string } }) => p.basicInfo?.name?.trim())
-          .filter((name): name is string => !!name)
-      );
+      const names = accessible
+        .map((p: { basicInfo?: { name?: string } }) => p.basicInfo?.name?.trim())
+        .filter((name: string | undefined): name is string => !!name);
+      setProjectNames(names);
+
+      const parsed: DrawingProjectBundle[] = Array.isArray(allData)
+        ? allData.map((b: { project: string; drawings: DrawingProjectTask[] }) => ({
+            project: b.project,
+            drawings: Array.isArray(b.drawings) ? b.drawings : [],
+          }))
+        : [];
+      setBundles(parsed);
     } catch (err) {
       console.error('Failed to load drawing schedule tasks', err);
     } finally {
@@ -96,8 +92,8 @@ export function DrawingScheduleTasksSection({ onToast, embedded = false }: Drawi
   }, [user]);
 
   const allRows = useMemo(
-    () => buildDrawingDoerTasks(projectNames, templates, schedule, planned),
-    [projectNames, templates, schedule, planned]
+    () => buildDrawingDoerTasksFromProjects(bundles, projectNames),
+    [bundles, projectNames]
   );
 
   const roleFilteredRows = useMemo(() => {
@@ -111,7 +107,8 @@ export function DrawingScheduleTasksSection({ onToast, embedded = false }: Drawi
         row.project.toLowerCase().includes(searchTerm.toLowerCase()) ||
         row.drawingName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         row.doerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        row.category.toLowerCase().includes(searchTerm.toLowerCase());
+        row.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        row.zone.toLowerCase().includes(searchTerm.toLowerCase());
 
       const status = row.completed
         ? 'Completed'
@@ -155,44 +152,49 @@ export function DrawingScheduleTasksSection({ onToast, embedded = false }: Drawi
     row: MergedDrawingDoerTask,
     action: 'start' | 'work_end'
   ) => {
+    if (!row.rowIndex) {
+      alert('Drawing row is missing. Open the project drawing schedule to fix it.');
+      return;
+    }
+
     setSavingKey(row.key);
     try {
       const today = new Date().toISOString().split('T')[0];
       let actualStartDate = row.actualStartDate || '';
       let actualEndDate = row.actualEndDate || '';
-      let rsDesignStatus = row.rsDesignStatus || 'Pending';
-      let revisionNo = parseInt(row.revisionNo || '0', 10);
 
       if (action === 'start' && !actualStartDate) {
         actualStartDate = today;
-        rsDesignStatus = 'In Progress';
-        revisionNo += 1;
-      }
-
-      if (action === 'work_end' && actualStartDate && !actualEndDate) {
+      } else if (action === 'work_end' && actualStartDate && !actualEndDate) {
         actualEndDate = today;
-        rsDesignStatus = 'Approved';
-        revisionNo += 1;
+      } else {
+        return;
       }
 
-      const res = await fetch('/api/drawings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          project: row.project,
-          items: [
-            {
-              drawingNo: row.drawingNo,
-              actualStartDate,
-              actualEndDate,
-              revisionNo: String(revisionNo),
-              drawingImage: row.drawingImage || '',
-              rsDesignStatus,
-              clientStatus: row.clientStatus || 'Pending',
-            },
-          ],
-        }),
-      });
+      const payload = {
+        drawingNo: row.drawingNo,
+        zone: row.zone,
+        areaName: row.areaName,
+        drawingName: row.drawingName,
+        resourceName: row.resourceName,
+        doerName: row.doerName,
+        category: row.category,
+        plannedStartDate: row.planStartDate,
+        plannedEndDate: row.planEndDate,
+        actualStartDate,
+        actualEndDate,
+        revisionNo: row.revisionNo || '0',
+        drawingImage: row.drawingImage || '',
+      };
+
+      const res = await fetch(
+        `/api/drawings?project=${encodeURIComponent(row.project)}&rowIndex=${row.rowIndex}`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        }
+      );
 
       if (res.ok) {
         onToast(
@@ -374,6 +376,8 @@ export function DrawingScheduleTasksSection({ onToast, embedded = false }: Drawi
               <tr>
                 <th>Project</th>
                 <th>Drawing</th>
+                <th>Zone</th>
+                <th>Area</th>
                 <th>Category</th>
                 <th>Doer</th>
                 <th>Plan Start</th>
@@ -387,8 +391,8 @@ export function DrawingScheduleTasksSection({ onToast, embedded = false }: Drawi
             <tbody>
               {paginatedRows.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className={styles.sectionEmpty}>
-                    No drawing schedule tasks found.
+                  <td colSpan={12} className={styles.sectionEmpty}>
+                    No drawing schedule tasks found. Install drawings on each project sheet first.
                   </td>
                 </tr>
               ) : (
@@ -419,6 +423,8 @@ export function DrawingScheduleTasksSection({ onToast, embedded = false }: Drawi
                         <strong>{row.drawingName}</strong>
                         <span className={styles.cellSub}>{row.drawingNo}</span>
                       </td>
+                      <td>{row.zone || '—'}</td>
+                      <td>{row.areaName || '—'}</td>
                       <td>{row.category}</td>
                       <td>
                         <span className={styles.cellWithIcon}>
@@ -487,7 +493,7 @@ export function DrawingScheduleTasksSection({ onToast, embedded = false }: Drawi
       )}
 
       <p className={styles.sectionFootnote}>
-        Need full revision upload and client status?{' '}
+        Need revision upload?{' '}
         <Link href="/drawings">Open Drawing Schedule</Link> in the project.
       </p>
     </>

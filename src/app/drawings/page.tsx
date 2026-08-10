@@ -1,116 +1,137 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Plus, Search, Edit2, Trash2, Settings,
-  Building, Tag, CheckSquare, X, AlertCircle,
-  ListTodo, ChevronRight, UploadCloud, User,
-  MonitorPlay, Bed, Hammer, HardHat, Zap, Droplet, Wind,
-  Paintbrush, Utensils, Bath, Grid, FileText, CheckCircle2, LayoutTemplate,
-  Calendar, Clock, FileImage, Download, History
+  CheckSquare, Calendar, User, Grid, LayoutTemplate, Loader2, Download, MapPin,
+  Sparkles, CheckCircle2, Circle, AlertCircle, X, UploadCloud, FileText,
 } from 'lucide-react';
 import styles from './drawings.module.css';
 import Modal from '@/components/Modal';
 import { useProject } from '@/context/ProjectContext';
 import { useAuth } from '@/context/AuthContext';
-import { filterProjectsForUser } from '@/lib/project-access';
+import { CONFIG } from '@/lib/config';
 import Link from 'next/link';
 
-interface DrawingTemplate {
+interface InstallLog {
+  id: string;
+  text: string;
+  tone: 'info' | 'ok' | 'warn' | 'run';
+}
+
+interface SourcePreview {
+  label: string;
+  drawingCount: number;
+  zones: number;
+  categories: number;
+}
+
+interface DrawingItem {
   id: string;
   rowIndex: number;
   drawingNo: string;
+  zone: string;
   areaName: string;
   drawingName: string;
   resourceName: string;
   doerName: string;
   category: string;
-}
-
-interface DrawingScheduleItem {
-  id: string;
-  rowIndex?: number;
-  project: string;
-  drawingNo: string;
-  areaName: string;
-  drawingName: string;
-  resourceName: string;
-  doerName: string;
-  planStartDate: string;
-  planEndDate: string;
+  plannedStartDate: string;
+  plannedEndDate: string;
   actualStartDate: string;
   actualEndDate: string;
-  category: string;
   revisionNo: string;
   lastUpdated: string;
   drawingImage: string;
-  rsDesignStatus: string;
-  clientStatus: string;
-  tplId?: string;
 }
 
-interface CategoryPlannedDate {
-  id: string;
-  rowIndex?: number;
-  project: string;
+interface DrawingForm {
+  drawingNo: string;
+  zone: string;
+  areaName: string;
+  drawingName: string;
+  resourceName: string;
+  doerName: string;
   category: string;
-  planStartDate: string;
-  planEndDate: string;
+  plannedStartDate: string;
+  plannedEndDate: string;
+  actualStartDate: string;
+  actualEndDate: string;
+  revisionNo: string;
+  drawingImage: string;
 }
 
-const getCategoryIcon = (name: string, size = 16) => {
-  const lowerName = name.toLowerCase();
-  const style = { marginRight: '8px', flexShrink: 0 };
-  
-  if (lowerName.includes('architecture') || lowerName.includes('civil')) return <Building size={size} style={style} />;
-  if (lowerName.includes('plumbing')) return <Droplet size={size} style={style} />;
-  if (lowerName.includes('electrical')) return <Zap size={size} style={style} />;
-  if (lowerName.includes('hvac')) return <Wind size={size} style={style} />;
-  if (lowerName.includes('interior') || lowerName.includes('furniture')) return <Bed size={size} style={style} />;
-  
-  return <LayoutTemplate size={size} style={style} />;
-};
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const emptyForm = (defaults?: Partial<DrawingForm>): DrawingForm => ({
+  drawingNo: '',
+  zone: defaults?.zone || '',
+  areaName: '',
+  drawingName: '',
+  resourceName: '',
+  doerName: '',
+  category: defaults?.category || 'Architecture',
+  plannedStartDate: '',
+  plannedEndDate: '',
+  actualStartDate: '',
+  actualEndDate: '',
+  revisionNo: '0',
+  drawingImage: '',
+});
+
+function sortCategories(cats: string[]) {
+  return [...cats].sort((a, b) => a.localeCompare(b));
+}
+
+function sortZones(zones: string[]) {
+  return [...zones].sort((a, b) => {
+    const numA = a.match(/(\d+)/);
+    const numB = b.match(/(\d+)/);
+    if (numA && numB) return parseInt(numA[1], 10) - parseInt(numB[1], 10);
+    return a.localeCompare(b);
+  });
+}
 
 export default function DrawingsPage() {
   const { activeProject } = useProject();
   const { user } = useAuth();
-  const [templates, setTemplates] = useState<DrawingTemplate[]>([]);
-  const [schedules, setSchedules] = useState<DrawingScheduleItem[]>([]);
-  const [plannedDates, setPlannedDates] = useState<CategoryPlannedDate[]>([]);
-  const [users, setUsers] = useState<any[]>([]);
-  const [projects, setProjects] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [activeTab, setActiveTab] = useState<'schedule' | 'templates'>('schedule');
+  const activeProjectName = activeProject?.name || '';
 
-  // Filters
+  const [activeMode, setActiveMode] = useState<'project' | 'template'>('project');
+  const [projectDrawings, setProjectDrawings] = useState<DrawingItem[]>([]);
+  const [templates, setTemplates] = useState<DrawingItem[]>([]);
+  const [installed, setInstalled] = useState<boolean | null>(null);
+  const [sourceProjects, setSourceProjects] = useState<string[]>([]);
+  const [installSource, setInstallSource] = useState<'template' | string>('template');
+  const [users, setUsers] = useState<{ id: string; name: string }[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [installing, setInstalling] = useState(false);
+  const [installPercent, setInstallPercent] = useState(0);
+  const [installLogs, setInstallLogs] = useState<InstallLog[]>([]);
+  const [sourcePreview, setSourcePreview] = useState<SourcePreview | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [savingRowId, setSavingRowId] = useState<string | null>(null);
+
+  const [selectedZone, setSelectedZone] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [searchItemName, setSearchItemName] = useState('');
 
-  // Modals
-  const [isTplModalOpen, setIsTplModalOpen] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
-  const [editingTpl, setEditingTpl] = useState<DrawingTemplate | null>(null);
-  const [updatingItem, setUpdatingItem] = useState<DrawingScheduleItem | null>(null);
-  const [itemToDelete, setItemToDelete] = useState<any>(null);
+  const [editingItem, setEditingItem] = useState<DrawingItem | null>(null);
+  const [itemToDelete, setItemToDelete] = useState<DrawingItem | null>(null);
+  const [updatingItem, setUpdatingItem] = useState<DrawingItem | null>(null);
+  const [form, setForm] = useState<DrawingForm>(emptyForm());
+  const [planDrafts, setPlanDrafts] = useState<Record<string, { startDate: string; endDate: string }>>({});
 
-  // Forms
-  const [tplForm, setTplForm] = useState<Partial<DrawingTemplate>>({
-    drawingNo: '', areaName: '', drawingName: '', resourceName: '', doerName: '', category: 'Architecture'
-  });
-  
-  // State for project schedule
-  const [localSchedule, setLocalSchedule] = useState<Record<string, DrawingScheduleItem>>({});
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const [uploadingImageFor, setUploadingImageFor] = useState<string | null>(null);
   const [stagedFile, setStagedFile] = useState<File | null>(null);
-  const [workAction, setWorkAction] = useState<'start' | 'work_end' | ''>('');
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // History Sidebar State removed per user request
-
-  const activeProjectName = activeProject?.name || '';
+  const workingItems = activeMode === 'template' ? templates : projectDrawings;
+  const isTemplateMode = activeMode === 'template';
+  const isProjectMode = activeMode === 'project';
 
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return 'N/A';
@@ -132,97 +153,60 @@ export default function DrawingsPage() {
 
   const getTodayIsoDate = () => new Date().toISOString().split('T')[0];
 
-  useEffect(() => {
-    fetchData();
-  }, [user]);
+  const isPlanEditingHidden = (item: DrawingItem) =>
+    Boolean(item.actualStartDate?.trim() && item.actualEndDate?.trim());
 
-  useEffect(() => {
-    // Merge templates with existing schedule for the active project
-    if (!activeProjectName || templates.length === 0) {
-      setLocalSchedule({});
+  async function fetchSources() {
+    const res = await fetch('/api/drawings/sources');
+    if (!res.ok) return;
+    const data = await res.json();
+    setSourceProjects(data.projects || []);
+  }
+
+  async function fetchTemplates() {
+    const res = await fetch('/api/drawings/templates');
+    if (!res.ok) return;
+    setTemplates(await res.json());
+  }
+
+  async function fetchProjectDrawings(projectName: string) {
+    if (!projectName) {
+      setInstalled(null);
+      setProjectDrawings([]);
       return;
     }
 
-    const activeProjectData = projects.find(p => p.basicInfo?.name === activeProjectName || p.id === activeProjectName);
-    const startDateStr = activeProjectData?.metadata?.createdAt;
-
-    const projectSchedules = schedules.filter(s => s.project === activeProjectName);
-    const merged: Record<string, DrawingScheduleItem> = {};
-
-    templates.forEach(tpl => {
-      const existingEntries = projectSchedules.filter(s => s.drawingNo === tpl.drawingNo);
-      
-      const catPlan = plannedDates.find(p => p.project === activeProjectName && p.category === tpl.category);
-      const planStartDate = catPlan?.planStartDate || '';
-      const planEndDate = catPlan?.planEndDate || '';
-
-      if (existingEntries.length > 0) {
-        const firstEntry = existingEntries[0];
-        const lastEntry = existingEntries[existingEntries.length - 1];
-
-        merged[tpl.id] = { 
-          ...lastEntry,
-          actualStartDate: firstEntry.actualStartDate,
-          actualEndDate: lastEntry.actualEndDate,
-          
-          // Re-inject template static fields
-          areaName: tpl.areaName,
-          drawingName: tpl.drawingName,
-          resourceName: tpl.resourceName,
-          doerName: tpl.doerName,
-          category: tpl.category,
-          planStartDate,
-          planEndDate,
-          id: lastEntry.id,
-          tplId: tpl.id
-        };
-      } else {
-        merged[tpl.id] = {
-          id: `new-${tpl.id}`,
-          tplId: tpl.id,
-          project: activeProjectName,
-          drawingNo: tpl.drawingNo,
-          areaName: tpl.areaName,
-          drawingName: tpl.drawingName,
-          resourceName: tpl.resourceName,
-          doerName: tpl.doerName,
-          category: tpl.category,
-          planStartDate,
-          planEndDate,
-          actualStartDate: '',
-          actualEndDate: '',
-          revisionNo: '0',
-          lastUpdated: '',
-          drawingImage: '',
-          rsDesignStatus: 'Pending',
-          clientStatus: 'Pending'
-        };
-      }
-    });
-
-    setLocalSchedule(merged);
-    setHasUnsavedChanges(false);
-  }, [templates, schedules, activeProjectName, projects, plannedDates]);
+    const res = await fetch(`/api/drawings?project=${encodeURIComponent(projectName)}`);
+    if (res.status === 404) {
+      setInstalled(false);
+      setProjectDrawings([]);
+      return;
+    }
+    if (!res.ok) {
+      setInstalled(false);
+      setProjectDrawings([]);
+      return;
+    }
+    const data = await res.json();
+    setInstalled(data.installed !== false);
+    setProjectDrawings(data.drawings || []);
+  }
 
   async function fetchData() {
     setLoading(true);
     try {
-      const [tplRes, schRes, usersRes, projRes, planRes] = await Promise.all([
-        fetch('/api/drawings/templates'),
-        fetch('/api/drawings'),
+      const [, usersRes] = await Promise.all([
+        fetchTemplates(),
         fetch('/api/users'),
-        fetch('/api/projects'),
-        fetch('/api/drawings/planned')
+        fetchSources(),
       ]);
-
-      if (tplRes.ok) setTemplates(await tplRes.json());
-      if (schRes.ok) setSchedules(await schRes.json());
       if (usersRes.ok) setUsers(await usersRes.json());
-      if (projRes.ok) {
-        const data = await projRes.json();
-        setProjects(filterProjectsForUser(data, user));
+      if (activeProjectName) {
+        await fetchProjectDrawings(activeProjectName);
+      } else {
+        setInstalled(null);
+        setProjectDrawings([]);
       }
-      if (planRes.ok) setPlannedDates(await planRes.json());
     } catch (err) {
       console.error('Error fetching data:', err);
     } finally {
@@ -230,200 +214,350 @@ export default function DrawingsPage() {
     }
   }
 
-  // Derived Category Data
-  const groupedByCategory = templates.reduce((acc, curr) => {
-    const cat = curr.category || 'Uncategorized';
-    if (!acc[cat]) acc[cat] = [];
-    acc[cat].push(curr);
-    return acc;
-  }, {} as Record<string, DrawingTemplate[]>);
+  useEffect(() => {
+    fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, activeProjectName]);
 
-  const uniqueCategories = Object.keys(groupedByCategory).sort();
-  const activeCategory = (selectedCategory && uniqueCategories.includes(selectedCategory))
-    ? selectedCategory
-    : uniqueCategories[0] || null;
+  useEffect(() => {
+    setPlanDrafts({});
+    setSelectedZone(null);
+    setSelectedCategory(null);
+  }, [activeProjectName, activeMode]);
 
-  const categoryHasPlanDates = (category: string) => {
-    if (!activeProjectName) return true;
-    const plan = plannedDates.find(
-      (p) => p.project === activeProjectName && p.category === category
+  const zones = useMemo(() => {
+    const set = new Set(workingItems.map((t) => t.zone?.trim() || 'Unassigned Zone'));
+    return sortZones(Array.from(set));
+  }, [workingItems]);
+
+  const activeZone = (selectedZone && zones.includes(selectedZone))
+    ? selectedZone
+    : zones[0] || null;
+
+  const categoriesInZone = useMemo(() => {
+    if (!activeZone) return [];
+    const set = new Set(
+      workingItems
+        .filter((t) => (t.zone?.trim() || 'Unassigned Zone') === activeZone)
+        .map((t) => t.category || 'Uncategorized')
     );
-    return !!(plan?.planStartDate?.trim() && plan?.planEndDate?.trim());
-  };
+    return sortCategories(Array.from(set));
+  }, [workingItems, activeZone]);
 
-  // ---- SCHEDULE HANDLERS ----
-  const handleScheduleChange = (tplId: string, field: keyof DrawingScheduleItem, value: any) => {
-    setLocalSchedule(prev => {
-      const updated = { ...prev[tplId], [field]: value };
-      
-      // Auto-increment revision if status changes or image uploaded (handled in upload)
-      if (field === 'rsDesignStatus' || field === 'clientStatus') {
-         if (prev[tplId][field] !== value) {
-            updated.revisionNo = (parseInt(updated.revisionNo || '0') + 1).toString();
-         }
-      }
+  const activeCategory = (selectedCategory && categoriesInZone.includes(selectedCategory))
+    ? selectedCategory
+    : categoriesInZone[0] || null;
 
-      return { ...prev, [tplId]: updated };
+  const visibleItems = useMemo(() => {
+    if (!activeZone || !activeCategory) return [];
+    return workingItems.filter((item) => {
+      const zone = item.zone?.trim() || 'Unassigned Zone';
+      const category = item.category || 'Uncategorized';
+      if (zone !== activeZone || category !== activeCategory) return false;
+      const q = searchItemName.toLowerCase();
+      if (!q) return true;
+      return (
+        item.drawingName.toLowerCase().includes(q) ||
+        item.drawingNo.toLowerCase().includes(q) ||
+        item.areaName.toLowerCase().includes(q)
+      );
     });
-    setHasUnsavedChanges(true);
+  }, [workingItems, activeZone, activeCategory, searchItemName]);
+
+  const categoryHasPlanDates = (zone: string, category: string) => {
+    if (!isProjectMode || !activeProjectName) return true;
+    const items = projectDrawings.filter(
+      (t) =>
+        (t.zone?.trim() || 'Unassigned Zone') === zone &&
+        (t.category || 'Uncategorized') === category
+    );
+    if (items.length === 0) return true;
+    return items.every(
+      (t) => t.plannedStartDate?.trim() && t.plannedEndDate?.trim()
+    );
   };
 
-  const handleSaveCategoryPlan = async (
-    category: string,
-    field: 'planStartDate' | 'planEndDate',
-    value: string
-  ) => {
-    if (!activeProjectName) return;
-    try {
-      setSubmitting(true);
-      const existingPlan = plannedDates.find(p => p.project === activeProjectName && p.category === category);
-      const url = existingPlan?.rowIndex ? `/api/drawings/planned?rowIndex=${existingPlan.rowIndex}` : '/api/drawings/planned';
-      const method = existingPlan?.rowIndex ? 'PUT' : 'POST';
-
-      const payload = {
-        project: activeProjectName,
-        category,
-        planStartDate: field === 'planStartDate' ? value : (existingPlan?.planStartDate || ''),
-        planEndDate: field === 'planEndDate' ? value : (existingPlan?.planEndDate || ''),
-      };
-
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      if (res.ok) {
-        await fetchData();
-      } else {
-        alert('Failed to save planned dates for category.');
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setSubmitting(false);
-    }
+  const zoneHasMissingPlans = (zone: string) => {
+    if (!isProjectMode || !activeProjectName) return false;
+    const cats = sortCategories(
+      Array.from(
+        new Set(
+          projectDrawings
+            .filter((t) => (t.zone?.trim() || 'Unassigned Zone') === zone)
+            .map((t) => t.category || 'Uncategorized')
+        )
+      )
+    );
+    return cats.some((c) => !categoryHasPlanDates(zone, c));
   };
 
-  const saveScheduleProgress = async () => {
-    if (!activeProjectName) {
-      alert("No active project selected.");
-      return;
-    }
+  const sourceLabel =
+    installSource === 'template' ? 'Template (master)' : `Project: ${installSource}`;
 
+  const pushInstallLog = (text: string, tone: InstallLog['tone'] = 'info') => {
+    setInstallLogs((prev) => [
+      ...prev,
+      { id: `${Date.now()}-${prev.length}`, text, tone },
+    ]);
+  };
+
+  const loadSourcePreview = async (source: string) => {
+    setPreviewLoading(true);
     try {
-      setSubmitting(true);
-      
-      // We'll separate items into ones that need POST (new) and ones that need PUT (existing)
-      const itemsToPost: DrawingScheduleItem[] = [];
-      const itemsToPut: DrawingScheduleItem[] = [];
-
-      Object.values(localSchedule).forEach(item => {
-        if (item.rowIndex) {
-          itemsToPut.push(item);
-        } else {
-          // Only post if it has some data filled
-          if (
-            item.planStartDate ||
-            item.planEndDate ||
-            item.actualStartDate ||
-            item.actualEndDate ||
-            item.drawingImage ||
-            item.rsDesignStatus !== 'Pending' ||
-            item.clientStatus !== 'Pending'
-          ) {
-            itemsToPost.push(item);
-          }
-        }
-      });
-
-      if (itemsToPost.length > 0) {
-        await fetch('/api/drawings', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ project: activeProjectName, items: itemsToPost }),
+      if (source === 'template') {
+        const res = await fetch('/api/drawings/templates');
+        const list: DrawingItem[] = res.ok ? await res.json() : [];
+        const items = Array.isArray(list) ? list : [];
+        setSourcePreview({
+          label: 'Template (master)',
+          drawingCount: items.length,
+          zones: new Set(items.map((t) => t.zone?.trim() || 'Unassigned Zone')).size,
+          categories: new Set(items.map((t) => t.category || 'Uncategorized')).size,
         });
+        return;
       }
 
-      for (const item of itemsToPut) {
-         await fetch(`/api/drawings?rowIndex=${item.rowIndex}`, {
-           method: 'PUT',
-           headers: { 'Content-Type': 'application/json' },
-           body: JSON.stringify(item),
-         });
+      const res = await fetch(`/api/drawings?project=${encodeURIComponent(source)}`);
+      if (!res.ok) {
+        setSourcePreview({ label: `Project: ${source}`, drawingCount: 0, zones: 0, categories: 0 });
+        return;
       }
-
-      setHasUnsavedChanges(false);
-      await fetchData(); 
-    } catch (err) {
-      console.error(err);
-      alert('Failed to save drawing schedule progress.');
+      const data = await res.json();
+      const list: DrawingItem[] = Array.isArray(data.drawings) ? data.drawings : [];
+      setSourcePreview({
+        label: `Project: ${source}`,
+        drawingCount: list.length,
+        zones: new Set(list.map((t) => t.zone?.trim() || 'Unassigned Zone')).size,
+        categories: new Set(list.map((t) => t.category || 'Uncategorized')).size,
+      });
+    } catch {
+      setSourcePreview(null);
     } finally {
-      setSubmitting(false);
+      setPreviewLoading(false);
     }
   };
 
-  // ---- TEMPLATE HANDLERS ----
-  const handleAddTemplate = () => {
-    setEditingTpl(null);
-    setTplForm({ drawingNo: '', areaName: '', drawingName: '', resourceName: '', doerName: '', category: uniqueCategories[0] || 'Architecture' });
-    setIsTplModalOpen(true);
+  useEffect(() => {
+    if (installed === false && activeProjectName) {
+      loadSourcePreview(installSource);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [installSource, installed, activeProjectName]);
+
+  const handleInstall = async () => {
+    if (!activeProjectName || installing) return;
+
+    setInstalling(true);
+    setInstallPercent(0);
+    setInstallLogs([]);
+
+    const source =
+      installSource === 'template'
+        ? 'template'
+        : { project: installSource };
+
+    let progressTimer: ReturnType<typeof setInterval> | null = null;
+
+    try {
+      pushInstallLog('Connecting to Drawing Schedule workbook…', 'run');
+      setInstallPercent(8);
+      await sleep(350);
+
+      pushInstallLog(`Scanning source · ${sourceLabel}`, 'run');
+      setInstallPercent(18);
+      await sleep(400);
+
+      const preview =
+        sourcePreview ||
+        ({
+          label: sourceLabel,
+          drawingCount: 0,
+          zones: 0,
+          categories: 0,
+        } as SourcePreview);
+
+      if (preview.drawingCount > 0) {
+        pushInstallLog(
+          `Found ${preview.drawingCount} drawings · ${preview.zones} zones · ${preview.categories} categories`,
+          'ok'
+        );
+      } else {
+        pushInstallLog('Reading drawing structure from source…', 'info');
+      }
+      setInstallPercent(28);
+      await sleep(300);
+
+      pushInstallLog(`Creating project sheet · ${activeProjectName}`, 'run');
+      setInstallPercent(40);
+
+      progressTimer = setInterval(() => {
+        setInstallPercent((p) => (p < 88 ? p + 2 : p));
+      }, 220);
+
+      pushInstallLog('Copying drawing structure (dates left empty)…', 'run');
+
+      const res = await fetch('/api/drawings/install', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ project: activeProjectName, source }),
+      });
+      const data = await res.json();
+
+      if (progressTimer) {
+        clearInterval(progressTimer);
+        progressTimer = null;
+      }
+
+      if (!res.ok) {
+        pushInstallLog(data.error || 'Install failed.', 'warn');
+        setInstallPercent(0);
+        alert(data.error || 'Failed to install drawings.');
+        return;
+      }
+
+      const copied = data.drawingCount || preview.drawingCount || 0;
+      setInstallPercent(94);
+      pushInstallLog(`Wrote ${copied} drawings into “${data.project || activeProjectName}”`, 'ok');
+      await sleep(280);
+
+      setInstallPercent(100);
+      pushInstallLog('Install complete — opening project sheet…', 'ok');
+      await sleep(500);
+
+      await fetchSources();
+      await fetchProjectDrawings(activeProjectName);
+      setActiveMode('project');
+    } catch (err) {
+      console.error(err);
+      pushInstallLog('Install interrupted. Please try again.', 'warn');
+      setInstallPercent(0);
+      alert('Failed to install drawings.');
+    } finally {
+      if (progressTimer) clearInterval(progressTimer);
+      setInstalling(false);
+    }
   };
 
-  const handleEditTemplate = (item: DrawingTemplate) => {
-    setEditingTpl(item);
-    setTplForm({ ...item });
-    setIsTplModalOpen(true);
+  const openAddModal = () => {
+    setEditingItem(null);
+    setForm(
+      emptyForm({
+        zone: activeZone && activeZone !== 'Unassigned Zone' ? activeZone : '',
+        category: activeCategory || 'Architecture',
+      })
+    );
+    setIsModalOpen(true);
   };
 
-  const submitTemplate = async (e: React.FormEvent) => {
+  const openEditModal = (item: DrawingItem) => {
+    setEditingItem(item);
+    setForm({
+      drawingNo: item.drawingNo,
+      zone: item.zone,
+      areaName: item.areaName,
+      drawingName: item.drawingName,
+      resourceName: item.resourceName,
+      doerName: item.doerName,
+      category: item.category,
+      plannedStartDate: item.plannedStartDate,
+      plannedEndDate: item.plannedEndDate,
+      actualStartDate: item.actualStartDate,
+      actualEndDate: item.actualEndDate,
+      revisionNo: item.revisionNo,
+      drawingImage: item.drawingImage,
+    });
+    setIsModalOpen(true);
+  };
+
+  const openUpdateModal = (item: DrawingItem) => {
+    setStagedFile(null);
+    setUpdatingItem({ ...item });
+    setIsUpdateModalOpen(true);
+  };
+
+  const buildPayload = (item: DrawingItem, patch: Partial<DrawingItem>) => ({
+    drawingNo: item.drawingNo,
+    zone: item.zone,
+    areaName: item.areaName,
+    drawingName: item.drawingName,
+    resourceName: item.resourceName,
+    doerName: item.doerName,
+    category: item.category,
+    plannedStartDate: item.plannedStartDate,
+    plannedEndDate: item.plannedEndDate,
+    actualStartDate: item.actualStartDate,
+    actualEndDate: item.actualEndDate,
+    revisionNo: item.revisionNo,
+    drawingImage: item.drawingImage,
+    ...patch,
+  });
+
+  const submitItem = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!tplForm.drawingName || !tplForm.category) {
+    if (!form.drawingName?.trim() || !form.category?.trim()) {
       alert('Drawing Name and Category are required.');
       return;
     }
 
-    const submissionForm = { ...tplForm };
-    if (!submissionForm.drawingNo) {
-      submissionForm.drawingNo = `DWG-${Math.floor(1000 + Math.random() * 9000)}`;
-    }
-
+    setSubmitting(true);
     try {
-      setSubmitting(true);
-      const url = editingTpl ? `/api/drawings/templates?rowIndex=${editingTpl.rowIndex}` : '/api/drawings/templates';
-      const method = editingTpl ? 'PUT' : 'POST';
+      let url: string;
+      let method: string;
+      let body: Record<string, string>;
+
+      if (isTemplateMode) {
+        url = editingItem
+          ? `/api/drawings/templates?rowIndex=${editingItem.rowIndex}`
+          : '/api/drawings/templates';
+        method = editingItem ? 'PUT' : 'POST';
+        body = { ...form };
+      } else {
+        if (!activeProjectName) {
+          alert('Select a project first.');
+          return;
+        }
+        url = editingItem
+          ? `/api/drawings?project=${encodeURIComponent(activeProjectName)}&rowIndex=${editingItem.rowIndex}`
+          : '/api/drawings';
+        method = editingItem ? 'PUT' : 'POST';
+        body = { ...form, project: activeProjectName };
+      }
 
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(submissionForm)
+        body: JSON.stringify(body),
       });
-
-      if (res.ok) {
-        setIsTplModalOpen(false);
-        await fetchData();
-      } else {
+      if (!res.ok) {
         const err = await res.json();
-        alert(`Error: ${err.error}`);
+        alert(err.error || 'Failed to save.');
+        return;
       }
+      setIsModalOpen(false);
+      if (isTemplateMode) await fetchTemplates();
+      else await fetchProjectDrawings(activeProjectName);
     } catch (err) {
       console.error(err);
-      alert('Failed to save template.');
+      alert('Failed to save.');
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleDeleteTemplate = async () => {
+  const handleDelete = async () => {
     if (!itemToDelete) return;
+    setSubmitting(true);
     try {
-      setSubmitting(true);
-      const res = await fetch(`/api/drawings/templates?rowIndex=${itemToDelete.rowIndex}`, { method: 'DELETE' });
+      const url = isTemplateMode
+        ? `/api/drawings/templates?rowIndex=${itemToDelete.rowIndex}`
+        : `/api/drawings?project=${encodeURIComponent(activeProjectName)}&rowIndex=${itemToDelete.rowIndex}`;
+
+      const res = await fetch(url, { method: 'DELETE' });
       if (res.ok) {
         setIsDeleteModalOpen(false);
         setItemToDelete(null);
-        await fetchData();
+        if (isTemplateMode) await fetchTemplates();
+        else await fetchProjectDrawings(activeProjectName);
       }
     } catch (err) {
       console.error(err);
@@ -431,6 +565,164 @@ export default function DrawingsPage() {
       setSubmitting(false);
     }
   };
+
+  const updateDrawingRow = async (item: DrawingItem, patch: Partial<DrawingItem>) => {
+    if (!activeProjectName) return false;
+    const payload = buildPayload(item, patch);
+
+    const res = await fetch(
+      `/api/drawings?project=${encodeURIComponent(activeProjectName)}&rowIndex=${item.rowIndex}`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      }
+    );
+    return res.ok;
+  };
+
+  const handleMarkWorkStep = async (item: DrawingItem) => {
+    if (!activeProjectName) return;
+    const today = getTodayIsoDate();
+    let actualStartDate = item.actualStartDate || '';
+    let actualEndDate = item.actualEndDate || '';
+
+    if (!actualStartDate) {
+      actualStartDate = today;
+    } else if (!actualEndDate) {
+      actualEndDate = today;
+    } else {
+      return;
+    }
+
+    setSavingRowId(item.id);
+    try {
+      const ok = await updateDrawingRow(item, { actualStartDate, actualEndDate });
+      if (ok) await fetchProjectDrawings(activeProjectName);
+      else alert('Failed to save work dates.');
+    } catch (err) {
+      console.error(err);
+      alert('Error saving work dates.');
+    } finally {
+      setSavingRowId(null);
+    }
+  };
+
+  const updatePlanDraft = (item: DrawingItem, field: 'startDate' | 'endDate', value: string) => {
+    const key = String(item.rowIndex);
+    setPlanDrafts((prev) => {
+      const current = prev[key] ?? {
+        startDate: item.plannedStartDate || '',
+        endDate: item.plannedEndDate || '',
+      };
+      return { ...prev, [key]: { ...current, [field]: value } };
+    });
+  };
+
+  const savePlanDates = async (item: DrawingItem) => {
+    const key = String(item.rowIndex);
+    const draft = planDrafts[key];
+    if (!draft?.startDate?.trim() || !draft?.endDate?.trim()) return;
+
+    setSavingRowId(item.id);
+    try {
+      const ok = await updateDrawingRow(item, {
+        plannedStartDate: draft.startDate,
+        plannedEndDate: draft.endDate,
+      });
+      if (ok) {
+        setPlanDrafts((prev) => {
+          const next = { ...prev };
+          delete next[key];
+          return next;
+        });
+        await fetchProjectDrawings(activeProjectName);
+      } else {
+        alert('Failed to save planned dates.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Failed to save planned dates.');
+    } finally {
+      setSavingRowId(null);
+    }
+  };
+
+  const handleApplyUpdate = async () => {
+    if (!updatingItem || !activeProjectName) return;
+
+    setSubmitting(true);
+    try {
+      let fileUrl = updatingItem.drawingImage || '';
+      const original = projectDrawings.find((d) => d.rowIndex === updatingItem.rowIndex) || updatingItem;
+
+      if (stagedFile) {
+        const formData = new FormData();
+        formData.append('files', stagedFile);
+        formData.append('folderId', CONFIG.DRAWING_SCHEDULE.FOLDER_ID);
+
+        const uploadRes = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!uploadRes.ok) throw new Error('File upload failed');
+
+        const uploadData = await uploadRes.json();
+        const urlData = uploadData.files[0].url;
+        fileUrl = typeof urlData === 'string'
+          ? urlData
+          : (urlData.webViewLink || urlData.webContentLink || '');
+      }
+
+      const imageChanged = Boolean(stagedFile);
+
+      let newRev = parseInt(updatingItem.revisionNo || '0', 10);
+      if (imageChanged) {
+        newRev += 1;
+      }
+
+      const ok = await updateDrawingRow(original, {
+        drawingImage: fileUrl,
+        revisionNo: String(newRev),
+      });
+
+      if (!ok) throw new Error('Failed to save drawing update');
+
+      await fetchProjectDrawings(activeProjectName);
+      setIsUpdateModalOpen(false);
+      setUpdatingItem(null);
+      setStagedFile(null);
+    } catch (err) {
+      console.error(err);
+      alert(`Error applying changes: ${(err as Error).message}`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const showInstallGate =
+    isProjectMode &&
+    Boolean(activeProjectName) &&
+    installed === false;
+
+  const showNoProject = isProjectMode && !activeProjectName;
+
+  const allZoneOptions = useMemo(() => {
+    const set = new Set([
+      ...templates.map((t) => t.zone).filter(Boolean),
+      ...projectDrawings.map((t) => t.zone).filter(Boolean),
+    ]);
+    return sortZones(Array.from(set));
+  }, [templates, projectDrawings]);
+
+  const allCategoryOptions = useMemo(() => {
+    const set = new Set([
+      ...templates.map((t) => t.category).filter(Boolean),
+      ...projectDrawings.map((t) => t.category).filter(Boolean),
+    ]);
+    return sortCategories(Array.from(set));
+  }, [templates, projectDrawings]);
 
   return (
     <div className={styles.container}>
@@ -451,7 +743,9 @@ export default function DrawingsPage() {
                     localStorage.setItem('pending_view_project_id', activeProject?.id || '');
                     window.location.href = '/projects';
                   }}
-                >{activeProjectName}</button>
+                >
+                  {activeProjectName}
+                </button>
               </>
             )}
             <span className="separator">&gt;</span>
@@ -459,447 +753,692 @@ export default function DrawingsPage() {
           </div>
         </div>
         <div className={styles.headerActions}>
-          <div className={styles.searchBox}>
-            <Search size={18} className={styles.searchIcon} />
-            <input 
-              type="text" 
-              placeholder="Search drawings..." 
-              value={searchItemName}
-              onChange={(e) => setSearchItemName(e.target.value)}
-            />
+          <div className={styles.modeSwitch} role="tablist" aria-label="Drawing mode">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={isProjectMode}
+              className={`${styles.modeSwitchBtn} ${isProjectMode ? styles.modeSwitchActive : ''}`}
+              onClick={() => setActiveMode('project')}
+            >
+              <CheckSquare size={16} />
+              Project
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={isTemplateMode}
+              className={`${styles.modeSwitchBtn} ${isTemplateMode ? styles.modeSwitchActive : ''}`}
+              onClick={() => setActiveMode('template')}
+            >
+              <Settings size={16} />
+              Template
+            </button>
           </div>
-          <button className={styles.secondaryButton} onClick={() => setActiveTab(activeTab === 'schedule' ? 'templates' : 'schedule')}>
-            {activeTab === 'schedule' ? <><Settings size={18} /> Manage Templates</> : <><CheckSquare size={18} /> View Schedule</>}
-          </button>
-          {activeTab === 'templates' && (
-            <button className={styles.addButton} onClick={handleAddTemplate}>
-              <Plus size={18} /> Add Drawing Template
+          {!showInstallGate && !showNoProject && (
+            <div className={styles.searchBox}>
+              <Search size={18} className={styles.searchIcon} />
+              <input
+                type="text"
+                placeholder="Search drawings..."
+                value={searchItemName}
+                onChange={(e) => setSearchItemName(e.target.value)}
+              />
+            </div>
+          )}
+          {(isTemplateMode || (isProjectMode && installed && activeProjectName)) && (
+            <button className={styles.addButton} onClick={openAddModal}>
+              <Plus size={18} />
+              {isTemplateMode ? 'Add Template Drawing' : 'Add Project Drawing'}
             </button>
           )}
         </div>
       </div>
 
       {loading ? (
-        <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-light)' }}>Loading...</div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          <div className={styles.templateLayout}>
-            {/* Sidebar */}
-            <div className={styles.templateSidebar}>
-              <h3 className={styles.sidebarTitle}>Categories</h3>
-              <div className={styles.sidebarList}>
-                {uniqueCategories.map(cat => {
-                  const missingPlanDate =
-                    activeTab === 'schedule' &&
-                    activeProjectName &&
-                    !categoryHasPlanDates(cat);
+        <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-light)' }}>
+          Loading...
+        </div>
+      ) : showNoProject ? (
+        <div className={styles.installCard}>
+          <BuildingPlaceholder />
+          <h3>Select a project</h3>
+          <p>Open a project from the portfolio, then install or view its drawing schedule.</p>
+          <Link href="/projects" className={styles.addButton} style={{ textDecoration: 'none' }}>
+            Go to Portfolio
+          </Link>
+        </div>
+      ) : showInstallGate ? (
+        <div className={`${styles.installCard} ${styles.installCardRich}`}>
+          <div className={styles.installHero}>
+            <div className={styles.installHeroIcon}>
+              {installing ? (
+                <Loader2 size={28} className={styles.spinIcon} />
+              ) : (
+                <Sparkles size={28} />
+              )}
+            </div>
+            <div className={styles.installHeroText}>
+              <h3>{installing ? 'Installing drawings…' : 'Install Drawings'}</h3>
+              <p>
+                Set up the drawing sheet for <strong>{activeProjectName}</strong>.
+                Copy structure from Template or another project — Planned & Actual dates start empty.
+              </p>
+            </div>
+          </div>
 
-                  return (
-                  <button
-                    key={cat}
-                    className={`${styles.sidebarItem} ${activeCategory === cat ? styles.active : ''}`}
-                    onClick={() => setSelectedCategory(cat)}
-                    title={missingPlanDate ? 'Planned start or end date not set for this category' : undefined}
+          {!installing ? (
+            <>
+              <div className={`${styles.formGroup} ${styles.installField}`} data-has-value="true">
+                <label className={styles.outlineLabel}>Copy from</label>
+                <select
+                  value={installSource}
+                  onChange={(e) => setInstallSource(e.target.value)}
+                  disabled={installing}
+                >
+                  <option value="template">Template (master)</option>
+                  {sourceProjects
+                    .filter((p) => p !== activeProjectName)
+                    .map((p) => (
+                      <option key={p} value={p}>
+                        Project: {p}
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              <div className={styles.installPreviewRow}>
+                {previewLoading ? (
+                  <span className={styles.installPreviewMuted}>
+                    <Loader2 size={14} className={styles.spinIcon} /> Scanning source…
+                  </span>
+                ) : sourcePreview ? (
+                  <>
+                    <span className={styles.installStat}>
+                      <strong>{sourcePreview.drawingCount}</strong> drawings
+                    </span>
+                    <span className={styles.installStatDot} />
+                    <span className={styles.installStat}>
+                      <strong>{sourcePreview.zones}</strong> zones
+                    </span>
+                    <span className={styles.installStatDot} />
+                    <span className={styles.installStat}>
+                      <strong>{sourcePreview.categories}</strong> categories
+                    </span>
+                  </>
+                ) : (
+                  <span className={styles.installPreviewMuted}>Select a source to preview</span>
+                )}
+              </div>
+
+              <button
+                className={`${styles.addButton} ${styles.installPrimaryBtn}`}
+                onClick={handleInstall}
+                disabled={installing || previewLoading || (sourcePreview?.drawingCount === 0)}
+              >
+                <Download size={18} /> Install Drawings
+              </button>
+            </>
+          ) : (
+            <div className={styles.installProgressPanel}>
+              <div className={styles.installProgressHeader}>
+                <span className={styles.installProgressLabel}>Progress</span>
+                <span className={styles.installProgressPct}>{installPercent}%</span>
+              </div>
+              <div className={styles.installProgressTrack}>
+                <div
+                  className={styles.installProgressFill}
+                  style={{ width: `${installPercent}%` }}
+                />
+              </div>
+              <div className={styles.installProgressMeta}>
+                <span>
+                  {installPercent < 100
+                    ? `${Math.max(0, 100 - installPercent)}% remaining`
+                    : 'All done'}
+                </span>
+                <span>{sourceLabel}</span>
+              </div>
+
+              <div className={styles.installLogBox} aria-live="polite">
+                {installLogs.map((log) => (
+                  <div
+                    key={log.id}
+                    className={`${styles.installLogRow} ${styles[`installLog_${log.tone}`]}`}
                   >
-                    {getCategoryIcon(cat)}
-                    <span className={styles.sidebarItemLabel}>{cat}</span>
-                    {missingPlanDate && (
-                      <span className={styles.missingDateDot} aria-label="Planned dates not set" />
+                    {log.tone === 'ok' ? (
+                      <CheckCircle2 size={14} />
+                    ) : log.tone === 'warn' ? (
+                      <AlertCircle size={14} />
+                    ) : log.tone === 'run' ? (
+                      <Loader2 size={14} className={styles.spinIcon} />
+                    ) : (
+                      <Circle size={14} />
                     )}
-                  </button>
+                    <span>{log.text}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className={styles.templateLayout}>
+          <div className={styles.doubleSidebar}>
+            <div className={styles.zoneSidebar}>
+              <h3 className={styles.sidebarTitle}>Zones</h3>
+              <div className={styles.sidebarList}>
+                {zones.map((zone) => {
+                  const missing = zoneHasMissingPlans(zone);
+                  return (
+                    <button
+                      key={zone}
+                      className={`${styles.sidebarItem} ${activeZone === zone ? styles.active : ''}`}
+                      onClick={() => {
+                        setSelectedZone(zone);
+                        setSelectedCategory(null);
+                      }}
+                    >
+                      <MapPin size={16} style={{ marginRight: 8, flexShrink: 0 }} />
+                      <span className={styles.sidebarItemLabel}>{zone}</span>
+                      {missing && (
+                        <span className={styles.missingDateDot} aria-label="Planned dates not set" />
+                      )}
+                    </button>
                   );
                 })}
-                {uniqueCategories.length === 0 && (
-                  <p className={styles.emptySidebar}>No categories found.</p>
+                {zones.length === 0 && (
+                  <p className={styles.emptySidebar}>No zones found.</p>
                 )}
               </div>
             </div>
 
-            {/* Content */}
-            <div className={styles.templateContent}>
-              {activeCategory ? (() => {
-                const allItemsForCategory = groupedByCategory[activeCategory] || [];
-                const items = allItemsForCategory.filter(item => 
-                  item.drawingName.toLowerCase().includes(searchItemName.toLowerCase()) || 
-                  item.drawingNo.toLowerCase().includes(searchItemName.toLowerCase())
-                );
-                
-                const currentCategoryPlan = activeCategory ? plannedDates.find(p => p.project === activeProjectName && p.category === activeCategory) : null;
-                const currentPlanStartDate = currentCategoryPlan?.planStartDate || '';
-                const currentPlanEndDate = currentCategoryPlan?.planEndDate || '';
+            <div className={styles.categorySidebar}>
+              <h3 className={styles.sidebarTitle}>Categories</h3>
+              <div className={styles.sidebarList}>
+                {categoriesInZone.map((cat) => {
+                  const missing =
+                    activeZone &&
+                    isProjectMode &&
+                    !categoryHasPlanDates(activeZone, cat);
+                  return (
+                    <button
+                      key={cat}
+                      className={`${styles.sidebarItem} ${activeCategory === cat ? styles.active : ''}`}
+                      onClick={() => setSelectedCategory(cat)}
+                    >
+                      <LayoutTemplate size={16} style={{ marginRight: 8, flexShrink: 0 }} />
+                      <span className={styles.sidebarItemLabel}>{cat}</span>
+                      {missing && (
+                        <span className={styles.missingDateDot} aria-label="Planned dates not set" />
+                      )}
+                    </button>
+                  );
+                })}
+                {categoriesInZone.length === 0 && (
+                  <p className={styles.emptySidebar}>No categories in this zone.</p>
+                )}
+              </div>
+            </div>
+          </div>
 
-                return (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    {activeCategory && activeTab === 'schedule' && activeProjectName && (
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px', backgroundColor: 'var(--bg-main)', borderRadius: '12px', border: '1px solid var(--border-color)', flexWrap: 'wrap', gap: '12px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <Calendar size={18} color="var(--primary)" />
-                          <strong style={{ fontSize: '0.95rem', color: 'var(--text-heading)' }}>{activeCategory} Planned Dates:</strong>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-light)' }}>Start:</span>
-                            <input
-                              type="date"
-                              className={styles.customDateInput}
-                              value={currentPlanStartDate}
-                              onChange={(e) => handleSaveCategoryPlan(activeCategory, 'planStartDate', e.target.value)}
-                              disabled={submitting}
-                            />
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-light)' }}>End:</span>
-                            <input
-                              type="date"
-                              className={styles.customDateInput}
-                              value={currentPlanEndDate}
-                              onChange={(e) => handleSaveCategoryPlan(activeCategory, 'planEndDate', e.target.value)}
-                              disabled={submitting}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    )}
+          <div className={styles.templateContent}>
+            {isTemplateMode && (
+              <div className={styles.templatePlanHint}>
+                <Settings size={16} />
+                <span>
+                  Polishing <strong>Template</strong> — add, edit, or delete master drawings. Future installs copy this structure.
+                </span>
+              </div>
+            )}
+            {isProjectMode && activeProjectName && (
+              <div className={styles.templatePlanHint}>
+                <Calendar size={16} />
+                <span>
+                  Polishing project sheet for <strong>{activeProjectName}</strong> — edit drawings and set Planned / Actual dates.
+                </span>
+              </div>
+            )}
 
-                    {items.length > 0 ? (
-                      <div className={styles.tableContainer}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        {items.map(item => {
-                          const scheduleItem = localSchedule[item.id];
-                          
-                          return (
-                            <div key={item.rowIndex} style={{
-                              display: 'flex',
-                              width: '100%',
-                              background: activeTab === 'schedule' ? 'linear-gradient(135deg, rgba(255,255,255,1) 0%, rgba(246,248,255,1) 100%)' : 'var(--bg-card)',
-                              borderLeft: activeTab === 'schedule' ? '4px solid var(--primary-color)' : 'none',
-                              boxShadow: activeTab === 'schedule' ? '0 6px 16px rgba(0,0,0,0.08)' : '0 4px 12px rgba(0,0,0,0.06)',
-                              borderRadius: '100px',
-                              padding: '12px 20px',
-                              gap: '20px',
-                              alignItems: 'center'
-                            }}>
-                              {/* Left Section: Drawing Details */}
-                              <div style={{ flex: activeTab === 'schedule' ? '0 0 22%' : '0 0 35%', display: 'flex', flexDirection: 'column', gap: '6px', minWidth: 0 }}>
-                                <div className={styles.drawingTitleRow} style={{ marginBottom: 0 }}>
-                                  <span className={styles.drawingNo} style={{ color: '#2563eb', fontWeight: 700, padding: '4px 0', whiteSpace: 'nowrap' }}>{item.drawingNo || 'N/A'}</span>
-                                  <strong className={styles.drawingName} style={{ color: '#1e293b', fontSize: '0.95rem' }}>{item.drawingName}</strong>
-                                  {isDoerMissing(item.doerName) && (
-                                    <span className={styles.missingDoerDot} title="Doer not assigned" aria-label="Doer not assigned" />
-                                  )}
-                                </div>
-                                <div className={styles.drawingMetaRow} style={{ marginTop: '4px' }}>
-                                  <span className={styles.metaTag} style={{ color: '#0369a1', fontWeight: 600 }}><Grid size={12} /> {item.areaName || 'No Area'}</span>
-                                  <span className={styles.metaTag} style={{ color: '#047857', fontWeight: 600 }}><User size={12} /> {item.resourceName || 'Unassigned'}</span>
-                                  <span className={styles.metaTag} style={{ color: '#0f766e', fontWeight: 600 }}>Doer: {item.doerName || 'Unassigned'}</span>
-                                </div>
-                              </div>
-                              
-                              {/* Middle Section: History Files (Schedule) OR Meta Details (Templates) */}
-                              {activeTab === 'schedule' ? (
-                                <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: '8px', padding: '0 15px', flexWrap: 'wrap', borderLeft: '1px dashed var(--border-color)', borderRight: '1px dashed var(--border-color)', minHeight: '40px' }}>
-                                  {(() => {
-                                    const itemHistory = schedules
-                                      .filter(s => s.project === activeProjectName && s.drawingNo === item.drawingNo && s.drawingImage)
-                                      .sort((a, b) => new Date(a.lastUpdated).getTime() - new Date(b.lastUpdated).getTime());
-                                      
-                                    if (itemHistory.length === 0) return <span style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic', fontWeight: 500 }}>No files uploaded yet</span>;
-                                    
-                                    return itemHistory.map((hist, idx) => {
-                                      const isLatest = idx === itemHistory.length - 1;
-                                      const dt = new Date(hist.lastUpdated);
-                                      const formattedDate = !isNaN(dt.getTime()) ? `${dt.getDate().toString().padStart(2, '0')} ${(dt.toLocaleString('default', { month: 'short' }))} ${dt.getHours().toString().padStart(2, '0')}:${dt.getMinutes().toString().padStart(2, '0')}` : '';
+            {activeCategory && activeZone ? (
+              visibleItems.length > 0 ? (
+                <div className={styles.tableContainer}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {visibleItems.map((item) => {
+                      const draftKey = String(item.rowIndex);
+                      const planDraft = planDrafts[draftKey];
+                      const displayPlan = planDraft ?? {
+                        startDate: item.plannedStartDate,
+                        endDate: item.plannedEndDate,
+                      };
+                      const isSaving = savingRowId === item.id;
+                      const showSavePlan = Boolean(planDraft?.startDate?.trim());
+                      const canSavePlan =
+                        Boolean(planDraft?.startDate?.trim() && planDraft?.endDate?.trim()) &&
+                        !isSaving;
+                      const missingDrawingPlan =
+                        isProjectMode &&
+                        (!item.plannedStartDate?.trim() || !item.plannedEndDate?.trim());
+                      const hidePlanEditors = isPlanEditingHidden(item);
 
-                                      return (
-                                        <div key={hist.id + idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-                                          <a 
-                                            href={hist.drawingImage} 
-                                            target="_blank" 
-                                            rel="noopener noreferrer" 
-                                            title={`Rev ${hist.revisionNo} • ${dt.toLocaleString()}`}
-                                            style={{
-                                              display: 'inline-flex', alignItems: 'center', gap: '6px',
-                                              padding: '6px 14px', borderRadius: '20px',
-                                              backgroundColor: 'transparent',
-                                              border: isLatest ? '2px solid #4f46e5' : '1px solid #cbd5e1',
-                                              color: isLatest ? '#4f46e5' : '#64748b',
-                                              fontSize: '0.85rem', textDecoration: 'none', fontWeight: 800,
-                                              transition: 'all 0.2s ease',
-                                            }}
-                                            onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 4px 10px rgba(0, 0, 0, 0.05)'; }}
-                                            onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
-                                          >
-                                            <FileImage size={14} />
-                                            R{hist.revisionNo}
-                                          </a>
-                                          {formattedDate && (
-                                            <span style={{ fontSize: '0.65rem', color: '#64748b', fontWeight: 600 }}>
-                                              {formattedDate}
-                                            </span>
-                                          )}
-                                        </div>
-                                      );
-                                    });
-                                  })()}
-                                </div>
-                              ) : (
-                                <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '20px', padding: '0 15px' }}>
-                                  <span className={styles.metaTag} style={{ color: '#0f766e', fontSize: '0.85rem', padding: '6px 0', fontWeight: 700 }}>
-                                    <User size={14} /> Doer: {item.doerName || 'Unassigned'}
-                                  </span>
-                                </div>
+                      return (
+                        <div
+                          key={item.rowIndex}
+                          className={`${styles.drawingCard} ${isProjectMode ? styles.drawingCardProject : ''}`}
+                        >
+                          <div className={styles.taskInfoCol}>
+                            <div className={styles.taskTitleRow}>
+                              <span className={styles.trackerIdBadge}>
+                                {item.drawingNo || 'N/A'}
+                              </span>
+                              <strong className={styles.taskName}>{item.drawingName}</strong>
+                              {isDoerMissing(item.doerName) && (
+                                <span
+                                  className={styles.missingDoerDot}
+                                  title="Doer not assigned"
+                                />
                               )}
-
-                              {/* Right Section: Controls */}
-                              {activeTab === 'schedule' ? (
-                                <div className={styles.scheduleRightCol}>
-                                  <div className={styles.datesCol}>
-                                    <div className={`${styles.dateRow} ${styles.dateRowPlan}`}>
-                                      <span className={styles.datePart}>
-                                        <strong>Plan Start:</strong> {displayDate(scheduleItem?.planStartDate)}
-                                      </span>
-                                      <span className={styles.dateDivider}>|</span>
-                                      <span className={`${styles.datePart} ${styles.datePartEnd}`}>
-                                        <strong>Plan End:</strong> {displayDate(scheduleItem?.planEndDate)}
-                                      </span>
-                                    </div>
-                                    <div className={`${styles.dateRow} ${styles.dateRowActual}`}>
-                                      <span className={styles.datePart}>
-                                        <strong>Actual Start:</strong> {displayDate(scheduleItem?.actualStartDate)}
-                                      </span>
-                                      <span className={styles.dateDivider}>|</span>
-                                      <span className={`${styles.datePart} ${styles.datePartEnd}`}>
-                                        <strong>Actual End:</strong> {displayDate(scheduleItem?.actualEndDate)}
-                                      </span>
-                                    </div>
-                                  </div>
-
-                                  <div className={styles.statusCol} style={{ flex: '0 0 110px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                    <div className={`${styles.statusSelect} ${styles[scheduleItem?.rsDesignStatus?.replace(/\s+/g, '') || 'Pending']}`} style={{ display: 'inline-block', textAlign: 'center', pointerEvents: 'none', width: '100%', padding: '4px', fontWeight: 700 }}>
-                                      RS: {scheduleItem?.rsDesignStatus || 'Pending'}
-                                    </div>
-                                    <div className={`${styles.statusSelect} ${styles[scheduleItem?.clientStatus?.replace(/\s+/g, '') || 'Pending']}`} style={{ display: 'inline-block', textAlign: 'center', pointerEvents: 'none', width: '100%', padding: '4px', fontWeight: 700 }}>
-                                      Client: {scheduleItem?.clientStatus || 'Pending'}
-                                    </div>
-                                  </div>
-
-                                  <div style={{ flex: '0 0 60px', display: 'flex', justifyContent: 'center' }}>
-                                    <button 
-                                      className={styles.controlBtn} 
-                                      onClick={() => {
-                                        setStagedFile(null);
-                                        setWorkAction('');
-                                        setUpdatingItem({ ...scheduleItem, tplId: item.id } as any);
-                                        setIsUpdateModalOpen(true);
-                                      }}
-                                      title="Update Status"
-                                    >
-                                      <Edit2 size={16} />
-                                    </button>
-                                  </div>
-                                </div>
-                              ) : (
-                                <div style={{ flex: '0 0 100px', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                                  <button className={styles.controlBtn} onClick={() => handleEditTemplate(item)}><Edit2 size={13} /></button>
-                                  <button className={`${styles.controlBtn} ${styles.delete}`} onClick={() => { setItemToDelete(item); setIsDeleteModalOpen(true); }}><Trash2 size={13} /></button>
-                                </div>
+                              {missingDrawingPlan && (
+                                <span
+                                  className={styles.missingDateDot}
+                                  title="Planned dates not set"
+                                />
                               )}
                             </div>
-                          );
-                        })}
-                      </div>
-                      </div>
-                    ) : (
-                      <p style={{ color: 'var(--text-light)', padding: '20px', textAlign: 'center', backgroundColor: 'var(--bg-card)', borderRadius: '12px', border: '1px dashed var(--border-color)' }}>
-                        No items found matching your search.
-                      </p>
-                    )}
+                            <div className={styles.taskMetaRow}>
+                              <span className={styles.metaTag}>
+                                <MapPin size={14} /> {item.zone || 'No Zone'}
+                              </span>
+                              <span className={styles.metaTag}>
+                                <Grid size={14} /> {item.areaName || 'No Area'}
+                              </span>
+                              <span className={styles.metaTag}>
+                                <User size={14} /> {item.resourceName || 'Unassigned'}
+                              </span>
+                              <span
+                                className={`${styles.metaTag} ${styles.metaTagDoer}`}
+                                title={`Doer: ${item.doerName || 'Unassigned'}`}
+                              >
+                                Doer: {item.doerName || 'Unassigned'}
+                              </span>
+                              {item.drawingImage?.trim() && (
+                                <a
+                                  href={item.drawingImage}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className={styles.viewDocLink}
+                                >
+                                  <FileText size={12} /> View Doc · R{item.revisionNo || '0'}
+                                </a>
+                              )}
+                            </div>
+                          </div>
+
+                          {isProjectMode ? (
+                            <div className={styles.scheduleRightCol}>
+                              <div className={styles.datesCol}>
+                                <div className={styles.dateGrid}>
+                                  <span className={`${styles.dateCell} ${styles.dateCellPlan}`}>
+                                    <strong>Plan Start:</strong>{' '}
+                                    {displayDate(item.plannedStartDate)}
+                                  </span>
+                                  <span className={`${styles.dateCell} ${styles.dateCellPlan}`}>
+                                    <strong>Plan End:</strong>{' '}
+                                    {displayDate(item.plannedEndDate)}
+                                  </span>
+                                  <span className={`${styles.dateCell} ${styles.dateCellActual}`}>
+                                    <strong>Actual Start:</strong>{' '}
+                                    {displayDate(item.actualStartDate)}
+                                  </span>
+                                  <span className={`${styles.dateCell} ${styles.dateCellActual}`}>
+                                    <strong>Actual End:</strong>{' '}
+                                    {displayDate(item.actualEndDate)}
+                                  </span>
+                                </div>
+                                {!hidePlanEditors && (
+                                  <div className={styles.inlinePlanEditors}>
+                                    <input
+                                      type="date"
+                                      className={styles.smallDateInput}
+                                      value={displayPlan.startDate || ''}
+                                      onChange={(e) =>
+                                        updatePlanDraft(item, 'startDate', e.target.value)
+                                      }
+                                      disabled={isSaving}
+                                    />
+                                    <input
+                                      type="date"
+                                      className={styles.smallDateInput}
+                                      value={displayPlan.endDate || ''}
+                                      onChange={(e) =>
+                                        updatePlanDraft(item, 'endDate', e.target.value)
+                                      }
+                                      disabled={isSaving}
+                                    />
+                                    {showSavePlan && (
+                                      <button
+                                        type="button"
+                                        className={styles.savePlanBtn}
+                                        disabled={!canSavePlan}
+                                        onClick={() => savePlanDates(item)}
+                                      >
+                                        {isSaving ? 'Saving...' : 'Save Plan'}
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className={styles.cardActionsStack}>
+                                <button
+                                  type="button"
+                                  className={styles.secondaryButton}
+                                  style={{ padding: '6px 10px', fontSize: '0.75rem', justifyContent: 'center', width: '100%' }}
+                                  onClick={() => openUpdateModal(item)}
+                                >
+                                  <UploadCloud size={14} /> Update
+                                </button>
+                                <div className={styles.trackerActionCol}>
+                                  {!item.actualStartDate?.trim() ? (
+                                    <button
+                                      type="button"
+                                      disabled={isSaving}
+                                      onClick={() => handleMarkWorkStep(item)}
+                                      className={styles.workStartBtn}
+                                    >
+                                      {isSaving ? (
+                                        <Loader2 size={14} className={styles.spinIcon} />
+                                      ) : (
+                                        <CheckSquare size={14} />
+                                      )}
+                                      {isSaving ? 'Saving...' : 'Start'}
+                                    </button>
+                                  ) : !item.actualEndDate?.trim() ? (
+                                    <button
+                                      type="button"
+                                      disabled={isSaving}
+                                      onClick={() => handleMarkWorkStep(item)}
+                                      className={styles.workEndBtn}
+                                    >
+                                      {isSaving ? (
+                                        <Loader2 size={14} className={styles.spinIcon} />
+                                      ) : (
+                                        <CheckSquare size={14} />
+                                      )}
+                                      {isSaving ? 'Saving...' : 'Work End'}
+                                    </button>
+                                  ) : (
+                                    <span className={styles.workDoneBadge}>
+                                      <CheckSquare size={14} /> Done
+                                    </span>
+                                  )}
+                                </div>
+
+                                <div className={styles.templateActions}>
+                                  <button
+                                    className={styles.controlBtn}
+                                    onClick={() => openEditModal(item)}
+                                    title="Edit"
+                                  >
+                                    <Edit2 size={13} />
+                                  </button>
+                                  <button
+                                    className={`${styles.controlBtn} ${styles.delete}`}
+                                    onClick={() => {
+                                      setItemToDelete(item);
+                                      setIsDeleteModalOpen(true);
+                                    }}
+                                    title="Delete"
+                                  >
+                                    <Trash2 size={13} />
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className={styles.templateRightCol}>
+                              <div className={styles.templateActions}>
+                                <button
+                                  className={styles.controlBtn}
+                                  onClick={() => openEditModal(item)}
+                                >
+                                  <Edit2 size={13} />
+                                </button>
+                                <button
+                                  className={`${styles.controlBtn} ${styles.delete}`}
+                                  onClick={() => {
+                                    setItemToDelete(item);
+                                    setIsDeleteModalOpen(true);
+                                  }}
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
-                );
-              })() : (
-                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', minHeight: '200px', backgroundColor: 'var(--bg-card)', borderRadius: '12px', border: '1px dashed var(--border-color)' }}>
-                  <p style={{ color: 'var(--text-light)' }}>Please create a template first.</p>
                 </div>
-              )}
-            </div>
+              ) : (
+                <p className={styles.emptyContent}>
+                  No drawings found matching your filters.
+                </p>
+              )
+            ) : (
+              <div className={styles.emptyContentBox}>
+                <p style={{ color: 'var(--text-light)' }}>
+                  {isTemplateMode
+                    ? 'Add drawings to the Template to get started.'
+                    : 'No drawings in this project sheet yet.'}
+                </p>
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
-      <Modal 
-        isOpen={isDeleteModalOpen} 
-        onClose={() => setIsDeleteModalOpen(false)} 
+      <Modal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
         title="Confirm Deletion"
         type="danger"
         width="450px"
       >
         <div className={styles.modalBody}>
-          <p>Are you sure you want to delete <strong>{itemToDelete?.drawingName}</strong>?</p>
+          <p>
+            Are you sure you want to delete <strong>{itemToDelete?.drawingName}</strong>?
+          </p>
           <div className={styles.modalActions}>
-            <button className={styles.cancelBtn} onClick={() => setIsDeleteModalOpen(false)}>Cancel</button>
-            <button className={styles.confirmDeleteBtn} onClick={handleDeleteTemplate} disabled={submitting}>
+            <button className={styles.cancelBtn} onClick={() => setIsDeleteModalOpen(false)}>
+              Cancel
+            </button>
+            <button
+              className={styles.confirmDeleteBtn}
+              onClick={handleDelete}
+              disabled={submitting}
+            >
               {submitting ? 'Deleting...' : 'Delete'}
             </button>
           </div>
         </div>
       </Modal>
 
-      {/* Template Edit/Create Modal */}
       <Modal
-        isOpen={isTplModalOpen}
-        onClose={() => setIsTplModalOpen(false)}
-        title={editingTpl ? 'Edit Drawing Template' : 'Add Drawing Template'}
-        width="500px"
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title={
+          editingItem
+            ? isTemplateMode
+              ? 'Edit Template Drawing'
+              : 'Edit Project Drawing'
+            : isTemplateMode
+              ? 'Add Template Drawing'
+              : 'Add Project Drawing'
+        }
+        width="520px"
       >
-        <form onSubmit={submitTemplate} className={styles.modalBody}>
-          <div className={styles.formGroup}>
-            <label>Category <span style={{color: 'red'}}>*</span></label>
-            <input 
+        <form onSubmit={submitItem} className={`${styles.modalBody} ${styles.fixedOutlineForm}`}>
+          <div className={styles.formGroup} data-has-value="true">
+            <label className={styles.outlineLabel}>Zone</label>
+            <input
+              list="zone-list"
+              value={form.zone}
+              onChange={(e) => setForm({ ...form, zone: e.target.value })}
+              placeholder="e.g. Zone-1"
+            />
+            <datalist id="zone-list">
+              {allZoneOptions.map((z) => (
+                <option key={z} value={z} />
+              ))}
+            </datalist>
+          </div>
+          <div className={styles.formGroup} data-has-value="true">
+            <label className={styles.outlineLabel}>
+              Category <span className={styles.requiredMark}>*</span>
+            </label>
+            <input
               list="category-list"
-              required 
-              value={tplForm.category} 
-              onChange={e => setTplForm({...tplForm, category: e.target.value})} 
+              required
+              value={form.category}
+              onChange={(e) => setForm({ ...form, category: e.target.value })}
               placeholder="Select or type a category..."
             />
             <datalist id="category-list">
-              {uniqueCategories.map(cat => (
-                <option key={cat} value={cat}>{cat}</option>
+              {allCategoryOptions.map((cat) => (
+                <option key={cat} value={cat} />
               ))}
             </datalist>
           </div>
-          <div className={styles.formGroup}>
-            <label>Drawing Name <span style={{color: 'red'}}>*</span></label>
-            <input 
-              type="text" 
-              required 
-              value={tplForm.drawingName} 
-              onChange={e => setTplForm({...tplForm, drawingName: e.target.value})} 
+          <div className={styles.formGroup} data-has-value="true">
+            <label className={styles.outlineLabel}>
+              Drawing Name <span className={styles.requiredMark}>*</span>
+            </label>
+            <input
+              type="text"
+              required
+              value={form.drawingName}
+              onChange={(e) => setForm({ ...form, drawingName: e.target.value })}
+              placeholder="Enter drawing name"
             />
           </div>
-          <div className={styles.formGroup}>
-            <label>Area Name</label>
-            <input 
-              type="text" 
-              value={tplForm.areaName} 
-              onChange={e => setTplForm({...tplForm, areaName: e.target.value})} 
+          <div className={styles.formGroup} data-has-value="true">
+            <label className={styles.outlineLabel}>Area Name</label>
+            <input
+              type="text"
+              value={form.areaName}
+              onChange={(e) => setForm({ ...form, areaName: e.target.value })}
+              placeholder="Enter area name"
             />
           </div>
-          <div className={styles.formGroup}>
-            <label>Resource Name</label>
-            <input 
-              type="text" 
-              value={tplForm.resourceName} 
-              onChange={e => setTplForm({...tplForm, resourceName: e.target.value})} 
+          <div className={styles.formGroup} data-has-value="true">
+            <label className={styles.outlineLabel}>Resource Name</label>
+            <input
+              type="text"
+              value={form.resourceName}
+              onChange={(e) => setForm({ ...form, resourceName: e.target.value })}
+              placeholder="Enter resource name"
             />
           </div>
-          <div className={styles.formGroup}>
-            <label>Doer Name</label>
-            <input 
+          <div className={styles.formGroup} data-has-value="true">
+            <label className={styles.outlineLabel}>Doer Name</label>
+            <input
               list="users-list"
-              value={tplForm.doerName || ''} 
-              onChange={e => setTplForm({...tplForm, doerName: e.target.value})}
+              value={form.doerName || ''}
+              onChange={(e) => setForm({ ...form, doerName: e.target.value })}
               placeholder="Select or type a user..."
             />
             <datalist id="users-list">
-              {users.map(u => (
-                <option key={u.id} value={u.name}>{u.name}</option>
+              {users.map((u) => (
+                <option key={u.id} value={u.name}>
+                  {u.name}
+                </option>
               ))}
             </datalist>
           </div>
-
+          {isProjectMode && (
+            <>
+              <div className={styles.formRow}>
+                <div className={styles.formGroup} data-has-value="true">
+                  <label className={styles.outlineLabel}>Planned Start</label>
+                  <input
+                    type="date"
+                    value={form.plannedStartDate}
+                    onChange={(e) =>
+                      setForm({ ...form, plannedStartDate: e.target.value })
+                    }
+                  />
+                </div>
+                <div className={styles.formGroup} data-has-value="true">
+                  <label className={styles.outlineLabel}>Planned End</label>
+                  <input
+                    type="date"
+                    value={form.plannedEndDate}
+                    onChange={(e) =>
+                      setForm({ ...form, plannedEndDate: e.target.value })
+                    }
+                  />
+                </div>
+              </div>
+              <div className={styles.formRow}>
+                <div className={styles.formGroup} data-has-value="true">
+                  <label className={styles.outlineLabel}>Actual Start</label>
+                  <input
+                    type="date"
+                    value={form.actualStartDate}
+                    onChange={(e) =>
+                      setForm({ ...form, actualStartDate: e.target.value })
+                    }
+                  />
+                </div>
+                <div className={styles.formGroup} data-has-value="true">
+                  <label className={styles.outlineLabel}>Actual End</label>
+                  <input
+                    type="date"
+                    value={form.actualEndDate}
+                    onChange={(e) =>
+                      setForm({ ...form, actualEndDate: e.target.value })
+                    }
+                  />
+                </div>
+              </div>
+            </>
+          )}
           <div className={styles.modalActions}>
-            <button type="button" className={styles.cancelBtn} onClick={() => setIsTplModalOpen(false)}>Cancel</button>
+            <button
+              type="button"
+              className={styles.cancelBtn}
+              onClick={() => setIsModalOpen(false)}
+            >
+              Cancel
+            </button>
             <button type="submit" className={styles.submitBtn} disabled={submitting}>
-              {submitting ? 'Saving...' : 'Save Template'}
+              {submitting ? 'Saving...' : 'Save'}
             </button>
           </div>
         </form>
       </Modal>
 
-      {/* Bottom Modal for Updating Schedule Item */}
       {isUpdateModalOpen && updatingItem && (
         <div className={styles.bottomModalOverlay} onClick={() => setIsUpdateModalOpen(false)}>
-          <div className={styles.bottomModalContent} onClick={e => e.stopPropagation()}>
+          <div className={styles.bottomModalContent} onClick={(e) => e.stopPropagation()}>
             <div className={styles.bottomModalHeader}>
               <div>
-                <h3 style={{ margin: 0, color: 'var(--text-heading)', fontSize: '1.2rem' }}>Update Schedule</h3>
-                <p style={{ margin: '4px 0 0 0', color: 'var(--text-light)', fontSize: '0.85rem' }}>{updatingItem.drawingName}</p>
+                <h3 style={{ margin: 0, color: 'var(--text-heading)', fontSize: '1.2rem' }}>
+                  Update Drawing
+                </h3>
+                <p style={{ margin: '4px 0 0 0', color: 'var(--text-light)', fontSize: '0.85rem' }}>
+                  {updatingItem.drawingName}
+                </p>
               </div>
               <button className={styles.closeBtn} onClick={() => setIsUpdateModalOpen(false)}>
                 <X size={20} />
               </button>
             </div>
-            
+
             <div className={styles.bottomModalBody}>
               <div className={styles.updateGrid}>
-                {(() => {
-                  const workPhase = !updatingItem.actualStartDate?.trim()
-                    ? 'start'
-                    : !updatingItem.actualEndDate?.trim()
-                      ? 'end'
-                      : 'complete';
-
-                  return (
-                    <>
-                      {workPhase === 'start' && (
-                        <div className={styles.formGroup}>
-                          <label>Start</label>
-                          <select
-                            className={styles.formSelect}
-                            value={workAction}
-                            onChange={(e) => setWorkAction(e.target.value as 'start' | '')}
-                          >
-                            <option value="">Select to start work...</option>
-                            <option value="start">Start — record today as work started</option>
-                          </select>
-                        </div>
-                      )}
-
-                      {workPhase === 'end' && (
-                        <div className={styles.formGroup}>
-                          <label>Work End</label>
-                          <select
-                            className={styles.formSelect}
-                            value={workAction}
-                            onChange={(e) => setWorkAction(e.target.value as 'work_end' | '')}
-                          >
-                            <option value="">Select to end work...</option>
-                            <option value="work_end">Work End — record today as work ended</option>
-                          </select>
-                          <p className={styles.markDateHint}>
-                            Work started: <strong>{formatDate(updatingItem.actualStartDate)}</strong>
-                          </p>
-                        </div>
-                      )}
-
-                      {workPhase === 'complete' && (
-                        <div className={styles.formGroup}>
-                          <label>Work Status</label>
-                          <p className={styles.markDateComplete}>
-                            Started: <strong>{formatDate(updatingItem.actualStartDate)}</strong>
-                            {' · '}
-                            Ended: <strong>{formatDate(updatingItem.actualEndDate)}</strong>
-                          </p>
-                        </div>
-                      )}
-
-                      <div className={styles.formGroup}>
-                        <label>Client Status</label>
-                        <select
-                          className={styles.formSelect}
-                          value={updatingItem.clientStatus || 'Pending'}
-                          onChange={(e) => setUpdatingItem({ ...updatingItem, clientStatus: e.target.value })}
-                        >
-                          <option value="Pending">Pending</option>
-                          <option value="Approved">Approved</option>
-                          <option value="Rejected">Rejected</option>
-                        </select>
-                      </div>
-                    </>
-                  );
-                })()}
-
                 <div className={styles.formGroup} style={{ gridColumn: '1 / -1' }}>
                   <label>Upload Revision</label>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
@@ -908,8 +1447,8 @@ export default function DrawingsPage() {
                     </div>
                     <label className={styles.secondaryButton} style={{ cursor: 'pointer', margin: 0 }}>
                       <UploadCloud size={16} /> Select File
-                      <input 
-                        type="file" 
+                      <input
+                        type="file"
                         style={{ display: 'none' }}
                         ref={fileInputRef}
                         onChange={(e) => {
@@ -930,99 +1469,12 @@ export default function DrawingsPage() {
             </div>
 
             <div className={styles.bottomModalFooter}>
-              <button className={styles.cancelBtn} onClick={() => setIsUpdateModalOpen(false)}>Close</button>
-              <button 
-                className={styles.submitBtn} 
-                onClick={async () => {
-                  if (!updatingItem) return;
-                  setSubmitting(true);
-                  try {
-                    let fileUrl = updatingItem.drawingImage || '';
-                    const tplId = (updatingItem as any).tplId;
-                    
-                    if (stagedFile) {
-                      setUploadingImageFor(tplId);
-                      const formData = new FormData();
-                      formData.append('files', stagedFile);
-                      formData.append('folderId', '1j8iL0WFy52LhkUGN_g7UeZJOyYFb3AFP');
-
-                      const res = await fetch('/api/upload', {
-                        method: 'POST',
-                        body: formData,
-                      });
-
-                      if (res.ok) {
-                        const data = await res.json();
-                        const urlData = data.files[0].url;
-                        fileUrl = typeof urlData === 'string' ? urlData : (urlData.webViewLink || urlData.webContentLink || '');
-                      } else {
-                        throw new Error('File upload failed');
-                      }
-                    }
-                  
-                    const currentItem = localSchedule[tplId];
-                    let newRev = parseInt(updatingItem.revisionNo || '0');
-
-                    const today = getTodayIsoDate();
-                    let actualStartDate = updatingItem.actualStartDate || '';
-                    let actualEndDate = updatingItem.actualEndDate || '';
-                    let rsDesignStatus = updatingItem.rsDesignStatus || 'Pending';
-
-                    if (workAction === 'start' && !actualStartDate) {
-                      actualStartDate = today;
-                      rsDesignStatus = 'In Progress';
-                    }
-
-                    if (workAction === 'work_end' && actualStartDate && !actualEndDate) {
-                      actualEndDate = today;
-                      rsDesignStatus = 'Approved';
-                    }
-
-                    const rsChanged = rsDesignStatus !== currentItem.rsDesignStatus;
-                    const clientChanged = updatingItem.clientStatus !== currentItem.clientStatus;
-                    const datesChanged = workAction === 'start' || workAction === 'work_end';
-
-                    if (rsChanged || clientChanged || stagedFile || datesChanged) {
-                      newRev++;
-                    }
-
-                    const updatedItemToSave = {
-                      ...updatingItem,
-                      drawingImage: fileUrl,
-                      revisionNo: newRev.toString(),
-                      actualStartDate,
-                      actualEndDate,
-                      rsDesignStatus,
-                    };
-
-                    setLocalSchedule(prev => ({
-                      ...prev,
-                      [tplId]: updatedItemToSave
-                    }));
-                    
-                    // ALWAYS append a new row to keep history, never update existing
-                    const resApi = await fetch('/api/drawings', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ project: activeProjectName, items: [updatedItemToSave] }),
-                    });
-
-                    if (!resApi.ok) {
-                       const errData = await resApi.json();
-                       throw new Error(errData.error || 'Failed to save to database');
-                    }
-                    await fetchData();
-                  } catch(e) {
-                    console.error(e);
-                    alert("Error applying changes: " + (e as any).message);
-                  } finally {
-                    setUploadingImageFor(null);
-                    setSubmitting(false);
-                    setStagedFile(null);
-                    setWorkAction('');
-                    setIsUpdateModalOpen(false);
-                  }
-                }}
+              <button className={styles.cancelBtn} onClick={() => setIsUpdateModalOpen(false)}>
+                Close
+              </button>
+              <button
+                className={styles.submitBtn}
+                onClick={handleApplyUpdate}
                 disabled={submitting}
               >
                 {submitting ? 'Applying...' : 'Apply Changes'}
@@ -1031,7 +1483,14 @@ export default function DrawingsPage() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
 
+function BuildingPlaceholder() {
+  return (
+    <div className={styles.installIconWrap}>
+      <LayoutTemplate size={40} />
     </div>
   );
 }

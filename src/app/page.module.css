@@ -1,19 +1,42 @@
+.dashboardShell {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.dashboardMain {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
 .dashboard {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 16px;
 }
 
 .pageHeader {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
 }
 
-.pageHeader > div {
+.headerFilter {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  align-items: center;
+  margin-left: auto;
+  width: min(280px, 100%);
+}
+
+.pageTitle {
+  font-size: 1.25rem;
+  margin: 0;
+  flex-shrink: 0;
 }
 
 .actionButtons {
@@ -59,11 +82,6 @@
 .portfolioBtn:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 16px rgba(79, 70, 229, 0.4);
-}
-
-.pageTitle {
-  font-size: 1.25rem;
-  margin: 0;
 }
 
 .breadcrumb {
@@ -206,13 +224,26 @@
 }
 
 .filterSelect {
-  width: min(320px, 100%);
+  width: min(260px, 100%);
 }
 
 .filterScope {
   font-size: 0.78rem;
   color: var(--text-light);
   font-weight: 600;
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .headerFilter {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .filterSelect {
+    flex: 1;
+    min-width: 160px;
+  }
 }
 
 .moduleSection {

@@ -20,6 +20,16 @@ import { useRouter } from 'next/navigation';
 import { useProject } from '@/context/ProjectContext';
 import { useAuth } from '@/context/AuthContext';
 import { filterProjectsForUser } from '@/lib/project-access';
+import { parseFlexibleDate } from '@/lib/em-access';
+import {
+  buildDrawingDoerTasksFromProjects,
+  buildTrackerDoerTasksFromProjects,
+  getDrawingProgressFromProjectSheets,
+  getTrackerProgressFromProjectSheets,
+  type DrawingProjectBundle,
+  type TrackerProjectBundle,
+} from '@/lib/schedule-merge';
+import ProjectOverviewPanel from '@/components/ProjectOverviewPanel';
 
 interface Project {
   id: string;
@@ -37,6 +47,33 @@ function getActiveTeamNames(team: any[]): string {
     .filter((m) => m.isActive !== 'No' && m.name?.trim())
     .map((m) => m.name.trim());
   return names.length > 0 ? names.join(', ') : 'No team assigned';
+}
+
+function formatDisplayDate(dateStr?: string): string {
+  if (!dateStr?.trim()) return '—';
+  const date = parseFlexibleDate(dateStr);
+  if (!date) return dateStr;
+  return date.toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
+function getDaysRemaining(dateStr?: string): number | null {
+  const date = parseFlexibleDate(dateStr);
+  if (!date) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const end = new Date(date);
+  end.setHours(0, 0, 0, 0);
+  return Math.ceil((end.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+function startOfDay(d: Date): Date {
+  const copy = new Date(d);
+  copy.setHours(0, 0, 0, 0);
+  return copy;
 }
 
 export default function ProjectsPage() {
@@ -60,6 +97,9 @@ export default function ProjectsPage() {
   const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('All');
+  const [detailDrawingBundles, setDetailDrawingBundles] = useState<DrawingProjectBundle[]>([]);
+  const [detailTrackerBundles, setDetailTrackerBundles] = useState<TrackerProjectBundle[]>([]);
+  const [detailPendingApprovals, setDetailPendingApprovals] = useState(0);
 
   const projectTypeTabs = useMemo(() => {
     const typeCounts = new Map<string, { label: string; count: number }>();
@@ -160,6 +200,214 @@ export default function ProjectsPage() {
       }, 0);
     }
   }, []);
+
+  useEffect(() => {
+    fetchProjects();
+    fetchUsers();
+    const saved = localStorage.getItem('projects_view_mode') as 'card' | 'table';
+    if (saved === 'card' || saved === 'table') {
+      setTimeout(() => {
+        setViewMode(saved);
+      }, 0);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!viewingProject) {
+      setDetailDrawingBundles([]);
+      setDetailTrackerBundles([]);
+      setDetailPendingApprovals(0);
+      return;
+    }
+
+    const projectName = viewingProject.basicInfo?.name?.trim() || '';
+    let cancelled = false;
+
+    async function loadDetailMetrics() {
+      try {
+        const [drawingRes, trackerRes, quotationsRes] = await Promise.all([
+          fetch('/api/drawings?all=1'),
+          fetch('/api/pms-tracker?all=1'),
+          fetch('/api/quotations'),
+        ]);
+
+        const drawings = drawingRes.ok ? await drawingRes.json() : [];
+        const trackers = trackerRes.ok ? await trackerRes.json() : [];
+        const quotations = quotationsRes.ok ? await quotationsRes.json() : [];
+
+        if (cancelled) return;
+
+        const drawingBundles = Array.isArray(drawings)
+          ? (drawings as DrawingProjectBundle[]).filter(
+              (b) => b.project?.trim().toLowerCase() === projectName.toLowerCase()
+            )
+          : [];
+        const trackerBundles = Array.isArray(trackers)
+          ? (trackers as TrackerProjectBundle[]).filter(
+              (b) => b.project?.trim().toLowerCase() === projectName.toLowerCase()
+            )
+          : [];
+
+        setDetailDrawingBundles(drawingBundles);
+        setDetailTrackerBundles(trackerBundles);
+
+        const pending = (Array.isArray(quotations) ? quotations : []).filter((q: any) => {
+          const matches =
+            q.project?.trim().toLowerCase() === projectName.toLowerCase();
+          if (!matches) return false;
+          const rs = (q.statusRSDesign || 'Pending').trim();
+          const client = (q.statusClient || 'Pending').trim();
+          return rs === 'Pending' || client === 'Pending';
+        }).length;
+        setDetailPendingApprovals(pending);
+      } catch (err) {
+        console.error('Failed to load project overview metrics', err);
+        if (!cancelled) {
+          setDetailDrawingBundles([]);
+          setDetailTrackerBundles([]);
+          setDetailPendingApprovals(0);
+        }
+      }
+    }
+
+    loadDetailMetrics();
+    return () => {
+      cancelled = true;
+    };
+  }, [viewingProject]);
+
+  const projectOverview = useMemo(() => {
+    if (!viewingProject) return null;
+
+    const projectName = viewingProject.basicInfo?.name?.trim() || '';
+    const names = [projectName];
+    const drawingProgress = getDrawingProgressFromProjectSheets(
+      detailDrawingBundles,
+      names
+    );
+    const trackerProgress = getTrackerProgressFromProjectSheets(
+      detailTrackerBundles,
+      names
+    );
+
+    const hasDrawing = drawingProgress.total > 0;
+    const hasTracker = trackerProgress.total > 0;
+    const avgProgress =
+      hasDrawing && hasTracker
+        ? Math.round((drawingProgress.percent + trackerProgress.percent) / 2)
+        : hasDrawing
+          ? drawingProgress.percent
+          : hasTracker
+            ? trackerProgress.percent
+            : 0;
+
+    const drawingTasks = buildDrawingDoerTasksFromProjects(
+      detailDrawingBundles,
+      names
+    );
+    const trackerTasks = buildTrackerDoerTasksFromProjects(
+      detailTrackerBundles,
+      names
+    );
+    const today = startOfDay(new Date());
+
+    let overdueCount = 0;
+    let dueTodayCount = 0;
+    let currentWorkTitle = 'No active work';
+    let currentWorkDetail = 'No in-progress drawing or tracker tasks.';
+    let nextMilestoneTitle = 'No upcoming milestone';
+    let nextMilestoneDue = '—';
+    let nextDueMs = Number.POSITIVE_INFINITY;
+
+    const considerTask = (task: {
+      actualStartDate?: string;
+      actualEndDate?: string;
+      planStartDate?: string;
+      planEndDate?: string;
+      drawingName?: string;
+      taskName?: string;
+      category?: string;
+      completed?: boolean;
+    }) => {
+      if (task.actualEndDate?.trim() || task.completed) return;
+
+      const due =
+        parseFlexibleDate(task.planEndDate) ||
+        parseFlexibleDate(task.planStartDate);
+      if (due) {
+        const dueDay = startOfDay(due);
+        if (dueDay.getTime() < today.getTime()) overdueCount += 1;
+        else if (dueDay.getTime() === today.getTime()) dueTodayCount += 1;
+        else if (dueDay.getTime() < nextDueMs) {
+          nextDueMs = dueDay.getTime();
+          nextMilestoneTitle =
+            task.drawingName ||
+            task.taskName ||
+            task.category ||
+            'Upcoming task';
+          nextMilestoneDue = formatDisplayDate(
+            task.planEndDate || task.planStartDate
+          );
+        }
+      }
+
+      if (
+        currentWorkTitle === 'No active work' &&
+        task.actualStartDate?.trim() &&
+        !task.actualEndDate?.trim()
+      ) {
+        currentWorkTitle =
+          task.drawingName || task.taskName || task.category || 'In progress';
+        currentWorkDetail = task.category
+          ? `${task.category} in progress`
+          : 'Work currently underway';
+      }
+    };
+
+    drawingTasks.forEach(considerTask);
+    trackerTasks.forEach(considerTask);
+
+    const healthLabel =
+      overdueCount > 0 ? 'Delayed' : dueTodayCount > 0 ? 'At Risk' : 'On Track';
+
+    const site = viewingProject.sites?.[0];
+    const locationParts = [site?.city, site?.state].filter(Boolean);
+    const locationLabel = locationParts.join(', ');
+
+    const status = viewingProject.basicInfo?.status || 'In Progress';
+    const progressStatusLabel =
+      status === 'Completed'
+        ? 'Completed'
+        : avgProgress > 0
+          ? 'In Progress'
+          : status;
+
+    return {
+      name: projectName || 'Untitled Project',
+      locationLabel,
+      category: viewingProject.basicInfo?.category || '',
+      lastUpdated: formatDisplayDate(
+        viewingProject.metadata?.createdAt || viewingProject.basicInfo?.startDate
+      ),
+      progressPercent: avgProgress,
+      progressStatusLabel,
+      targetCompletion: formatDisplayDate(
+        viewingProject.basicInfo?.expectedEndDate
+      ),
+      daysRemaining: getDaysRemaining(viewingProject.basicInfo?.expectedEndDate),
+      healthLabel: healthLabel as 'On Track' | 'At Risk' | 'Delayed',
+      pendingApprovals: detailPendingApprovals,
+      currentWorkTitle,
+      currentWorkDetail,
+      nextMilestoneTitle,
+      nextMilestoneDue,
+    };
+  }, [
+    viewingProject,
+    detailDrawingBundles,
+    detailTrackerBundles,
+    detailPendingApprovals,
+  ]);
 
   const handleViewModeChange = (mode: 'card' | 'table') => {
     setViewMode(mode);
@@ -331,96 +579,8 @@ export default function ProjectsPage() {
           </div>
         </div>
 
-        <div className={styles.detailHero}>
-          <div className={styles.heroMain}>
-            <div className={styles.heroTitle}>
-              <span className={styles.projectBadge}>{viewingProject.basicInfo.type}</span>
-              <h1>{viewingProject.basicInfo.name}</h1>
-              <span className={styles.projectCode}>{viewingProject.basicInfo.code || viewingProject.id}</span>
-            </div>
-            <div className={styles.heroStats}>
-              <div className={styles.heroStatItem}>
-                <label>Status</label>
-                <div className={`${styles.statusValue} ${viewingProject.basicInfo.status === 'Completed' ? styles.statusCompleted : ''}`}>
-                  <CheckCircle size={18} /> {viewingProject.basicInfo.status}
-                </div>
-              </div>
-              <div className={styles.heroStatItem}>
-                <label>Progress</label>
-                <div className={styles.progressLabel}>{viewingProject.metadata?.completion || 0}%</div>
-                <div className={styles.progressBarLarge}>
-                  <div className={styles.progressFillLarge} style={{ width: `${viewingProject.metadata?.completion || 0}%` }} />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
         <div className={styles.detailContent}>
-          <div className={styles.detailGrid}>
-            <div className={styles.detailCard}>
-              <div className={styles.cardHeaderSmall}><Info size={18} /> Basic Details</div>
-              <div className={styles.cardTable}>
-                <div className={styles.tableRow}><label>Category</label><span>{viewingProject.basicInfo.category}</span></div>
-                <div className={styles.tableRow}><label>Budget</label><span>₹{viewingProject.basicInfo.estimatedBudget}</span></div>
-                <div className={styles.tableRow}><label>Start Date</label><span>{viewingProject.basicInfo.startDate || 'N/A'}</span></div>
-                <div className={styles.tableRow}><label>Priority</label><span>{viewingProject.basicInfo.priority}</span></div>
-              </div>
-            </div>
-
-            <div className={styles.detailCard}>
-              <div className={styles.cardHeaderSmall}><Users size={18} /> Clients ({viewingProject.clients.length})</div>
-              <div className={styles.scrollList}>
-                {viewingProject.clients.map((c, i) => (
-                  <div key={i} className={styles.clientMini}>
-                    <div className={styles.clientTop}>
-                      <strong>{c.name}</strong>
-                      <span className={styles.roleTag}>{c.type}</span>
-                    </div>
-                    <div className={styles.clientMeta}>
-                      {c.mobile && <span><Phone size={12} /> {c.mobile}</span>}
-                      {c.email && <span><Mail size={12} /> {c.email}</span>}
-                    </div>
-                    {c.company && <div className={styles.clientCompany}><Building size={12} /> {c.company}</div>}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className={styles.detailCard}>
-              <div className={styles.cardHeaderSmall}><MapPin size={18} /> Sites ({viewingProject.sites.length})</div>
-              <div className={styles.scrollList}>
-                {viewingProject.sites.map((s, i) => (
-                  <div key={i} className={styles.siteMini}>
-                    <div className={styles.siteTop}>
-                      <strong>{s.name}</strong>
-                      <span className={styles.roleTag}>{s.type}</span>
-                    </div>
-                    <p className={styles.siteAddr}>{s.address} {s.city && `, ${s.city}`}</p>
-                    <div className={styles.siteMeta}>
-                      <span><Layers size={12} /> {s.area} Sqft</span>
-                      {s.googleLocation && <a href={s.googleLocation} target="_blank"><ExternalLink size={12} /> Map</a>}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className={styles.detailCard}>
-              <div className={styles.cardHeaderSmall}><ShieldCheck size={18} /> Internal Team</div>
-              <div className={styles.scrollList}>
-                {viewingProject.team.map((t, i) => (
-                  <div key={i} className={styles.teamMini}>
-                    <div className={styles.teamAvatar}><User size={20} /></div>
-                    <div>
-                      <strong>{t.name}</strong>
-                      <p>{t.role}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+          {projectOverview ? <ProjectOverviewPanel data={projectOverview} /> : null}
           
           <div className={styles.descriptionSection}>
             <div className={styles.cardHeaderSmall}><FileText size={18} /> Project Description</div>

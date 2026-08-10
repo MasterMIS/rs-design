@@ -1,29 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSheetsData, appendSheetsData, updateSheetRow, deleteSheetRow } from '@/lib/google-sheets';
 import { CONFIG } from '@/lib/config';
+import {
+  nextDrawingNo,
+  parseDrawingRows,
+  quoteSheetRange,
+  toDrawingSheetRow,
+} from '@/lib/drawings';
 
 const SHEET_ID = CONFIG.DRAWING_SCHEDULE.SHEET_ID;
 const SHEET_NAME = CONFIG.DRAWING_SCHEDULE.TEMPLATES_SHEET;
 
 export async function GET() {
   try {
-    const data = await getSheetsData(SHEET_ID, `${SHEET_NAME}!A2:F1000`);
-
-    if (!data || data.length === 0) return NextResponse.json([]);
-
-    const items = data.map((row: string[], index: number) => {
-      return {
-        rowIndex: index + 2,
-        id: `TPL-${index + 2}`,
-        drawingNo: row[0] || '',
-        areaName: row[1] || '',
-        drawingName: row[2] || '',
-        resourceName: row[3] || '',
-        doerName: row[4] || '',
-        category: row[5] || 'Uncategorized',
-      };
-    }).filter((t: any) => t.drawingName);
-
+    const data = await getSheetsData(SHEET_ID, quoteSheetRange(SHEET_NAME, 'A2:N1000'));
+    const items = parseDrawingRows(data as string[][] | undefined);
     return NextResponse.json(items);
   } catch (error: unknown) {
     const err = error as Error;
@@ -35,24 +26,55 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { drawingNo, areaName, drawingName, resourceName, doerName, category } = body;
+    const {
+      drawingNo,
+      zone,
+      areaName,
+      drawingName,
+      resourceName,
+      doerName,
+      category,
+      plannedStartDate,
+      plannedEndDate,
+      actualStartDate,
+      actualEndDate,
+      revisionNo,
+      lastUpdated,
+      drawingImage,
+    } = body;
 
     if (!drawingName) {
       return NextResponse.json({ error: 'Drawing Name is required.' }, { status: 400 });
     }
 
-    const newRow = [
-      drawingNo || '',
-      areaName || '',
-      drawingName || '',
-      resourceName || '',
-      doerName || '',
-      category || 'Uncategorized'
-    ];
+    let finalDrawingNo = drawingNo || '';
+    if (!finalDrawingNo.trim()) {
+      const existing = parseDrawingRows(
+        (await getSheetsData(SHEET_ID, quoteSheetRange(SHEET_NAME, 'A2:N1000'))) as string[][]
+      );
+      finalDrawingNo = nextDrawingNo(existing);
+    }
 
-    await appendSheetsData(SHEET_ID, `${SHEET_NAME}!A2`, [newRow]);
+    const newRow = toDrawingSheetRow({
+      drawingNo: finalDrawingNo,
+      zone,
+      areaName,
+      drawingName,
+      resourceName,
+      doerName,
+      category,
+      plannedStartDate: plannedStartDate || '',
+      plannedEndDate: plannedEndDate || '',
+      actualStartDate: actualStartDate || '',
+      actualEndDate: actualEndDate || '',
+      revisionNo: revisionNo || '0',
+      lastUpdated: lastUpdated || '',
+      drawingImage: drawingImage || '',
+    });
 
-    return NextResponse.json({ success: true });
+    await appendSheetsData(SHEET_ID, quoteSheetRange(SHEET_NAME, 'A2'), [newRow]);
+
+    return NextResponse.json({ success: true, drawingNo: finalDrawingNo });
   } catch (error: unknown) {
     const err = error as Error;
     console.error('API Error (POST Drawing Template):', err);
@@ -69,22 +91,49 @@ export async function PUT(request: NextRequest) {
     const rowIndex = parseInt(rowIndexStr);
 
     const body = await request.json();
-    const { drawingNo, areaName, drawingName, resourceName, doerName, category } = body;
+    const {
+      drawingNo,
+      zone,
+      areaName,
+      drawingName,
+      resourceName,
+      doerName,
+      category,
+      plannedStartDate,
+      plannedEndDate,
+      actualStartDate,
+      actualEndDate,
+      revisionNo,
+      lastUpdated,
+      drawingImage,
+    } = body;
 
     if (!drawingName) {
       return NextResponse.json({ error: 'Drawing Name is required.' }, { status: 400 });
     }
 
-    const updatedRow = [
-      drawingNo || '',
-      areaName || '',
-      drawingName || '',
-      resourceName || '',
-      doerName || '',
-      category || 'Uncategorized'
-    ];
+    const updatedRow = toDrawingSheetRow({
+      drawingNo,
+      zone,
+      areaName,
+      drawingName,
+      resourceName,
+      doerName,
+      category,
+      plannedStartDate: plannedStartDate || '',
+      plannedEndDate: plannedEndDate || '',
+      actualStartDate: actualStartDate || '',
+      actualEndDate: actualEndDate || '',
+      revisionNo: revisionNo || '0',
+      lastUpdated: lastUpdated || '',
+      drawingImage: drawingImage || '',
+    });
 
-    await updateSheetRow(SHEET_ID, `${SHEET_NAME}!A${rowIndex}:F${rowIndex}`, [updatedRow]);
+    await updateSheetRow(
+      SHEET_ID,
+      quoteSheetRange(SHEET_NAME, `A${rowIndex}:N${rowIndex}`),
+      [updatedRow]
+    );
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {

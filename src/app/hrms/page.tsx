@@ -6,6 +6,18 @@ import { Plus, Edit2, Trash2, X, BarChart3, Search, Filter, ChevronLeft, Chevron
 import styles from './hrms.module.css';
 import Modal from '@/components/Modal';
 import { useAuth } from '@/context/AuthContext';
+import {
+  getNextStepInfo,
+  getPendingStepStatus,
+  getStepName,
+  HRMS_STEP_NAMES,
+  normalizeHrmsFollowUpDate,
+} from '@/lib/sales-pipeline';
+
+const HRMS_PIPELINE_OPTS = {
+  stepNames: HRMS_STEP_NAMES,
+  normalizeFollowUpDate: normalizeHrmsFollowUpDate,
+};
 
 interface Candidate {
   rowIndex: number;
@@ -81,15 +93,6 @@ const FilterSection = ({ title, options, selected, onChange }: { title: string, 
   );
 };
 
-export const getNextStepInfo = (candidate: Candidate) => {
-  if (!candidate.actual_1) return { step: 1, title: 'Step 1' };
-  if (!candidate.actual_2) return { step: 2, title: 'Step 2' };
-  if (!candidate.actual_3) return { step: 3, title: 'Step 3' };
-  if (!candidate.actual_4) return { step: 4, title: 'Step 4' };
-  if (!candidate.actual_5) return { step: 5, title: 'Step 5' };
-  return { step: 6, title: 'Completed' };
-};
-
 // Define dynamic icons for posts and steps
 const getPostIcon = (post: string) => {
   switch (post) {
@@ -123,71 +126,6 @@ const getStepIcon = (step: number) => {
   }
 };
 
-export const getStepName = (step: number) => {
-  switch(step) {
-    case 1: return "Step-1 Calling followup";
-    case 2: return "Step-2 Level 1 interview";
-    case 3: return "Step-3 Level 2 interview";
-    case 4: return "Step-4 Offer letter";
-    case 5: return "Step-5 Joining";
-    default: return "Completed";
-  }
-};
-
-export const getPendingStepStatus = (candidate: Candidate, customNow?: Date) => {
-  const info = getNextStepInfo(candidate);
-  if (info.step > 5) return null;
-  
-  const currentStatus = candidate[`status_${info.step}` as keyof Candidate];
-  const nextFollowUpDateStr = candidate[`next_follow_up_date_${info.step}` as keyof Candidate];
-  
-  let plannedDateStr = candidate[`planned_${info.step}` as keyof Candidate];
-  let isFollowUp = false;
-  
-  if (currentStatus === 'Next Follow Up' && nextFollowUpDateStr) {
-    if (typeof nextFollowUpDateStr === 'string' && nextFollowUpDateStr.length === 10) {
-      plannedDateStr = `${nextFollowUpDateStr}T12:30:00.000Z`;
-    } else {
-      plannedDateStr = nextFollowUpDateStr;
-    }
-    isFollowUp = true;
-  }
-  
-  if (!plannedDateStr) return null; 
-  
-  const plannedDate = new Date(plannedDateStr as string);
-  const now = customNow || new Date();
-  
-  const diffMs = plannedDate.getTime() - now.getTime();
-  const diffDays = Math.floor(Math.abs(diffMs) / (1000 * 60 * 60 * 24));
-  const diffHours = Math.floor((Math.abs(diffMs) / (1000 * 60 * 60)) % 24);
-  const diffMinutes = Math.floor((Math.abs(diffMs) / (1000 * 60)) % 60);
-  const diffSeconds = Math.floor((Math.abs(diffMs) / 1000) % 60);
-  
-  let timeText = '';
-  if (diffDays > 0) timeText += `${diffDays}d `;
-  if (diffHours > 0 || diffDays > 0) timeText += `${diffHours}h `;
-  if (diffMinutes > 0 || diffHours > 0 || diffDays > 0) timeText += `${diffMinutes}m `;
-  timeText += `${diffSeconds}s`;
-  
-  const isDelayed = diffMs < 0;
-  
-  const formattedPlannedDate = new Intl.DateTimeFormat('en-IN', {
-    day: '2-digit', month: 'short', year: 'numeric',
-    hour: '2-digit', minute: '2-digit', hour12: true
-  }).format(plannedDate);
-  
-  return {
-    stepName: getStepName(info.step),
-    isDelayed,
-    timeText: isDelayed ? `${timeText} delayed` : `${timeText} left`,
-    plannedDate,
-    formattedPlannedDate,
-    step: info.step,
-    isFollowUp
-  };
-};
-
 const StepCountdown = ({ candidate, handleOpenStepModal }: { candidate: Candidate, handleOpenStepModal: (candidate: Candidate) => void }) => {
   const [now, setNow] = useState(new Date());
   useEffect(() => {
@@ -195,7 +133,7 @@ const StepCountdown = ({ candidate, handleOpenStepModal }: { candidate: Candidat
     return () => clearInterval(timer);
   }, []);
   
-  const status = getPendingStepStatus(candidate, now);
+  const status = getPendingStepStatus(candidate, { ...HRMS_PIPELINE_OPTS, now });
   if (!status) return null;
 
   return (
@@ -692,7 +630,7 @@ export default function HRMSPage() {
 
         result = result.filter(l => {
           if (l.lost_remark) return false;
-          const status = getPendingStepStatus(l);
+          const status = getPendingStepStatus(l, HRMS_PIPELINE_OPTS);
           if (!status) return false;
           
           if (timeFilter === 'delayed') return status.isDelayed;
@@ -785,7 +723,7 @@ export default function HRMSPage() {
         return;
       }
       counts['All Time']++;
-      const status = getPendingStepStatus(l);
+      const status = getPendingStepStatus(l, HRMS_PIPELINE_OPTS);
       if (!status) return;
       if (status.isDelayed) counts['Delayed']++;
       else if (status.plannedDate >= todayStart && status.plannedDate < tomorrowStart) counts['Today']++;
@@ -945,7 +883,7 @@ export default function HRMSPage() {
                       onClick={() => { setSelectedStep(step); setCurrentPage(1); }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>{getStepIcon(step)}<span style={{ fontSize: '0.85rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }} title={getStepName(step)}>{getStepName(step)}</span></div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>{getStepIcon(step)}<span style={{ fontSize: '0.85rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }} title={getStepName(step, HRMS_STEP_NAMES)}>{getStepName(step, HRMS_STEP_NAMES)}</span></div>
                         {count > 0 && <span className={styles.badge}>{count}</span>}
                       </div>
                     </div>

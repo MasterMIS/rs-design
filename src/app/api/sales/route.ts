@@ -47,11 +47,14 @@ const SHEET_NAME = CONFIG.SALES.SHEET_NAME;
 // AH: Status_5 (33)
 // AI: Next_Follow_Up_Date_5 (34)
 // AJ: Remark_5 (35)
-// AK: Lost_Remark (36)
+// AK: Planned_6 (36)
+// AL: Actual_6 (37)
+// AM: Status_6 (38)
+// AN: Lost_Remark (39)
 
 export async function GET() {
   try {
-    const data = await getSheetsData(SHEET_ID, `${SHEET_NAME}!A2:AK1000`);
+    const data = await getSheetsData(SHEET_ID, `${SHEET_NAME}!A2:AN1000`);
 
     if (!data || data.length === 0) return NextResponse.json([]);
 
@@ -94,7 +97,10 @@ export async function GET() {
         status_5: row[33] || '',
         next_follow_up_date_5: row[34] || '',
         remark_5: row[35] || '',
-        lost_remark: row[36] || '',
+        planned_6: row[36] || '',
+        actual_6: row[37] || '',
+        status_6: row[38] || '',
+        lost_remark: row[39] || '',
       };
     });
 
@@ -168,7 +174,7 @@ export async function POST(request: NextRequest) {
       typeOfClient || '',
       nameOfBuilder || '',
       plannedDate.toISOString(),
-      ...Array(24).fill('') // Padding columns N (13) to AK (36) with empty strings
+      ...Array(27).fill('') // Padding columns N (13) to AN (39)
     ];
 
     await appendSheetsData(SHEET_ID, `${SHEET_NAME}!A2`, [newRow]);
@@ -244,10 +250,13 @@ export async function PUT(request: NextRequest) {
       formData.get('status_5') as string || '',
       formData.get('next_follow_up_date_5') as string || '',
       formData.get('remark_5') as string || '',
+      formData.get('planned_6') as string || '',
+      formData.get('actual_6') as string || '',
+      formData.get('status_6') as string || '',
       formData.get('lost_remark') as string || ''
     ];
 
-    await updateSheetRow(SHEET_ID, `${SHEET_NAME}!A${rowIndex}:AK${rowIndex}`, [updatedRow]);
+    await updateSheetRow(SHEET_ID, `${SHEET_NAME}!A${rowIndex}:AN${rowIndex}`, [updatedRow]);
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {

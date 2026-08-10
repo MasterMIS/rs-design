@@ -39,17 +39,13 @@ export function isTrackerInProgress(row: {
 export function isDrawingCompleted(row: {
   actualStartDate?: string;
   actualEndDate?: string;
-  clientStatus?: string;
 }) {
-  if (row.actualEndDate?.trim()) return true;
-  const status = row.clientStatus?.toLowerCase() || '';
-  return status.includes('approved') || status.includes('complete');
+  return !!row.actualEndDate?.trim();
 }
 
 export function isDrawingInProgress(row: {
   actualStartDate?: string;
   actualEndDate?: string;
-  clientStatus?: string;
 }) {
   if (isDrawingCompleted(row)) return false;
   return !!row.actualStartDate?.trim();

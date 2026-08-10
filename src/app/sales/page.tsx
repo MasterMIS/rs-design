@@ -2,10 +2,19 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
-import { Plus, Edit2, Trash2, X, BarChart3, Search, Filter, ChevronLeft, ChevronRight, User, Phone, MapPin, Building, Briefcase, HardHat, Users, Calendar, Fingerprint, Tag, Download, Home, Store, CheckSquare, XCircle, RefreshCw } from 'lucide-react';
+import { Plus, Edit2, Trash2, X, BarChart3, Search, Filter, ChevronLeft, ChevronRight, User, Phone, MapPin, Building, Briefcase, HardHat, Users, Calendar, Fingerprint, Tag, Download, Home, Store, CheckSquare, XCircle } from 'lucide-react';
 import styles from './sales.module.css';
 import Modal from '@/components/Modal';
 import { useAuth } from '@/context/AuthContext';
+import {
+  getNextStepInfo,
+  getPendingStepStatus,
+  getStepName,
+  isSalesLeadActive,
+  isSalesLeadLost,
+  SALES_MAX_STEP,
+  SALES_PIPELINE_OPTS,
+} from '@/lib/sales-pipeline';
 
 interface Lead {
   rowIndex: number;
@@ -45,6 +54,9 @@ interface Lead {
   status_5?: string;
   next_follow_up_date_5?: string;
   remark_5?: string;
+  planned_6?: string;
+  actual_6?: string;
+  status_6?: string;
   lost_remark?: string;
 }
 
@@ -79,76 +91,6 @@ const FilterSection = ({ title, options, selected, onChange }: { title: string, 
   );
 };
 
-export const getNextStepInfo = (lead: Lead) => {
-  if (!lead.actual_1) return { step: 1, title: 'Step 1' };
-  if (!lead.actual_2) return { step: 2, title: 'Step 2' };
-  if (!lead.actual_3) return { step: 3, title: 'Step 3' };
-  if (!lead.actual_4) return { step: 4, title: 'Step 4' };
-  if (!lead.actual_5) return { step: 5, title: 'Step 5' };
-  return { step: 6, title: 'Completed' };
-};
-
-export const getStepName = (step: number) => {
-  switch(step) {
-    case 1: return "Step-1 Link Send & Assing To";
-    case 2: return "Step-2 Qualify lead - confirm requirment from customer";
-    case 3: return "Step-3 If Lead Qualified - Fix Meeting";
-    case 4: return "Step-4 Meeting & Presentation";
-    case 5: return "Step-5 Offer";
-    default: return "Completed";
-  }
-};
-
-export const getPendingStepStatus = (lead: Lead, customNow?: Date) => {
-  const info = getNextStepInfo(lead);
-  if (info.step > 5) return null;
-  
-  const currentStatus = lead[`status_${info.step}` as keyof Lead];
-  const nextFollowUpDateStr = lead[`next_follow_up_date_${info.step}` as keyof Lead];
-  
-  let plannedDateStr = lead[`planned_${info.step}` as keyof Lead];
-  let isFollowUp = false;
-  
-  if (currentStatus === 'Next Follow Up' && nextFollowUpDateStr) {
-    plannedDateStr = nextFollowUpDateStr;
-    isFollowUp = true;
-  }
-  
-  if (!plannedDateStr) return null; 
-  
-  const plannedDate = new Date(plannedDateStr as string);
-  const now = customNow || new Date();
-  
-  const diffMs = plannedDate.getTime() - now.getTime();
-  const diffDays = Math.floor(Math.abs(diffMs) / (1000 * 60 * 60 * 24));
-  const diffHours = Math.floor((Math.abs(diffMs) / (1000 * 60 * 60)) % 24);
-  const diffMinutes = Math.floor((Math.abs(diffMs) / (1000 * 60)) % 60);
-  const diffSeconds = Math.floor((Math.abs(diffMs) / 1000) % 60);
-  
-  let timeText = '';
-  if (diffDays > 0) timeText += `${diffDays}d `;
-  if (diffHours > 0 || diffDays > 0) timeText += `${diffHours}h `;
-  if (diffMinutes > 0 || diffHours > 0 || diffDays > 0) timeText += `${diffMinutes}m `;
-  timeText += `${diffSeconds}s`;
-  
-  const isDelayed = diffMs < 0;
-  
-  const formattedPlannedDate = new Intl.DateTimeFormat('en-IN', {
-    day: '2-digit', month: 'short', year: 'numeric',
-    hour: '2-digit', minute: '2-digit', hour12: true
-  }).format(plannedDate);
-  
-  return {
-    stepName: getStepName(info.step),
-    isDelayed,
-    timeText: isDelayed ? `${timeText} delayed` : `${timeText} left`,
-    plannedDate,
-    formattedPlannedDate,
-    step: info.step,
-    isFollowUp
-  };
-};
-
 const StepCountdown = ({ lead, handleOpenStepModal }: { lead: Lead, handleOpenStepModal: (lead: Lead) => void }) => {
   const [now, setNow] = useState(new Date());
   useEffect(() => {
@@ -156,7 +98,7 @@ const StepCountdown = ({ lead, handleOpenStepModal }: { lead: Lead, handleOpenSt
     return () => clearInterval(timer);
   }, []);
   
-  const status = getPendingStepStatus(lead, now);
+  const status = getPendingStepStatus(lead, { ...SALES_PIPELINE_OPTS, now });
   if (!status) return null;
 
   return (
@@ -172,7 +114,7 @@ const StepCountdown = ({ lead, handleOpenStepModal }: { lead: Lead, handleOpenSt
           {status.isFollowUp ? 'FOLLOW UP' : 'PLANNED'}: {status.formattedPlannedDate}
         </div>
       </div>
-      {!lead.lost_remark && (
+      {isSalesLeadActive(lead) && (
         <button 
           className={`${styles.iconBtn} ${styles.complete}`}
           onClick={() => handleOpenStepModal(lead)}
@@ -219,9 +161,7 @@ export default function SalesPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
-  const [salesmenList, setSalesmenList] = useState<string[]>([]);
-  const [isSalesmanModalOpen, setIsSalesmanModalOpen] = useState(false);
-  const [newSalesmanName, setNewSalesmanName] = useState('');
+  const [usersList, setUsersList] = useState<{ name: string; status?: string }[]>([]);
 
   // Filtering & Pagination
   const [searchQuery, setSearchQuery] = useState('');
@@ -259,15 +199,33 @@ export default function SalesPage() {
     nameOfBuilder: '',
   });
 
-  const [isLostModalOpen, setIsLostModalOpen] = useState(false);
-  const [currentLostLead, setCurrentLostLead] = useState<Lead | null>(null);
-  const [lostRemark, setLostRemark] = useState('');
-  const [isRevertLostModalOpen, setIsRevertLostModalOpen] = useState(false);
+  const getSalesStepInfo = (lead: Lead) => getNextStepInfo(lead, SALES_MAX_STEP);
 
   useEffect(() => {
     fetchLeads();
-    fetchSalesmen();
+    fetchUsers();
   }, []);
+
+  const userNames = useMemo(
+    () =>
+      usersList
+        .filter((u) => u.name?.trim() && (u.status || 'Active') === 'Active')
+        .map((u) => u.name.trim())
+        .sort((a, b) => a.localeCompare(b)),
+    [usersList]
+  );
+
+  const sidebarSalesmen = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const lead of leads) {
+      const name = lead.salesman?.trim();
+      if (!name) continue;
+      counts.set(name, (counts.get(name) || 0) + 1);
+    }
+    return Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([name, count]) => ({ name, count }));
+  }, [leads]);
 
   // Derived unique options for advanced filters
   const uniqueCityTypes = useMemo(() => Array.from(new Set(leads.map(l => l.cityType).filter(Boolean))), [leads]);
@@ -277,15 +235,15 @@ export default function SalesPage() {
   const uniqueGeneratedBy = useMemo(() => Array.from(new Set(leads.map(l => l.generatedBy).filter(Boolean))), [leads]);
   const uniqueNameOfBuilder = useMemo(() => Array.from(new Set(leads.map(l => l.nameOfBuilder).filter(Boolean))), [leads]);
 
-  const fetchSalesmen = async () => {
+  const fetchUsers = async () => {
     try {
-      const response = await fetch('/api/sales/salesmen');
+      const response = await fetch('/api/users');
       if (response.ok) {
         const data = await response.json();
-        setSalesmenList(data);
+        setUsersList(Array.isArray(data) ? data : []);
       }
     } catch (error) {
-      console.error('Error fetching salesmen:', error);
+      console.error('Error fetching users:', error);
     }
   };
 
@@ -349,33 +307,6 @@ export default function SalesPage() {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleAddSalesmanClick = () => {
-    setNewSalesmanName('');
-    setIsSalesmanModalOpen(true);
-  };
-
-  const handleAddSalesman = async () => {
-    if (newSalesmanName && newSalesmanName.trim() !== '') {
-      try {
-        const response = await fetch('/api/sales/salesmen', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: newSalesmanName.trim() })
-        });
-        if (response.ok) {
-          fetchSalesmen();
-          setFormData(prev => ({ ...prev, salesman: newSalesmanName.trim() }));
-          setIsSalesmanModalOpen(false);
-        } else {
-          const err = await response.json();
-          alert(`Error: ${err.error}`);
-        }
-      } catch (error) {
-        console.error('Error adding salesman:', error);
-      }
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -435,9 +366,16 @@ export default function SalesPage() {
 
   const handleOpenStepModal = (lead: Lead) => {
     setCurrentStepLead(lead);
-    const info = getNextStepInfo(lead);
+    const info = getSalesStepInfo(lead);
     setStepFormData({
-      status: info.step === 1 ? '' : info.step === 2 ? 'Qualified' : 'Done'
+      status:
+        info.step === 6
+          ? 'Won'
+          : info.step === 1
+            ? ''
+            : info.step === 2
+              ? 'Qualified'
+              : 'Done',
     });
     setIsStepModalOpen(true);
   };
@@ -447,9 +385,9 @@ export default function SalesPage() {
     if (!currentStepLead) return;
     setIsSubmitting(true);
     
-    const info = getNextStepInfo(currentStepLead);
+    const info = getSalesStepInfo(currentStepLead);
     const step = info.step;
-    if (step > 5) return;
+    if (step > SALES_MAX_STEP) return;
     
     const submitData = new FormData();
     Object.entries(currentStepLead).forEach(([k, v]) => {
@@ -457,16 +395,24 @@ export default function SalesPage() {
     });
     
     const now = new Date();
+    const isStep6 = step === SALES_MAX_STEP;
+    const isStepNextFollowUp = step > 1 && step < SALES_MAX_STEP && stepFormData.status === 'Next Follow Up';
     
-    const isStepNextFollowUp = step > 1 && stepFormData.status === 'Next Follow Up';
-    
-    if (!isStepNextFollowUp) {
+    if (!isStepNextFollowUp || isStep6) {
       submitData.set(`actual_${step}`, now.toISOString());
     }
     
     submitData.set(`status_${step}`, stepFormData.status || '');
+
+    if (isStep6) {
+      if (stepFormData.status === 'Lost') {
+        submitData.set('lost_remark', stepFormData.remarks || '');
+      } else {
+        submitData.set('lost_remark', '');
+      }
+    }
     
-    if (step > 1) {
+    if (step > 1 && !isStep6) {
       submitData.set(`next_follow_up_date_${step}`, isStepNextFollowUp ? (stepFormData.next_follow_up_date || '') : '');
       
       if (stepFormData.remarks) {
@@ -476,7 +422,7 @@ export default function SalesPage() {
       if (step === 4 && stepFormData.meeting_mode) submitData.set(`meeting_mode_4`, stepFormData.meeting_mode);
     }
     
-    if (step < 5 && !isStepNextFollowUp) {
+    if (step < SALES_MAX_STEP && !isStepNextFollowUp) {
       const nextPlanned = new Date(now);
       const tat = step === 2 ? 3 : 1; 
       nextPlanned.setDate(nextPlanned.getDate() + tat);
@@ -500,66 +446,6 @@ export default function SalesPage() {
     } catch (e) {
       console.error(e);
     } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleOpenLostModal = (lead: Lead) => {
-    setCurrentLostLead(lead);
-    setLostRemark(String(lead.lost_remark || ''));
-    setIsLostModalOpen(true);
-  };
-
-  const handleLostSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!currentLostLead) return;
-    setIsSubmitting(true);
-    
-    const submitData = new FormData();
-    Object.entries(currentLostLead).forEach(([k, v]) => {
-      submitData.append(k, String(v || ''));
-    });
-    submitData.set('lost_remark', lostRemark);
-    
-    try {
-      const response = await fetch(`/api/sales?rowIndex=${currentLostLead.rowIndex}`, {
-        method: 'PUT',
-        body: submitData
-      });
-      if (response.ok) {
-        await fetchLeads();
-        setIsLostModalOpen(false);
-      }
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleOpenRevertLostModal = (lead: Lead) => {
-    setCurrentLostLead(lead);
-    setIsRevertLostModalOpen(true);
-  };
-
-  const handleRemoveLost = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!currentLostLead) return;
-    setIsSubmitting(true);
-    const submitData = new FormData();
-    Object.entries(currentLostLead).forEach(([k, v]) => {
-      submitData.append(k, String(v || ''));
-    });
-    submitData.set('lost_remark', '');
-    
-    try {
-      const response = await fetch(`/api/sales?rowIndex=${currentLostLead.rowIndex}`, {
-        method: 'PUT',
-        body: submitData
-      });
-      if (response.ok) {
-        await fetchLeads();
-        setIsRevertLostModalOpen(false);
-      }
-    } catch(e) {} finally {
       setIsSubmitting(false);
     }
   };
@@ -595,13 +481,13 @@ export default function SalesPage() {
       result = result.filter(l => l.salesman === selectedSalesman);
     }
     if (sidebarMode === 'step' && selectedStep !== null) {
-      result = result.filter(l => getNextStepInfo(l).step === selectedStep);
+      result = result.filter(l => getSalesStepInfo(l).step === selectedStep);
     }
 
     // Apply Time Filters
     if (timeFilter) {
       if (timeFilter === 'lost') {
-        result = result.filter(l => l.lost_remark);
+        result = result.filter(l => isSalesLeadLost(l));
       } else {
         const now = new Date();
         const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -611,8 +497,8 @@ export default function SalesPage() {
         dayAfterStart.setDate(dayAfterStart.getDate() + 1);
 
         result = result.filter(l => {
-          if (l.lost_remark) return false;
-          const status = getPendingStepStatus(l);
+          if (isSalesLeadLost(l)) return false;
+          const status = getPendingStepStatus(l, SALES_PIPELINE_OPTS);
           if (!status) return false;
           
           if (timeFilter === 'delayed') return status.isDelayed;
@@ -622,8 +508,8 @@ export default function SalesPage() {
         });
       }
     } else {
-      // All Time view hides Lost leads
-      result = result.filter(l => !l.lost_remark);
+      // All Time view hides lost leads
+      result = result.filter(l => !isSalesLeadLost(l));
     }
 
     // Apply Lead Type Filter
@@ -682,7 +568,7 @@ export default function SalesPage() {
     const counts: Record<string, number> = {};
     leadTypesList.forEach(lt => counts[lt] = 0);
     // Only count non-lost for lead types
-    const activeLeads = leads.filter(l => !l.lost_remark);
+    const activeLeads = leads.filter(l => !isSalesLeadLost(l));
     counts['All Types'] = activeLeads.length;
     activeLeads.forEach(l => {
       if (l.leadType && counts[l.leadType] !== undefined) counts[l.leadType]++;
@@ -700,12 +586,12 @@ export default function SalesPage() {
     dayAfterStart.setDate(dayAfterStart.getDate() + 1);
 
     leads.forEach(l => {
-      if (l.lost_remark) {
+      if (isSalesLeadLost(l)) {
         counts['Lost']++;
         return;
       }
       counts['All Time']++;
-      const status = getPendingStepStatus(l);
+      const status = getPendingStepStatus(l, SALES_PIPELINE_OPTS);
       if (!status) return;
       if (status.isDelayed) counts['Delayed']++;
       else if (status.plannedDate >= todayStart && status.plannedDate < tomorrowStart) counts['Today']++;
@@ -829,21 +715,18 @@ export default function SalesPage() {
                     <span className={styles.badge}>{leads.length}</span>
                   </div>
                 </div>
-                {salesmenList.map((salesman, idx) => {
-                  const count = leads.filter(l => l.salesman === salesman).length;
-                  return (
+                {sidebarSalesmen.map(({ name, count }) => (
                   <div 
-                    key={idx}
-                    className={`${styles.filterItem} ${selectedSalesman === salesman ? styles.active : ''}`}
-                    onClick={() => { setSelectedSalesman(salesman); setCurrentPage(1); }}
+                    key={name}
+                    className={`${styles.filterItem} ${selectedSalesman === name ? styles.active : ''}`}
+                    onClick={() => { setSelectedSalesman(name); setCurrentPage(1); }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
-                      <span>{salesman}</span>
-                      {count > 0 && <span className={styles.badge}>{count}</span>}
+                      <span>{name}</span>
+                      <span className={styles.badge}>{count}</span>
                     </div>
                   </div>
-                  );
-                })}
+                ))}
               </>
             ) : (
               <>
@@ -856,8 +739,8 @@ export default function SalesPage() {
                     <span className={styles.badge}>{leads.length}</span>
                   </div>
                 </div>
-                {[1, 2, 3, 4, 5, 6].map((step) => {
-                  const count = leads.filter(l => getNextStepInfo(l).step === step).length;
+                {[1, 2, 3, 4, 5, 6, 7].map((step) => {
+                  const count = leads.filter(l => getSalesStepInfo(l).step === step).length;
                   return (
                     <div 
                       key={step}
@@ -959,25 +842,6 @@ export default function SalesPage() {
                     </div>
                     <div className={styles.cardActions}>
                       <StepCountdown lead={lead} handleOpenStepModal={handleOpenStepModal} />
-                      {!lead.lost_remark ? (
-                        <button 
-                          className={`${styles.iconBtn} ${styles.delete}`}
-                          onClick={() => handleOpenLostModal(lead)}
-                          title="Mark as Lost"
-                          style={{ color: '#e74c3c' }}
-                        >
-                          <XCircle size={16} />
-                        </button>
-                      ) : (
-                        <button 
-                          className={`${styles.iconBtn} ${styles.update}`}
-                          onClick={() => handleOpenRevertLostModal(lead)}
-                          title="Remove Lost Remark"
-                          style={{ color: '#f7b84b' }}
-                        >
-                          <RefreshCw size={16} />
-                        </button>
-                      )}
                       <button 
                         className={`${styles.iconBtn} ${styles.edit}`}
                         onClick={() => handleOpenModal(lead)}
@@ -1090,6 +954,19 @@ export default function SalesPage() {
                         </div>
                       </div>
                     )}
+                    {lead.status_6 && (
+                      <div className={styles.detailItem}>
+                        <div className={styles.detailIconWrapper} style={{ color: lead.status_6 === 'Won' ? '#1abc9c' : '#e74c3c' }}>
+                          {lead.status_6 === 'Won' ? <CheckSquare size={16} /> : <XCircle size={16} />}
+                        </div>
+                        <div className={styles.detailContent}>
+                          <span className={styles.detailLabel}>Close Status</span>
+                          <span className={styles.detailValue} style={{ color: lead.status_6 === 'Won' ? '#1abc9c' : '#e74c3c', fontWeight: 700 }}>
+                            {lead.status_6}
+                          </span>
+                        </div>
+                      </div>
+                    )}
                     {lead.lost_remark && (
                       <div className={styles.detailItem} style={{ gridColumn: '1 / -1', background: '#ffebee', padding: '10px', borderRadius: '8px', border: '1px solid #ffcdd2', marginTop: '10px', width: '100%', boxSizing: 'border-box' }}>
                         <div className={styles.detailIconWrapper} style={{ color: '#e74c3c' }}>
@@ -1158,39 +1035,22 @@ export default function SalesPage() {
                     <label className={styles.outlineLabel}>Salesman</label>
                     <div className={styles.inputWithIcon}>
                       <User size={16} className={styles.inputIcon} />
-                      <input 
-                        type="text" 
-                        name="salesman" 
-                        value={formData.salesman} 
-                        onChange={handleInputChange} 
-                        list="salesmen-list"
-                        placeholder="Select or type Salesman"
-                        style={{ borderTopRightRadius: 0, borderBottomRightRadius: 0, borderRight: 'none', flex: 1 }}
-                      />
-                      <datalist id="salesmen-list">
-                        {salesmenList.map((sm, idx) => (
-                          <option key={idx} value={sm} />
-                        ))}
-                      </datalist>
-                      <button 
-                        type="button" 
-                        style={{ 
-                          background: 'var(--bg-hover)', 
-                          border: '1px solid var(--border-color)', 
-                          borderRadius: '0 8px 8px 0', 
-                          padding: '0 12px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: 'var(--text-secondary)',
-                          cursor: 'pointer',
-                          height: '46.4px'
-                        }}
-                        onClick={handleAddSalesmanClick}
-                        title="Add new salesman"
+                      <select
+                        name="salesman"
+                        value={formData.salesman}
+                        onChange={handleInputChange}
                       >
-                        <Plus size={16} />
-                      </button>
+                        <option value="">Select Salesman</option>
+                        {userNames.map((name) => (
+                          <option key={name} value={name}>
+                            {name}
+                          </option>
+                        ))}
+                        {formData.salesman &&
+                          !userNames.includes(formData.salesman) && (
+                            <option value={formData.salesman}>{formData.salesman}</option>
+                          )}
+                      </select>
                     </div>
                   </div>
                   <div className={styles.formGroup}>
@@ -1293,32 +1153,6 @@ export default function SalesPage() {
             </form>
       </Modal>
 
-      <Modal isOpen={isSalesmanModalOpen} onClose={() => setIsSalesmanModalOpen(false)} title="Add New Salesman">
-        <div className={styles.modalBody}>
-          <div className={styles.formGroup} style={{ marginTop: 0 }}>
-            <label className={styles.outlineLabel}>Salesman Name</label>
-            <div className={styles.inputWithIcon}>
-              <User size={16} className={styles.inputIcon} />
-              <input 
-                type="text" 
-                value={newSalesmanName} 
-                onChange={(e) => setNewSalesmanName(e.target.value)} 
-                placeholder="Enter salesman name"
-                autoFocus
-              />
-            </div>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '24px' }}>
-            <button type="button" onClick={() => setIsSalesmanModalOpen(false)} style={{ padding: '10px 16px', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'transparent', color: 'var(--text-main)', cursor: 'pointer', fontWeight: 600 }}>
-              Cancel
-            </button>
-            <button type="button" onClick={handleAddSalesman} style={{ padding: '10px 16px', borderRadius: '8px', border: 'none', backgroundColor: 'var(--primary)', color: 'white', cursor: 'pointer', fontWeight: 600 }}>
-              Add Salesman
-            </button>
-          </div>
-        </div>
-      </Modal>
-
       {/* Right Advanced Filter Sidebar */}
       {isRightSidebarOpen && (
         <div className={styles.rightSidebarOverlay} onClick={() => setIsRightSidebarOpen(false)}>
@@ -1354,10 +1188,10 @@ export default function SalesPage() {
         <Modal 
           isOpen={isStepModalOpen} 
           onClose={() => setIsStepModalOpen(false)} 
-          title={`Complete ${getNextStepInfo(currentStepLead).title}`}
+          title={`Complete ${getSalesStepInfo(currentStepLead).title}`}
         >
           <form onSubmit={handleStepSubmit} className={styles.bottomSheetForm}>
-            {getNextStepInfo(currentStepLead).step === 1 ? (
+            {getSalesStepInfo(currentStepLead).step === 1 ? (
               <div className={styles.formGroup} style={{ gridColumn: '1 / -1' }}>
                 <label className={styles.outlineLabel}>Status</label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginTop: '10px' }}>
@@ -1370,6 +1204,34 @@ export default function SalesPage() {
                   <span style={{ fontWeight: 600, color: stepFormData.status === 'Done' ? '#1abc9c' : 'var(--text-secondary)' }}>
                     {stepFormData.status === 'Done' ? 'Done' : 'Pending'}
                   </span>
+                </div>
+              </div>
+            ) : getSalesStepInfo(currentStepLead).step === SALES_MAX_STEP ? (
+              <div className={styles.formGroup} style={{ gridColumn: '1 / -1' }}>
+                <label className={styles.outlineLabel}>Close Outcome</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginTop: '10px' }}>
+                  <div className={styles.toggleSwitchContainer} style={{ width: '320px' }}>
+                    <div 
+                      className={styles.toggleSwitchSliderDynamic} 
+                      style={{ 
+                        width: 'calc(50% - 4px)',
+                        left: stepFormData.status === 'Lost' ? 'calc(50% + 4px)' : '4px',
+                        background: stepFormData.status === 'Lost' ? '#e74c3c' : '#1abc9c'
+                      }} 
+                    />
+                    <button 
+                      type="button"
+                      onClick={() => setStepFormData({ ...stepFormData, status: 'Won' })}
+                      className={`${styles.toggleSwitchBtn} ${stepFormData.status !== 'Lost' ? styles.active : ''}`}
+                      style={{ color: stepFormData.status !== 'Lost' ? '#fff' : '#6c757d' }}
+                    >Won</button>
+                    <button 
+                      type="button"
+                      onClick={() => setStepFormData({ ...stepFormData, status: 'Lost' })}
+                      className={`${styles.toggleSwitchBtn} ${stepFormData.status === 'Lost' ? styles.active : ''}`}
+                      style={{ color: stepFormData.status === 'Lost' ? '#fff' : '#6c757d' }}
+                    >Lost</button>
+                  </div>
                 </div>
               </div>
             ) : (
@@ -1387,10 +1249,10 @@ export default function SalesPage() {
                     />
                     <button 
                       type="button"
-                      onClick={() => setStepFormData({...stepFormData, status: getNextStepInfo(currentStepLead).step === 2 ? 'Qualified' : 'Done'})}
+                      onClick={() => setStepFormData({...stepFormData, status: getSalesStepInfo(currentStepLead).step === 2 ? 'Qualified' : 'Done'})}
                       className={`${styles.toggleSwitchBtn} ${stepFormData.status !== 'Next Follow Up' ? styles.active : ''}`}
                       style={{ color: stepFormData.status !== 'Next Follow Up' ? '#fff' : '#6c757d' }}
-                    >{getNextStepInfo(currentStepLead).step === 2 ? 'Qualified' : 'Done'}</button>
+                    >{getSalesStepInfo(currentStepLead).step === 2 ? 'Qualified' : 'Done'}</button>
                     <button 
                       type="button"
                       onClick={() => setStepFormData({...stepFormData, status: 'Next Follow Up'})}
@@ -1402,7 +1264,24 @@ export default function SalesPage() {
               </div>
             )}
             
-            {getNextStepInfo(currentStepLead).step > 1 && (
+            {getSalesStepInfo(currentStepLead).step === SALES_MAX_STEP ? (
+              <div className={styles.formGroup} style={{ gridColumn: '1 / -1' }}>
+                <label className={styles.outlineLabel}>
+                  {stepFormData.status === 'Lost' ? 'Lost Remark *' : 'Remarks'}
+                </label>
+                <div className={styles.inputWithIcon}>
+                  <Edit2 size={16} className={styles.inputIcon} />
+                  <input
+                    type="text"
+                    name="remarks"
+                    value={stepFormData.remarks || ''}
+                    onChange={(e) => setStepFormData({ ...stepFormData, remarks: e.target.value })}
+                    placeholder={stepFormData.status === 'Lost' ? 'Enter reason for losing this lead' : 'Any closing remarks...'}
+                    required={stepFormData.status === 'Lost'}
+                  />
+                </div>
+              </div>
+            ) : getSalesStepInfo(currentStepLead).step > 1 && (
               <>
                 {stepFormData.status === 'Next Follow Up' && (
                   <div className={styles.formGroup}>
@@ -1414,7 +1293,7 @@ export default function SalesPage() {
                   </div>
                 )}
                 
-                {getNextStepInfo(currentStepLead).step === 4 && stepFormData.status !== 'Next Follow Up' && (
+                {getSalesStepInfo(currentStepLead).step === 4 && stepFormData.status !== 'Next Follow Up' && (
                   <div className={styles.formGroup}>
                     <label className={styles.outlineLabel}>Meeting Mode</label>
                     <div className={styles.inputWithIcon}>
@@ -1446,48 +1325,6 @@ export default function SalesPage() {
         </Modal>
       )}
 
-      {isLostModalOpen && currentLostLead && (
-        <Modal isOpen={isLostModalOpen} onClose={() => setIsLostModalOpen(false)} title="Mark Lead as Lost">
-          <form onSubmit={handleLostSubmit}>
-            <div className={styles.modalBody}>
-              <div className={styles.formGroup} style={{ gridColumn: '1 / -1' }}>
-                <label className={styles.outlineLabel}>Lost Remark *</label>
-                <div className={styles.inputWithIcon}>
-                  <Edit2 size={16} className={styles.inputIcon} />
-                  <input 
-                    type="text" 
-                    value={lostRemark} 
-                    onChange={e => setLostRemark(e.target.value)} 
-                    placeholder="Enter reason for losing this lead" 
-                    required 
-                  />
-                </div>
-              </div>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '24px', gridColumn: '1 / -1', padding: '0 24px 24px 24px' }}>
-              <button type="button" onClick={() => setIsLostModalOpen(false)} style={{ padding: '10px 16px', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'transparent', color: 'var(--text-main)', cursor: 'pointer', fontWeight: 600 }}>Cancel</button>
-              <button type="submit" disabled={isSubmitting} style={{ padding: '10px 16px', borderRadius: '8px', border: 'none', backgroundColor: '#e74c3c', color: 'white', cursor: 'pointer', fontWeight: 600 }}>{isSubmitting ? 'Saving...' : 'Mark as Lost'}</button>
-            </div>
-          </form>
-        </Modal>
-      )}
-      {isRevertLostModalOpen && currentLostLead && (
-        <Modal isOpen={isRevertLostModalOpen} onClose={() => setIsRevertLostModalOpen(false)} title="Unmark Lead as Lost">
-          <form onSubmit={handleRemoveLost}>
-            <div className={styles.modalBody}>
-              <div className={styles.formGroup} style={{ gridColumn: '1 / -1' }}>
-                <p style={{ margin: 0, color: 'var(--text-main)', fontSize: '0.95rem', lineHeight: '1.5' }}>
-                  Are you sure you want to unmark this lead as lost? This will remove the lost remark and reopen the lead workflow.
-                </p>
-              </div>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '24px', gridColumn: '1 / -1', padding: '0 24px 24px 24px' }}>
-              <button type="button" onClick={() => setIsRevertLostModalOpen(false)} style={{ padding: '10px 16px', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'transparent', color: 'var(--text-main)', cursor: 'pointer', fontWeight: 600 }}>Cancel</button>
-              <button type="submit" disabled={isSubmitting} style={{ padding: '10px 16px', borderRadius: '8px', border: 'none', backgroundColor: '#3bafda', color: 'white', cursor: 'pointer', fontWeight: 600 }}>{isSubmitting ? 'Processing...' : 'Unmark Lost'}</button>
-            </div>
-          </form>
-        </Modal>
-      )}
       </div>
     </div>
   );

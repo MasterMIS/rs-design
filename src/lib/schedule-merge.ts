@@ -40,12 +40,38 @@ export interface DrawingPlannedRow {
   planEndDate?: string;
 }
 
+/** Row from a per-project drawing sheet (dates/status live on the row). */
+export interface DrawingProjectTask {
+  id: string;
+  rowIndex?: number;
+  drawingNo: string;
+  zone?: string;
+  areaName?: string;
+  drawingName?: string;
+  resourceName?: string;
+  doerName?: string;
+  category: string;
+  plannedStartDate?: string;
+  plannedEndDate?: string;
+  actualStartDate?: string;
+  actualEndDate?: string;
+  revisionNo?: string;
+  lastUpdated?: string;
+  drawingImage?: string;
+}
+
+export interface DrawingProjectBundle {
+  project: string;
+  drawings: DrawingProjectTask[];
+}
+
 export interface MergedDrawingDoerTask {
   key: string;
   tplId: string;
   project: string;
   drawingNo: string;
   drawingName: string;
+  zone: string;
   areaName: string;
   category: string;
   resourceName: string;
@@ -54,10 +80,9 @@ export interface MergedDrawingDoerTask {
   planEndDate: string;
   actualStartDate: string;
   actualEndDate: string;
-  rsDesignStatus: string;
-  clientStatus: string;
   revisionNo: string;
   drawingImage: string;
+  rowIndex?: number;
   completed: boolean;
 }
 
@@ -226,6 +251,7 @@ export function mergeTrackerScheduleEntries(
   };
 }
 
+/** @deprecated Prefer buildDrawingProgressItemsFromProjects with project sheets. */
 export function buildDrawingProgressItems(
   projectNames: string[],
   templates: DrawingTemplateRow[],
@@ -318,6 +344,42 @@ export function buildTrackerProgressItemsFromProjects(
   return items;
 }
 
+export function buildDrawingProgressItemsFromProjects(
+  bundles: DrawingProjectBundle[],
+  projectNames?: string[]
+): ProgressItem[] {
+  const items: ProgressItem[] = [];
+  const allow = projectNames?.map((n) => n.trim().toLowerCase());
+
+  for (const bundle of bundles) {
+    if (allow && !allow.includes(bundle.project.trim().toLowerCase())) {
+      continue;
+    }
+    for (const drawing of bundle.drawings) {
+      const statusRow = {
+        actualStartDate: drawing.actualStartDate,
+        actualEndDate: drawing.actualEndDate,
+      };
+      items.push({
+        category: drawing.category || 'Uncategorized',
+        completed: isDrawingCompleted(statusRow),
+        inProgress: isDrawingInProgress(statusRow),
+      });
+    }
+  }
+
+  return items;
+}
+
+export function getDrawingProgressFromProjectSheets(
+  bundles: DrawingProjectBundle[],
+  projectNames?: string[]
+): ProgressStats {
+  return computeProgress(
+    buildDrawingProgressItemsFromProjects(bundles, projectNames)
+  );
+}
+
 export function getDrawingProgressForProjects(
   projectNames: string[],
   templates: DrawingTemplateRow[],
@@ -347,6 +409,51 @@ export function getTrackerProgressFromProjectSheets(
   );
 }
 
+export function buildDrawingDoerTasksFromProjects(
+  bundles: DrawingProjectBundle[],
+  projectNames?: string[]
+): MergedDrawingDoerTask[] {
+  const rows: MergedDrawingDoerTask[] = [];
+  const allow = projectNames?.map((n) => n.trim().toLowerCase());
+
+  for (const bundle of bundles) {
+    if (allow && !allow.includes(bundle.project.trim().toLowerCase())) {
+      continue;
+    }
+
+    for (const drawing of bundle.drawings) {
+      const statusRow = {
+        actualStartDate: drawing.actualStartDate,
+        actualEndDate: drawing.actualEndDate,
+      };
+
+      rows.push({
+        key: `${bundle.project}-${drawing.drawingNo || drawing.rowIndex}`,
+        tplId: drawing.id,
+        project: bundle.project,
+        drawingNo: drawing.drawingNo,
+        drawingName: drawing.drawingName || drawing.drawingNo,
+        zone: drawing.zone || '',
+        areaName: drawing.areaName || '',
+        category: drawing.category || 'Uncategorized',
+        resourceName: drawing.resourceName || '',
+        doerName: drawing.doerName || '',
+        planStartDate: drawing.plannedStartDate || '',
+        planEndDate: drawing.plannedEndDate || '',
+        actualStartDate: drawing.actualStartDate || '',
+        actualEndDate: drawing.actualEndDate || '',
+        revisionNo: drawing.revisionNo || '0',
+        drawingImage: drawing.drawingImage || '',
+        rowIndex: drawing.rowIndex,
+        completed: isDrawingCompleted(statusRow),
+      });
+    }
+  }
+
+  return rows;
+}
+
+/** @deprecated Prefer buildDrawingDoerTasksFromProjects with project sheets. */
 export function buildDrawingDoerTasks(
   projectNames: string[],
   templates: DrawingTemplateFull[],
@@ -372,7 +479,6 @@ export function buildDrawingDoerTasks(
       const statusRow = {
         actualStartDate: merged?.actualStartDate,
         actualEndDate: merged?.actualEndDate,
-        clientStatus: merged?.clientStatus,
       };
 
       rows.push({
@@ -381,6 +487,7 @@ export function buildDrawingDoerTasks(
         project: projectName,
         drawingNo: tpl.drawingNo,
         drawingName: tpl.drawingName || tpl.drawingNo,
+        zone: '',
         areaName: tpl.areaName || '',
         category: tpl.category,
         resourceName: tpl.resourceName || '',
@@ -389,8 +496,6 @@ export function buildDrawingDoerTasks(
         planEndDate: catPlan?.planEndDate || '',
         actualStartDate: merged?.actualStartDate || '',
         actualEndDate: merged?.actualEndDate || '',
-        rsDesignStatus: merged?.rsDesignStatus || 'Pending',
-        clientStatus: merged?.clientStatus || 'Pending',
         revisionNo: merged?.revisionNo || '0',
         drawingImage: merged?.drawingImage || '',
         completed: isDrawingCompleted(statusRow),

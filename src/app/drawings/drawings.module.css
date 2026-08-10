@@ -26,6 +26,48 @@
 .headerActions {
   display: flex;
   gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.modeSwitch {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--bg-main);
+  border: 1px solid var(--border-color);
+  gap: 2px;
+}
+
+.modeSwitchBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-main);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.modeSwitchBtn:hover {
+  color: var(--primary);
+}
+
+.modeSwitchActive {
+  background: var(--banner-bg, var(--primary));
+  color: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+.modeSwitchActive:hover {
+  color: white;
 }
 
 .addButton {
@@ -172,15 +214,49 @@
   color: white;
 }
 
-/* Forms */
+/* Forms — outline-fixed labels in add/edit modal only */
 .formGroup {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 6px;
   margin-bottom: 12px;
 }
 
-.formGroup>label {
+.fixedOutlineForm .formGroup {
+  margin-top: 4px;
+  margin-bottom: 14px;
+  padding-top: 10px;
+}
+
+.fixedOutlineForm .formGroup > label,
+.fixedOutlineForm .formGroup > .outlineLabel,
+.formGroup > .outlineLabel {
+  position: absolute !important;
+  top: 2px !important;
+  left: 12px !important;
+  z-index: 10 !important;
+  margin: 0 !important;
+  padding: 0 6px !important;
+  transform: none !important;
+  font-size: 0.75rem !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: #4f46e5 !important;
+  background-color: var(--bg-card, #fff) !important;
+  pointer-events: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  line-height: 1.2;
+  transition: none !important;
+}
+
+.bottomModalBody .formGroup {
+  gap: 6px;
+}
+
+.bottomModalBody .formGroup > label {
   font-size: 0.85rem;
   font-weight: 700;
   color: var(--text-heading);
@@ -189,23 +265,60 @@
   gap: 6px;
 }
 
+.outlineLabel .requiredMark,
+.formGroup > label .requiredMark {
+  color: #ef4444;
+  font-size: 0.85rem;
+}
+
 .formGroup input,
 .formGroup select {
-  padding: 10px 14px;
+  width: 100%;
+  padding: 14px;
   border-radius: 10px;
   border: 2px solid #cbd5e1;
   background-color: transparent;
   color: var(--text-heading);
   font-size: 0.95rem;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
-  width: 100%;
 }
 
 .formGroup input:focus,
 .formGroup select:focus {
-  border-color: #4f46e5;
+  border-color: var(--primary, #4f46e5);
   box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
   outline: none;
+}
+
+.formSelect {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 2px solid #cbd5e1;
+  background-color: var(--bg-card);
+  color: var(--text-heading);
+  font-size: 0.95rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.formSelect:focus {
+  border-color: var(--primary, #4f46e5);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+  outline: none;
+}
+
+.formRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.inlinePlanEditors {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 6px;
 }
 
 /* Custom Date Input for Category Planner */
@@ -294,7 +407,7 @@
 }
 
 .modalBody {
-  padding: 16px 20px;
+  padding: 16px 20px 8px;
 }
 
 .modalActions {
@@ -431,13 +544,288 @@
   overflow: hidden;
 }
 
+.doubleSidebar {
+  display: flex;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border-color);
+}
+
+.zoneSidebar,
+.categorySidebar,
 .templateSidebar {
-  width: 280px;
-  min-width: 280px;
+  width: 200px;
+  min-width: 180px;
   background-color: var(--bg-card);
   padding: 16px 0;
   display: flex;
   flex-direction: column;
+}
+
+.zoneSidebar {
+  border-right: 1px solid var(--border-color);
+}
+
+.categorySidebar {
+  width: 220px;
+}
+
+.installCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  text-align: center;
+  padding: 48px 24px;
+  background: var(--bg-card);
+  border: 1px dashed var(--border-color);
+  border-radius: 16px;
+  max-width: 560px;
+  margin: 24px auto;
+}
+
+.installCardRich {
+  align-items: stretch;
+  text-align: left;
+  max-width: 640px;
+  padding: 28px;
+  border: 1px solid rgba(79, 70, 229, 0.18);
+  background:
+    radial-gradient(120% 80% at 0% 0%, rgba(79, 70, 229, 0.08), transparent 55%),
+    radial-gradient(100% 70% at 100% 0%, rgba(16, 185, 129, 0.06), transparent 50%),
+    var(--bg-card);
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
+}
+
+.installCard h3 {
+  margin: 0;
+  color: var(--text-heading);
+  font-size: 1.25rem;
+}
+
+.installCard p {
+  margin: 0;
+  color: var(--text-light);
+  font-size: 0.92rem;
+  line-height: 1.5;
+  max-width: none;
+}
+
+.installIcon,
+.installIconWrap {
+  color: var(--primary);
+}
+
+.installHero {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.installHeroIcon {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: #4f46e5;
+  background: linear-gradient(145deg, rgba(79, 70, 229, 0.14), rgba(79, 70, 229, 0.05));
+  border: 1px solid rgba(79, 70, 229, 0.2);
+}
+
+.installHeroText {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.installHeroText h3 {
+  font-size: 1.35rem;
+}
+
+.installField {
+  width: 100%;
+  margin-top: 8px;
+  margin-bottom: 4px;
+}
+
+.installPreviewRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid var(--border-color);
+}
+
+.installStat {
+  font-size: 0.84rem;
+  color: var(--text-main);
+}
+
+.installStat strong {
+  color: #4f46e5;
+  font-weight: 800;
+}
+
+.installStatDot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #94a3b8;
+}
+
+.installPreviewMuted {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.84rem;
+  color: var(--text-light);
+}
+
+.installPrimaryBtn {
+  width: 100%;
+  justify-content: center;
+  padding: 12px 18px;
+  font-size: 0.95rem;
+  margin-top: 4px;
+}
+
+.installPrimaryBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.installProgressPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.installProgressHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.installProgressLabel {
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-light);
+}
+
+.installProgressPct {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #4f46e5;
+  font-variant-numeric: tabular-nums;
+}
+
+.installProgressTrack {
+  width: 100%;
+  height: 10px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  overflow: hidden;
+}
+
+.installProgressFill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #6366f1, #22c55e);
+  transition: width 0.25s ease;
+  box-shadow: 0 0 12px rgba(99, 102, 241, 0.35);
+}
+
+.installProgressMeta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.78rem;
+  color: var(--text-light);
+  font-weight: 600;
+}
+
+.installLogBox {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 12px;
+  border-radius: 12px;
+  background: #0f172a;
+  border: 1px solid #1e293b;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.installLogRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: #cbd5e1;
+  animation: installLogIn 0.28s ease;
+}
+
+.installLogRow svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.installLog_info {
+  color: #94a3b8;
+}
+
+.installLog_run {
+  color: #93c5fd;
+}
+
+.installLog_ok {
+  color: #86efac;
+}
+
+.installLog_warn {
+  color: #fca5a5;
+}
+
+@keyframes installLogIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.emptyContent {
+  color: var(--text-light);
+  padding: 20px;
+  text-align: center;
+  background-color: var(--bg-card);
+  border-radius: 12px;
+  border: 1px dashed var(--border-color);
+}
+
+.emptyContentBox {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 200px;
+  background-color: var(--bg-card);
+  border-radius: 12px;
+  border: 1px dashed var(--border-color);
 }
 
 .sidebarTitle {
@@ -616,6 +1004,97 @@
   gap: 4px;
   font-size: 0.75rem;
   color: var(--text-light);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.drawingCard {
+  display: flex;
+  flex-wrap: wrap;
+  width: 100%;
+  background: var(--bg-card);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+  border-radius: 16px;
+  padding: 14px 20px;
+  gap: 12px 20px;
+  align-items: flex-start;
+}
+
+.drawingCardProject {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 1) 0%, rgba(246, 248, 255, 1) 100%);
+  border-left: 4px solid var(--primary-color);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px 24px;
+  align-items: start;
+}
+
+.taskInfoCol {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-right: 12px;
+}
+
+.drawingCardProject .taskInfoCol {
+  max-width: none;
+  padding-right: 16px;
+}
+
+.taskTitleRow {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  min-width: 0;
+}
+
+.trackerIdBadge {
+  flex-shrink: 0;
+  color: #2563eb;
+  font-weight: 700;
+  font-size: 0.82rem;
+  white-space: nowrap;
+  padding-top: 2px;
+}
+
+.taskName {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: #1e293b;
+  font-size: 0.95rem;
+  font-weight: 800;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.taskMetaRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  row-gap: 6px;
+}
+
+.metaTagDoer {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.taskMetaRow .metaTag:nth-child(1) {
+  color: #0369a1;
+}
+
+.taskMetaRow .metaTag:nth-child(2) {
+  color: #047857;
+}
+
+.taskMetaRow .metaTag:nth-child(3) {
+  color: #0f766e;
 }
 
 .scheduleControlsBox {
@@ -626,67 +1105,134 @@
 
 .scheduleRightCol {
   display: flex;
-  align-items: center;
-  gap: 12px;
+  align-items: flex-start;
+  gap: 16px;
   flex: 0 0 auto;
-  min-width: 360px;
-  max-width: 44%;
-  padding-left: 8px;
+  overflow: visible;
+}
+
+.drawingCardProject .scheduleRightCol {
+  margin-left: 0;
+  padding-left: 0;
+}
+
+.cardActionsStack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  flex: 0 0 auto;
+  min-width: 110px;
+  align-self: center;
 }
 
 .datesCol {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  flex: 1;
+  gap: 6px;
+  flex: 0 0 auto;
   min-width: 300px;
 }
 
-.dateRow {
+.dateGrid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  align-items: center;
-  column-gap: 10px;
+  grid-template-columns: minmax(150px, auto) minmax(150px, auto);
+  gap: 4px 20px;
   font-size: 0.72rem;
   font-weight: 600;
-  line-height: 1.3;
+  line-height: 1.4;
+}
+
+.dateCell {
+  min-width: 0;
   white-space: nowrap;
 }
 
-.datePart {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.datePartEnd {
-  text-align: left;
-}
-
-.dateRowPlan {
+.dateCellPlan {
   color: #312e81;
 }
 
-.dateRowActual {
+.dateCellActual {
   color: #134e4a;
 }
 
-.dateRow strong {
+.dateCell strong {
   font-weight: 700;
 }
 
-.dateRowPlan strong {
+.dateCellPlan strong {
   color: #4f46e5;
 }
 
-.dateRowActual strong {
+.dateCellActual strong {
   color: #0d9488;
 }
 
-.dateDivider {
-  color: #94a3b8;
-  font-weight: 400;
-  user-select: none;
+.trackerActionCol {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+.workStartBtn,
+.workEndBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: none;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  min-width: 108px;
+}
+
+.workStartBtn {
+  background-color: #10b981;
+  color: #fff;
+}
+
+.workEndBtn {
+  background-color: #4f46e5;
+  color: #fff;
+}
+
+.workStartBtn:hover:not(:disabled),
+.workEndBtn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+}
+
+.workStartBtn:disabled,
+.workEndBtn:disabled {
+  background-color: #e2e8f0;
+  color: #64748b;
+  cursor: not-allowed;
+}
+
+.workDoneBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: #dcfce7;
+  color: #15803d;
+  font-size: 0.8rem;
+  font-weight: 700;
+  min-width: 108px;
+}
+
+.spinIcon {
+  animation: spin 1s linear infinite;
 }
 
 .dateInputGroup {
@@ -704,7 +1250,8 @@
 }
 
 .smallDateInput {
-  flex: 1;
+  flex: 1 1 120px;
+  min-width: 120px;
   padding: 4px 8px;
   border: 1px solid var(--border-color);
   border-radius: 6px;
@@ -722,7 +1269,9 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  width: 130px;
+  flex: 0 0 auto;
+  width: 138px;
+  min-width: 138px;
 }
 
 .statusSelect {
@@ -807,13 +1356,68 @@
   animation: spin 1s linear infinite;
 }
 
+@media (max-width: 1100px) {
+  .doubleSidebar {
+    flex-direction: column;
+    width: 240px;
+  }
+  .zoneSidebar,
+  .categorySidebar {
+    width: 100%;
+    border-right: none;
+  }
+  .zoneSidebar {
+    border-bottom: 1px solid var(--border-color);
+  }
+  .drawingCardProject {
+    grid-template-columns: 1fr;
+  }
+  .scheduleRightCol {
+    flex-basis: 100%;
+    justify-content: flex-end;
+  }
+  .dateGrid {
+    grid-template-columns: repeat(2, minmax(150px, auto));
+  }
+}
+
 @media (max-width: 800px) {
   .templateLayout {
     flex-direction: column;
   }
-  .templateSidebar {
+  .doubleSidebar {
     width: 100%;
-    min-width: 100%;
+    flex-direction: row;
+    border-right: none;
+    border-bottom: 1px solid var(--border-color);
+  }
+  .zoneSidebar,
+  .categorySidebar,
+  .templateSidebar {
+    width: 50%;
+    min-width: 0;
+  }
+  .formRow {
+    grid-template-columns: 1fr;
+  }
+  .scheduleRightCol {
+    flex-direction: column;
+    align-items: stretch;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .datesCol {
+    min-width: 0;
+    flex-basis: auto;
+  }
+  .dateGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .cardActionsStack {
+    flex-direction: row;
+    align-self: stretch;
+    justify-content: flex-end;
+    min-width: 0;
   }
 }
 
@@ -920,4 +1524,67 @@
   .updateGrid {
     grid-template-columns: 1fr;
   }
+}
+
+.templatePlanHint {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-main);
+  color: var(--text-light);
+  font-size: 0.88rem;
+  margin-bottom: 12px;
+}
+
+.templatePlanHint strong {
+  color: var(--text-heading);
+}
+
+.templateRightCol {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+.templateActions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+.cardActionsStack .templateActions {
+  margin-top: 0;
+}
+
+.savePlanBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: none;
+  border-radius: 999px;
+  background: var(--primary);
+  color: white;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.2s ease;
+}
+
+.savePlanBtn:hover:not(:disabled) {
+  opacity: 0.92;
+}
+
+.savePlanBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }

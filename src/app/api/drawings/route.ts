@@ -1,33 +1,67 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSheetsData, appendSheetsData, updateSheetRow, deleteSheetRow } from '@/lib/google-sheets';
+import {
+  appendSheetsData,
+  deleteSheetRow,
+  getSheetsData,
+  listSheetTitles,
+  sheetExists,
+  updateSheetRow,
+} from '@/lib/google-sheets';
 import { CONFIG } from '@/lib/config';
+import {
+  isDrawingProjectSheetTitle,
+  nextDrawingNo,
+  parseDrawingRows,
+  quoteSheetRange,
+  sanitizeSheetTitle,
+  toDrawingSheetRow,
+  type DrawingRow,
+} from '@/lib/drawings';
 
 const SHEET_ID = CONFIG.DRAWING_SCHEDULE.SHEET_ID;
-const SHEET_NAME = CONFIG.DRAWING_SCHEDULE.SUBMISSIONS_SHEET;
 
-export async function GET() {
+async function loadProjectDrawings(project: string): Promise<DrawingRow[]> {
+  const data = await getSheetsData(SHEET_ID, quoteSheetRange(project, 'A2:N1000'));
+  return parseDrawingRows(data as string[][] | undefined);
+}
+
+export async function GET(request: NextRequest) {
   try {
-    const data = await getSheetsData(SHEET_ID, `${SHEET_NAME}!A2:I1000`);
+    const { searchParams } = new URL(request.url);
+    const all = searchParams.get('all') === '1';
+    const projectParam = searchParams.get('project');
 
-    if (!data || data.length === 0) return NextResponse.json([]);
+    if (all) {
+      const titles = await listSheetTitles(SHEET_ID);
+      const projects = titles.filter(isDrawingProjectSheetTitle);
+      const results: { project: string; drawings: DrawingRow[] }[] = [];
 
-    const items = data.map((row: string[], index: number) => {
-      return {
-        rowIndex: index + 2,
-        id: `DS-${index + 2}`,
-        drawingNo: row[0] || '',
-        project: row[1] || '',
-        actualStartDate: row[2] || '',
-        actualEndDate: row[3] || '',
-        revisionNo: row[4] || '0',
-        lastUpdated: row[5] || '',
-        drawingImage: row[6] || '',
-        rsDesignStatus: row[7] || 'Pending',
-        clientStatus: row[8] || 'Pending',
-      };
-    }).filter((t: { project: string; drawingNo: string }) => t.project && t.drawingNo);
+      for (const project of projects) {
+        const drawings = await loadProjectDrawings(project);
+        results.push({ project, drawings });
+      }
 
-    return NextResponse.json(items);
+      return NextResponse.json(results);
+    }
+
+    if (!projectParam?.trim()) {
+      return NextResponse.json(
+        { error: 'Missing project query parameter. Use ?project=Name or ?all=1.' },
+        { status: 400 }
+      );
+    }
+
+    const project = sanitizeSheetTitle(projectParam);
+    const exists = await sheetExists(SHEET_ID, project);
+    if (!exists) {
+      return NextResponse.json(
+        { installed: false, project, drawings: [] },
+        { status: 404 }
+      );
+    }
+
+    const drawings = await loadProjectDrawings(project);
+    return NextResponse.json({ installed: true, project, drawings });
   } catch (error: unknown) {
     const err = error as Error;
     console.error('API Error (GET Drawing Schedule):', err);
@@ -38,34 +72,66 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { project, items } = body;
+    const project = sanitizeSheetTitle(body.project || '');
 
-    if (!project || !items || !Array.isArray(items)) {
-      return NextResponse.json({ error: 'Project and items are required.' }, { status: 400 });
+    if (!project) {
+      return NextResponse.json({ error: 'Project name is required.' }, { status: 400 });
     }
 
-    const timestamp = new Date().toISOString();
-    const rowsToAppend: string[][] = [];
-
-    for (const item of items) {
-      rowsToAppend.push([
-        item.drawingNo || '',
-        project,
-        item.actualStartDate || '',
-        item.actualEndDate || '',
-        item.revisionNo || '0',
-        timestamp,
-        item.drawingImage || '',
-        item.rsDesignStatus || 'Pending',
-        item.clientStatus || 'Pending',
-      ]);
+    if (!(await sheetExists(SHEET_ID, project))) {
+      return NextResponse.json(
+        { error: `Project sheet "${project}" not found. Install drawings first.` },
+        { status: 404 }
+      );
     }
 
-    if (rowsToAppend.length > 0) {
-      await appendSheetsData(SHEET_ID, `${SHEET_NAME}!A2`, rowsToAppend);
+    const {
+      drawingNo,
+      zone,
+      areaName,
+      drawingName,
+      resourceName,
+      doerName,
+      category,
+      plannedStartDate,
+      plannedEndDate,
+      actualStartDate,
+      actualEndDate,
+      revisionNo,
+      lastUpdated,
+      drawingImage,
+    } = body;
+
+    if (!drawingName) {
+      return NextResponse.json({ error: 'Drawing Name is required.' }, { status: 400 });
     }
 
-    return NextResponse.json({ success: true });
+    let finalDrawingNo = drawingNo || '';
+    if (!finalDrawingNo.trim()) {
+      const existing = await loadProjectDrawings(project);
+      finalDrawingNo = nextDrawingNo(existing);
+    }
+
+    const newRow = toDrawingSheetRow({
+      drawingNo: finalDrawingNo,
+      zone,
+      areaName,
+      drawingName,
+      resourceName,
+      doerName,
+      category,
+      plannedStartDate,
+      plannedEndDate,
+      actualStartDate,
+      actualEndDate,
+      revisionNo: revisionNo || '0',
+      lastUpdated: lastUpdated || '',
+      drawingImage,
+    });
+
+    await appendSheetsData(SHEET_ID, quoteSheetRange(project, 'A2'), [newRow]);
+
+    return NextResponse.json({ success: true, drawingNo: finalDrawingNo });
   } catch (error: unknown) {
     const err = error as Error;
     console.error('API Error (POST Drawing Schedule):', err);
@@ -77,28 +143,72 @@ export async function PUT(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const rowIndexStr = searchParams.get('rowIndex');
+    const projectParam = searchParams.get('project');
 
-    if (!rowIndexStr) return NextResponse.json({ error: 'Missing Row Index' }, { status: 400 });
-    const rowIndex = parseInt(rowIndexStr);
+    if (!rowIndexStr) {
+      return NextResponse.json({ error: 'Missing Row Index' }, { status: 400 });
+    }
+    if (!projectParam?.trim()) {
+      return NextResponse.json({ error: 'Missing project query parameter.' }, { status: 400 });
+    }
+
+    const project = sanitizeSheetTitle(projectParam);
+    const rowIndex = parseInt(rowIndexStr, 10);
+
+    if (!(await sheetExists(SHEET_ID, project))) {
+      return NextResponse.json(
+        { error: `Project sheet "${project}" not found.` },
+        { status: 404 }
+      );
+    }
 
     const body = await request.json();
-    const timestamp = new Date().toISOString();
+    const {
+      drawingNo,
+      zone,
+      areaName,
+      drawingName,
+      resourceName,
+      doerName,
+      category,
+      plannedStartDate,
+      plannedEndDate,
+      actualStartDate,
+      actualEndDate,
+      revisionNo,
+      drawingImage,
+    } = body;
 
-    const updatedRow = [
-      body.drawingNo || '',
-      body.project || '',
-      body.actualStartDate || '',
-      body.actualEndDate || '',
-      body.revisionNo || '0',
-      timestamp,
-      body.drawingImage || '',
-      body.rsDesignStatus || 'Pending',
-      body.clientStatus || 'Pending',
-    ];
+    if (!drawingName) {
+      return NextResponse.json({ error: 'Drawing Name is required.' }, { status: 400 });
+    }
 
-    await updateSheetRow(SHEET_ID, `${SHEET_NAME}!A${rowIndex}:I${rowIndex}`, [updatedRow]);
+    const lastUpdated = new Date().toISOString();
 
-    return NextResponse.json({ success: true, timestamp });
+    const updatedRow = toDrawingSheetRow({
+      drawingNo,
+      zone,
+      areaName,
+      drawingName,
+      resourceName,
+      doerName,
+      category,
+      plannedStartDate,
+      plannedEndDate,
+      actualStartDate,
+      actualEndDate,
+      revisionNo: revisionNo || '0',
+      lastUpdated,
+      drawingImage,
+    });
+
+    await updateSheetRow(
+      SHEET_ID,
+      quoteSheetRange(project, `A${rowIndex}:N${rowIndex}`),
+      [updatedRow]
+    );
+
+    return NextResponse.json({ success: true, lastUpdated });
   } catch (error: unknown) {
     const err = error as Error;
     console.error('API Error (PUT Drawing Schedule):', err);
@@ -110,13 +220,26 @@ export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const rowIndexStr = searchParams.get('rowIndex');
+    const projectParam = searchParams.get('project');
 
     if (!rowIndexStr) {
       return NextResponse.json({ error: 'Missing Row Index' }, { status: 400 });
     }
+    if (!projectParam?.trim()) {
+      return NextResponse.json({ error: 'Missing project query parameter.' }, { status: 400 });
+    }
 
-    const rowIndex = parseInt(rowIndexStr);
-    await deleteSheetRow(SHEET_ID, SHEET_NAME, rowIndex - 1);
+    const project = sanitizeSheetTitle(projectParam);
+    const rowIndex = parseInt(rowIndexStr, 10);
+
+    if (!(await sheetExists(SHEET_ID, project))) {
+      return NextResponse.json(
+        { error: `Project sheet "${project}" not found.` },
+        { status: 404 }
+      );
+    }
+
+    await deleteSheetRow(SHEET_ID, project, rowIndex - 1);
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
