@@ -15,9 +15,10 @@ import { useAuth } from '@/context/AuthContext';
 import { filterProjectsForUser } from '@/lib/project-access';
 import {
   buildDrawingProgressItems,
-  buildTrackerProgressItems,
+  buildTrackerProgressItemsFromProjects,
   getDrawingProgressForProjects,
-  getTrackerProgressForProjects,
+  getTrackerProgressFromProjectSheets,
+  type TrackerProjectBundle,
 } from '@/lib/schedule-merge';
 import {
   computeAverageProjectPercent,
@@ -60,12 +61,7 @@ export default function Dashboard() {
       clientStatus?: string;
     }>
   >([]);
-  const [trackerTemplates, setTrackerTemplates] = useState<
-    Array<{ trackerId: string; category: string }>
-  >([]);
-  const [trackerSchedule, setTrackerSchedule] = useState<
-    Array<{ project?: string; trackerId: string; actualStartDate?: string; actualEndDate?: string }>
-  >([]);
+  const [trackerBundles, setTrackerBundles] = useState<TrackerProjectBundle[]>([]);
 
   useEffect(() => {
     if (!user) return;
@@ -77,8 +73,7 @@ export default function Dashboard() {
           projectsRaw,
           drawingTpl,
           drawingSched,
-          trackerTpl,
-          trackerSched,
+          trackerAll,
         ] = await Promise.all([
           fetchJson<{ basicInfo?: { name?: string } }>('/api/projects'),
           fetchJson<{ drawingNo: string; category: string }>(
@@ -91,19 +86,17 @@ export default function Dashboard() {
             actualEndDate?: string;
             clientStatus?: string;
           }>('/api/drawings'),
-          fetchJson<{ trackerId: string; category: string }>(
-            '/api/pms-tracker/templates'
-          ),
-          fetchJson<{ project?: string; trackerId: string; actualStartDate?: string; actualEndDate?: string }>(
-            '/api/pms-tracker'
-          ),
+          fetch('/api/pms-tracker?all=1').then(async (res) => {
+            if (!res.ok) return [] as TrackerProjectBundle[];
+            const data = await res.json();
+            return Array.isArray(data) ? (data as TrackerProjectBundle[]) : [];
+          }),
         ]);
 
         setProjectsList(filterProjectsForUser(projectsRaw, user));
         setDrawingTemplates(drawingTpl);
         setDrawingSchedule(drawingSched);
-        setTrackerTemplates(trackerTpl);
-        setTrackerSchedule(trackerSched);
+        setTrackerBundles(trackerAll);
       } finally {
         setLoading(false);
       }
@@ -134,12 +127,8 @@ export default function Dashboard() {
 
   const trackerProgress = useMemo(
     () =>
-      getTrackerProgressForProjects(
-        activeProjectNames,
-        trackerTemplates,
-        trackerSchedule
-      ),
-    [activeProjectNames, trackerTemplates, trackerSchedule]
+      getTrackerProgressFromProjectSheets(trackerBundles, activeProjectNames),
+    [activeProjectNames, trackerBundles]
   );
 
   const drawingProgress = useMemo(
@@ -155,14 +144,13 @@ export default function Dashboard() {
   const trackerAveragePercent = useMemo(() => {
     if (selectedProject !== ALL_PROJECTS) return trackerProgress.percent;
     return computeAverageProjectPercent(projectNames, (projectName) =>
-      buildTrackerProgressItems([projectName], trackerTemplates, trackerSchedule)
+      buildTrackerProgressItemsFromProjects(trackerBundles, [projectName])
     );
   }, [
     selectedProject,
     trackerProgress.percent,
     projectNames,
-    trackerTemplates,
-    trackerSchedule,
+    trackerBundles,
   ]);
 
   const drawingAveragePercent = useMemo(() => {

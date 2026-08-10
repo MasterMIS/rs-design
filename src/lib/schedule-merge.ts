@@ -81,6 +81,7 @@ export interface TrackerTemplateFull extends TrackerTemplateRow {
   resourceName?: string;
   doerName?: string;
   tat?: string;
+  zone?: string;
 }
 
 export interface TrackerPlannedRow {
@@ -91,12 +92,35 @@ export interface TrackerPlannedRow {
   endDate?: string;
 }
 
+/** Row from a per-project PMS sheet (dates live on the row). */
+export interface TrackerProjectTask {
+  id: string;
+  rowIndex?: number;
+  trackerId: string;
+  zone?: string;
+  areaName?: string;
+  taskName?: string;
+  resourceName?: string;
+  doerName?: string;
+  category: string;
+  plannedStartDate?: string;
+  plannedEndDate?: string;
+  actualStartDate?: string;
+  actualEndDate?: string;
+}
+
+export interface TrackerProjectBundle {
+  project: string;
+  tasks: TrackerProjectTask[];
+}
+
 export interface MergedTrackerDoerTask {
   key: string;
   tplId: string;
   project: string;
   trackerId: string;
   taskName: string;
+  zone: string;
   areaName: string;
   category: string;
   resourceName: string;
@@ -233,6 +257,7 @@ export function buildDrawingProgressItems(
   return items;
 }
 
+/** @deprecated Prefer buildTrackerProgressItemsFromProjects with project sheets. */
 export function buildTrackerProgressItems(
   projectNames: string[],
   templates: TrackerTemplateRow[],
@@ -263,6 +288,36 @@ export function buildTrackerProgressItems(
   return items;
 }
 
+export function buildTrackerProgressItemsFromProjects(
+  bundles: TrackerProjectBundle[],
+  projectNames?: string[]
+): ProgressItem[] {
+  const items: ProgressItem[] = [];
+  const allow = projectNames?.map((n) => n.trim().toLowerCase());
+
+  for (const bundle of bundles) {
+    if (
+      allow &&
+      !allow.includes(bundle.project.trim().toLowerCase())
+    ) {
+      continue;
+    }
+    for (const task of bundle.tasks) {
+      const statusRow = {
+        actualStartDate: task.actualStartDate,
+        actualEndDate: task.actualEndDate,
+      };
+      items.push({
+        category: task.category,
+        completed: isTrackerCompleted(statusRow),
+        inProgress: isTrackerInProgress(statusRow),
+      });
+    }
+  }
+
+  return items;
+}
+
 export function getDrawingProgressForProjects(
   projectNames: string[],
   templates: DrawingTemplateRow[],
@@ -280,6 +335,15 @@ export function getTrackerProgressForProjects(
 ): ProgressStats {
   return computeProgress(
     buildTrackerProgressItems(projectNames, templates, schedule)
+  );
+}
+
+export function getTrackerProgressFromProjectSheets(
+  bundles: TrackerProjectBundle[],
+  projectNames?: string[]
+): ProgressStats {
+  return computeProgress(
+    buildTrackerProgressItemsFromProjects(bundles, projectNames)
   );
 }
 
@@ -337,6 +401,7 @@ export function buildDrawingDoerTasks(
   return rows;
 }
 
+/** @deprecated Prefer buildTrackerDoerTasksFromProjects with project sheets. */
 export function buildTrackerDoerTasks(
   projectNames: string[],
   templates: TrackerTemplateFull[],
@@ -372,6 +437,7 @@ export function buildTrackerDoerTasks(
         project: projectName,
         trackerId: tpl.trackerId,
         taskName: tpl.taskName || tpl.trackerId,
+        zone: tpl.zone || '',
         areaName: tpl.areaName || '',
         category: tpl.category,
         resourceName: tpl.resourceName || '',
@@ -382,6 +448,52 @@ export function buildTrackerDoerTasks(
         actualStartDate: merged?.actualStartDate || '',
         actualEndDate: merged?.actualEndDate || '',
         rowIndex: merged?.rowIndex,
+        completed: isTrackerCompleted(statusRow),
+      });
+    }
+  }
+
+  return rows;
+}
+
+export function buildTrackerDoerTasksFromProjects(
+  bundles: TrackerProjectBundle[],
+  projectNames?: string[]
+): MergedTrackerDoerTask[] {
+  const rows: MergedTrackerDoerTask[] = [];
+  const allow = projectNames?.map((n) => n.trim().toLowerCase());
+
+  for (const bundle of bundles) {
+    if (
+      allow &&
+      !allow.includes(bundle.project.trim().toLowerCase())
+    ) {
+      continue;
+    }
+
+    for (const task of bundle.tasks) {
+      const statusRow = {
+        actualStartDate: task.actualStartDate,
+        actualEndDate: task.actualEndDate,
+      };
+
+      rows.push({
+        key: `${bundle.project}-${task.trackerId || task.rowIndex}`,
+        tplId: task.id,
+        project: bundle.project,
+        trackerId: task.trackerId,
+        taskName: task.taskName || task.trackerId,
+        zone: task.zone || '',
+        areaName: task.areaName || '',
+        category: task.category,
+        resourceName: task.resourceName || '',
+        doerName: task.doerName || '',
+        tat: '',
+        planStartDate: task.plannedStartDate || '',
+        planEndDate: task.plannedEndDate || '',
+        actualStartDate: task.actualStartDate || '',
+        actualEndDate: task.actualEndDate || '',
+        rowIndex: task.rowIndex,
         completed: isTrackerCompleted(statusRow),
       });
     }

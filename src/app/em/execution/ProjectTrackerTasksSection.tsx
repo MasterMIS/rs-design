@@ -17,11 +17,10 @@ import { useProject } from '@/context/ProjectContext';
 import { filterProjectsForUser } from '@/lib/project-access';
 import { canViewAllEmTasks, getDoerLabel, isTaskAssignedToUser, matchesPlanDateRange } from '@/lib/em-access';
 import {
-  buildTrackerDoerTasks,
+  buildTrackerDoerTasksFromProjects,
   type MergedTrackerDoerTask,
-  type TrackerPlannedRow,
-  type TrackerScheduleRow,
-  type TrackerTemplateFull,
+  type TrackerProjectBundle,
+  type TrackerProjectTask,
 } from '@/lib/schedule-merge';
 import MultiSelectFilter from '@/components/MultiSelectFilter';
 import styles from '../em.module.css';
@@ -48,9 +47,7 @@ export function ProjectTrackerTasksSection({
 
   const [loading, setLoading] = useState(true);
   const [savingKey, setSavingKey] = useState<string | null>(null);
-  const [templates, setTemplates] = useState<TrackerTemplateFull[]>([]);
-  const [schedule, setSchedule] = useState<TrackerScheduleRow[]>([]);
-  const [planned, setPlanned] = useState<TrackerPlannedRow[]>([]);
+  const [bundles, setBundles] = useState<TrackerProjectBundle[]>([]);
   const [projectNames, setProjectNames] = useState<string[]>([]);
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -65,28 +62,27 @@ export function ProjectTrackerTasksSection({
   const fetchTrackerData = async () => {
     setLoading(true);
     try {
-      const [tplRes, schRes, planRes, projRes] = await Promise.all([
-        fetch('/api/pms-tracker/templates'),
-        fetch('/api/pms-tracker'),
-        fetch('/api/pms-tracker/planned'),
+      const [allRes, projRes] = await Promise.all([
+        fetch('/api/pms-tracker?all=1'),
         fetch('/api/projects'),
       ]);
 
-      const tplData = tplRes.ok ? await tplRes.json() : [];
-      const schData = schRes.ok ? await schRes.json() : [];
-      const planData = planRes.ok ? await planRes.json() : [];
+      const allData = allRes.ok ? await allRes.json() : [];
       const projData = projRes.ok ? await projRes.json() : [];
 
-      setTemplates(Array.isArray(tplData) ? tplData : []);
-      setSchedule(Array.isArray(schData) ? schData : []);
-      setPlanned(Array.isArray(planData) ? planData : []);
-
       const accessible = filterProjectsForUser(Array.isArray(projData) ? projData : [], user);
-      setProjectNames(
-        accessible
-          .map((p: { basicInfo?: { name?: string } }) => p.basicInfo?.name?.trim())
-          .filter((name): name is string => !!name)
-      );
+      const names = accessible
+        .map((p: { basicInfo?: { name?: string } }) => p.basicInfo?.name?.trim())
+        .filter((name: string | undefined): name is string => !!name);
+      setProjectNames(names);
+
+      const parsed: TrackerProjectBundle[] = Array.isArray(allData)
+        ? allData.map((b: { project: string; tasks: TrackerProjectTask[] }) => ({
+            project: b.project,
+            tasks: Array.isArray(b.tasks) ? b.tasks : [],
+          }))
+        : [];
+      setBundles(parsed);
     } catch (err) {
       console.error('Failed to load project tracker tasks', err);
     } finally {
@@ -99,8 +95,8 @@ export function ProjectTrackerTasksSection({
   }, [user]);
 
   const allRows = useMemo(
-    () => buildTrackerDoerTasks(projectNames, templates, schedule, planned),
-    [projectNames, templates, schedule, planned]
+    () => buildTrackerDoerTasksFromProjects(bundles, projectNames),
+    [bundles, projectNames]
   );
 
   const roleFilteredRows = useMemo(() => {
@@ -114,7 +110,8 @@ export function ProjectTrackerTasksSection({
         row.project.toLowerCase().includes(searchTerm.toLowerCase()) ||
         row.taskName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         row.doerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        row.category.toLowerCase().includes(searchTerm.toLowerCase());
+        row.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        row.zone.toLowerCase().includes(searchTerm.toLowerCase());
 
       const status = row.completed
         ? 'Completed'
@@ -158,6 +155,11 @@ export function ProjectTrackerTasksSection({
     row: MergedTrackerDoerTask,
     action: 'start' | 'work_end'
   ) => {
+    if (!row.rowIndex) {
+      alert('Task row is missing. Open the project tracker to fix it.');
+      return;
+    }
+
     setSavingKey(row.key);
     try {
       const today = new Date().toISOString().split('T')[0];
@@ -174,23 +176,26 @@ export function ProjectTrackerTasksSection({
 
       const payload = {
         trackerId: row.trackerId,
-        project: row.project,
+        zone: row.zone,
+        areaName: row.areaName,
+        taskName: row.taskName,
+        resourceName: row.resourceName,
+        doerName: row.doerName,
+        category: row.category,
+        plannedStartDate: row.planStartDate,
+        plannedEndDate: row.planEndDate,
         actualStartDate,
         actualEndDate,
       };
 
-      const url = row.rowIndex
-        ? `/api/pms-tracker?rowIndex=${row.rowIndex}`
-        : '/api/pms-tracker';
-      const method = row.rowIndex ? 'PUT' : 'POST';
-
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(
-          row.rowIndex ? payload : { project: row.project, items: [payload] }
-        ),
-      });
+      const res = await fetch(
+        `/api/pms-tracker?project=${encodeURIComponent(row.project)}&rowIndex=${row.rowIndex}`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        }
+      );
 
       if (res.ok) {
         onToast(
@@ -372,6 +377,7 @@ export function ProjectTrackerTasksSection({
               <tr>
                 <th>Project</th>
                 <th>Task</th>
+                <th>Zone</th>
                 <th>Area</th>
                 <th>Category</th>
                 <th>Doer</th>
@@ -386,8 +392,8 @@ export function ProjectTrackerTasksSection({
             <tbody>
               {paginatedRows.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className={styles.sectionEmpty}>
-                    No project tracker tasks found.
+                  <td colSpan={12} className={styles.sectionEmpty}>
+                    No project tracker tasks found. Install tasks on each project sheet first.
                   </td>
                 </tr>
               ) : (
@@ -418,6 +424,7 @@ export function ProjectTrackerTasksSection({
                         <strong>{row.taskName}</strong>
                         <span className={styles.cellSub}>{row.trackerId}</span>
                       </td>
+                      <td>{row.zone || '—'}</td>
                       <td>{row.areaName || '—'}</td>
                       <td>{row.category}</td>
                       <td>
@@ -487,7 +494,7 @@ export function ProjectTrackerTasksSection({
       )}
 
       <p className={styles.sectionFootnote}>
-        Need category plans or full tracker view?{' '}
+        Need full zone/category view?{' '}
         <Link href="/pms-tracker">Open Project Tracker</Link> in the project.
       </p>
     </>

@@ -145,3 +145,84 @@ export const deleteSheetRow = async (sheetId: string, sheetName: string, rowInde
     throw error;
   }
 };
+
+export const listSheetTitles = async (spreadsheetId: string): Promise<string[]> => {
+  try {
+    const sheets = google.sheets({ version: 'v4', auth });
+    const spreadsheet = await sheets.spreadsheets.get({
+      spreadsheetId,
+      fields: 'sheets.properties.title',
+    });
+    return (spreadsheet.data.sheets || [])
+      .map((s) => s.properties?.title || '')
+      .filter(Boolean);
+  } catch (error: any) {
+    console.error('Error listing sheet titles:', error.message);
+    throw error;
+  }
+};
+
+export const sheetExists = async (spreadsheetId: string, title: string): Promise<boolean> => {
+  const titles = await listSheetTitles(spreadsheetId);
+  return titles.some((t) => t === title);
+};
+
+export const createSheet = async (spreadsheetId: string, title: string) => {
+  try {
+    const sheets = google.sheets({ version: 'v4', auth });
+    const response = await sheets.spreadsheets.batchUpdate({
+      spreadsheetId,
+      requestBody: {
+        requests: [
+          {
+            addSheet: {
+              properties: {
+                title,
+              },
+            },
+          },
+        ],
+      },
+    });
+    return response.data;
+  } catch (error: any) {
+    console.error('Error creating sheet:', error.message);
+    throw error;
+  }
+};
+
+/** Create the sheet tab if it does not already exist. Returns whether it was newly created. */
+export const ensureSheet = async (spreadsheetId: string, title: string): Promise<boolean> => {
+  const exists = await sheetExists(spreadsheetId, title);
+  if (exists) return false;
+  await createSheet(spreadsheetId, title);
+  return true;
+};
+
+export const clearAndWriteRange = async (
+  spreadsheetId: string,
+  range: string,
+  values: any[][]
+) => {
+  try {
+    const sheets = google.sheets({ version: 'v4', auth });
+    await sheets.spreadsheets.values.clear({
+      spreadsheetId,
+      range,
+    });
+    if (!values.length) return { cleared: true };
+
+    const response = await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: {
+        values,
+      },
+    });
+    return response.data;
+  } catch (error: any) {
+    console.error('Error clearing/writing sheet range:', error.message);
+    throw error;
+  }
+};

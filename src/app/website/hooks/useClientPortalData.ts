@@ -2,11 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { filterProjectsForUser } from '@/lib/project-access';
-import {
-  mergeDrawingScheduleEntries,
-  mergeTrackerScheduleEntries,
-  findTrackerPlannedDates,
-} from '@/lib/schedule-merge';
+import { mergeDrawingScheduleEntries } from '@/lib/schedule-merge';
 import { filterByProject } from '../utils/filterByProject';
 import {
   computeDrawingProgress,
@@ -27,9 +23,7 @@ import type {
   Quotation,
   Requirement,
   Selection,
-  TrackerPlannedDate,
-  TrackerScheduleItem,
-  TrackerTemplate,
+  TrackerProjectTask,
 } from '../types';
 
 type AuthUser = {
@@ -60,9 +54,7 @@ const emptyData: ClientPortalData = {
   drawingTemplates: [],
   drawingSchedule: [],
   drawingPlanned: [],
-  trackerTemplates: [],
-  trackerSchedule: [],
-  trackerPlanned: [],
+  trackerTasks: [],
 };
 
 export function useClientPortalData(user: AuthUser) {
@@ -87,9 +79,6 @@ export function useClientPortalData(user: AuthUser) {
           drawingTemplates,
           drawingSchedule,
           drawingPlanned,
-          trackerTemplates,
-          trackerSchedule,
-          trackerPlanned,
         ] = await Promise.all([
           fetchJson<Project>('/api/projects'),
           fetchJson<Requirement>('/api/requirements'),
@@ -101,12 +90,28 @@ export function useClientPortalData(user: AuthUser) {
           fetchJson<DrawingTemplate>('/api/drawings/templates'),
           fetchJson<DrawingScheduleItem>('/api/drawings'),
           fetchJson<DrawingPlannedDate>('/api/drawings/planned'),
-          fetchJson<TrackerTemplate>('/api/pms-tracker/templates'),
-          fetchJson<TrackerScheduleItem>('/api/pms-tracker'),
-          fetchJson<TrackerPlannedDate>('/api/pms-tracker/planned'),
         ]);
 
         const projectsList = filterProjectsForUser(projectsRaw, user);
+
+        let initialProject = '';
+        if (user?.role === 'Client') {
+          initialProject = user.projectName || '';
+        } else if (projectsList.length > 0) {
+          initialProject = projectsList[0].basicInfo?.name || '';
+        }
+
+        let trackerTasks: TrackerProjectTask[] = [];
+        if (initialProject) {
+          const trackerRes = await fetch(
+            `/api/pms-tracker?project=${encodeURIComponent(initialProject)}`
+          );
+          if (trackerRes.ok) {
+            const trackerData = await trackerRes.json();
+            trackerTasks = Array.isArray(trackerData.tasks) ? trackerData.tasks : [];
+          }
+        }
+
         setData({
           projectsList,
           requirements,
@@ -118,18 +123,9 @@ export function useClientPortalData(user: AuthUser) {
           drawingTemplates,
           drawingSchedule,
           drawingPlanned,
-          trackerTemplates,
-          trackerSchedule,
-          trackerPlanned,
+          trackerTasks,
         });
-
-        if (user?.role === 'Client') {
-          setSelectedProjectName(user.projectName || '');
-        } else if (projectsList.length > 0) {
-          setSelectedProjectName(projectsList[0].basicInfo?.name || '');
-        } else {
-          setSelectedProjectName('');
-        }
+        setSelectedProjectName(initialProject);
       } catch (err) {
         console.error('Error loading client portal:', err);
       } finally {
@@ -139,6 +135,40 @@ export function useClientPortalData(user: AuthUser) {
 
     load();
   }, [user]);
+
+  useEffect(() => {
+    if (!selectedProjectName) {
+      setData((prev) => ({ ...prev, trackerTasks: [] }));
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const trackerRes = await fetch(
+          `/api/pms-tracker?project=${encodeURIComponent(selectedProjectName)}`
+        );
+        if (cancelled) return;
+        if (trackerRes.ok) {
+          const trackerData = await trackerRes.json();
+          setData((prev) => ({
+            ...prev,
+            trackerTasks: Array.isArray(trackerData.tasks) ? trackerData.tasks : [],
+          }));
+        } else {
+          setData((prev) => ({ ...prev, trackerTasks: [] }));
+        }
+      } catch {
+        if (!cancelled) {
+          setData((prev) => ({ ...prev, trackerTasks: [] }));
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedProjectName]);
 
   const currentProject = useMemo(
     () =>
@@ -159,8 +189,7 @@ export function useClientPortalData(user: AuthUser) {
       audits: filterByProject(data.audits, selectedProjectName),
       drawingSchedule: filterByProject(data.drawingSchedule, selectedProjectName),
       drawingPlanned: filterByProject(data.drawingPlanned, selectedProjectName),
-      trackerSchedule: filterByProject(data.trackerSchedule, selectedProjectName),
-      trackerPlanned: filterByProject(data.trackerPlanned, selectedProjectName),
+      trackerTasks: data.trackerTasks,
     }),
     [data, selectedProjectName]
   );
@@ -192,32 +221,20 @@ export function useClientPortalData(user: AuthUser) {
   }, [data.drawingTemplates, filtered.drawingSchedule, filtered.drawingPlanned]);
 
   const mergedTracker = useMemo((): MergedTrackerRow[] => {
-    return data.trackerTemplates.map((tpl) => {
-      const entries = filtered.trackerSchedule.filter(
-        (s) => s.trackerId === tpl.trackerId
-      );
-      const schedule = mergeTrackerScheduleEntries(entries);
-      const taskPlan = findTrackerPlannedDates(
-        filtered.trackerPlanned,
-        selectedProjectName,
-        tpl.category,
-        tpl.trackerId,
-        tpl.taskName
-      );
-      return {
-        id: tpl.id,
-        trackerId: tpl.trackerId,
-        taskName: tpl.taskName,
-        areaName: tpl.areaName,
-        category: tpl.category,
-        tat: tpl.tat,
-        planStartDate: taskPlan.startDate || '',
-        planEndDate: taskPlan.endDate || '',
-        actualStartDate: schedule?.actualStartDate || '',
-        actualEndDate: schedule?.actualEndDate || '',
-      };
-    });
-  }, [data.trackerTemplates, filtered.trackerSchedule, filtered.trackerPlanned, selectedProjectName]);
+    return filtered.trackerTasks.map((task) => ({
+      id: task.id,
+      trackerId: task.trackerId,
+      taskName: task.taskName,
+      zone: task.zone,
+      areaName: task.areaName,
+      category: task.category,
+      tat: '',
+      planStartDate: task.plannedStartDate || '',
+      planEndDate: task.plannedEndDate || '',
+      actualStartDate: task.actualStartDate || '',
+      actualEndDate: task.actualEndDate || '',
+    }));
+  }, [filtered.trackerTasks]);
 
   const moduleCounts = useMemo<ModuleCounts>(
     () => ({

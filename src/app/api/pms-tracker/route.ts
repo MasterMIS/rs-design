@@ -1,31 +1,70 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSheetsData, appendSheetsData, updateSheetRow } from '@/lib/google-sheets';
+import {
+  appendSheetsData,
+  deleteSheetRow,
+  getSheetsData,
+  listSheetTitles,
+  sheetExists,
+  updateSheetRow,
+} from '@/lib/google-sheets';
 import { CONFIG } from '@/lib/config';
+import {
+  isProjectSheetTitle,
+  nextPmsTrackerId,
+  parsePmsRows,
+  quoteSheetRange,
+  sanitizeSheetTitle,
+  toPmsSheetRow,
+  type PmsTrackerRow,
+} from '@/lib/pms-tracker';
 
 const SHEET_ID = CONFIG.PMS_TRACKER.SHEET_ID;
-const SHEET_NAME = CONFIG.PMS_TRACKER.SUBMISSIONS_SHEET;
 
-export async function GET() {
+async function loadProjectTasks(project: string): Promise<PmsTrackerRow[]> {
+  const data = await getSheetsData(SHEET_ID, quoteSheetRange(project, 'A2:K1000'));
+  return parsePmsRows(data as string[][] | undefined);
+}
+
+export async function GET(request: NextRequest) {
   try {
-    const data = await getSheetsData(SHEET_ID, `${SHEET_NAME}!A2:D1000`);
+    const { searchParams } = new URL(request.url);
+    const all = searchParams.get('all') === '1';
+    const projectParam = searchParams.get('project');
 
-    if (!data || data.length === 0) return NextResponse.json([]);
+    if (all) {
+      const titles = await listSheetTitles(SHEET_ID);
+      const projects = titles.filter(isProjectSheetTitle);
+      const results: { project: string; tasks: PmsTrackerRow[] }[] = [];
 
-    const items = data.map((row: string[], index: number) => {
-      return {
-        rowIndex: index + 2,
-        id: `PMS-SCH-${index + 2}`,
-        trackerId: row[0] || '',
-        project: row[1] || '',
-        actualStartDate: row[2] || '',
-        actualEndDate: row[3] || '',
-      };
-    }).filter((t: { project: string; trackerId: string }) => t.project && t.trackerId);
+      for (const project of projects) {
+        const tasks = await loadProjectTasks(project);
+        results.push({ project, tasks });
+      }
 
-    return NextResponse.json(items);
+      return NextResponse.json(results);
+    }
+
+    if (!projectParam?.trim()) {
+      return NextResponse.json(
+        { error: 'Missing project query parameter. Use ?project=Name or ?all=1.' },
+        { status: 400 }
+      );
+    }
+
+    const project = sanitizeSheetTitle(projectParam);
+    const exists = await sheetExists(SHEET_ID, project);
+    if (!exists) {
+      return NextResponse.json(
+        { installed: false, project, tasks: [] },
+        { status: 404 }
+      );
+    }
+
+    const tasks = await loadProjectTasks(project);
+    return NextResponse.json({ installed: true, project, tasks });
   } catch (error: unknown) {
     const err = error as Error;
-    console.error('API Error (GET PMS Schedule):', err);
+    console.error('API Error (GET PMS Tracker):', err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
@@ -33,33 +72,63 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { project, items } = body;
+    const project = sanitizeSheetTitle(body.project || '');
 
-    if (!project || !items || !Array.isArray(items)) {
-      return NextResponse.json({ error: 'Project and items are required.' }, { status: 400 });
+    if (!project) {
+      return NextResponse.json({ error: 'Project name is required.' }, { status: 400 });
     }
 
-    const rowsToAppend: string[][] = [];
-
-    for (const item of items) {
-      if (item.actualStartDate || item.actualEndDate) {
-        rowsToAppend.push([
-          item.trackerId || '',
-          project,
-          item.actualStartDate || '',
-          item.actualEndDate || '',
-        ]);
-      }
+    if (!(await sheetExists(SHEET_ID, project))) {
+      return NextResponse.json(
+        { error: `Project sheet "${project}" not found. Install tasks first.` },
+        { status: 404 }
+      );
     }
 
-    if (rowsToAppend.length > 0) {
-      await appendSheetsData(SHEET_ID, `${SHEET_NAME}!A2`, rowsToAppend);
+    const {
+      trackerId,
+      zone,
+      areaName,
+      taskName,
+      resourceName,
+      doerName,
+      category,
+      plannedStartDate,
+      plannedEndDate,
+      actualStartDate,
+      actualEndDate,
+    } = body;
+
+    if (!taskName) {
+      return NextResponse.json({ error: 'Task Name is required.' }, { status: 400 });
     }
 
-    return NextResponse.json({ success: true });
+    let finalTrackerId = trackerId || '';
+    if (!finalTrackerId.trim()) {
+      const existing = await loadProjectTasks(project);
+      finalTrackerId = nextPmsTrackerId(existing);
+    }
+
+    const newRow = toPmsSheetRow({
+      trackerId: finalTrackerId,
+      zone,
+      areaName,
+      taskName,
+      resourceName,
+      doerName,
+      category,
+      plannedStartDate,
+      plannedEndDate,
+      actualStartDate,
+      actualEndDate,
+    });
+
+    await appendSheetsData(SHEET_ID, quoteSheetRange(project, 'A2'), [newRow]);
+
+    return NextResponse.json({ success: true, trackerId: finalTrackerId });
   } catch (error: unknown) {
     const err = error as Error;
-    console.error('API Error (POST PMS Schedule):', err);
+    console.error('API Error (POST PMS Tracker):', err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
@@ -68,25 +137,101 @@ export async function PUT(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const rowIndexStr = searchParams.get('rowIndex');
+    const projectParam = searchParams.get('project');
 
-    if (!rowIndexStr) return NextResponse.json({ error: 'Missing Row Index' }, { status: 400 });
-    const rowIndex = parseInt(rowIndexStr);
+    if (!rowIndexStr) {
+      return NextResponse.json({ error: 'Missing Row Index' }, { status: 400 });
+    }
+    if (!projectParam?.trim()) {
+      return NextResponse.json({ error: 'Missing project query parameter.' }, { status: 400 });
+    }
+
+    const project = sanitizeSheetTitle(projectParam);
+    const rowIndex = parseInt(rowIndexStr, 10);
+
+    if (!(await sheetExists(SHEET_ID, project))) {
+      return NextResponse.json(
+        { error: `Project sheet "${project}" not found.` },
+        { status: 404 }
+      );
+    }
 
     const body = await request.json();
+    const {
+      trackerId,
+      zone,
+      areaName,
+      taskName,
+      resourceName,
+      doerName,
+      category,
+      plannedStartDate,
+      plannedEndDate,
+      actualStartDate,
+      actualEndDate,
+    } = body;
 
-    const updatedRow = [
-      body.trackerId || '',
-      body.project || '',
-      body.actualStartDate || '',
-      body.actualEndDate || '',
-    ];
+    if (!taskName) {
+      return NextResponse.json({ error: 'Task Name is required.' }, { status: 400 });
+    }
 
-    await updateSheetRow(SHEET_ID, `${SHEET_NAME}!A${rowIndex}:D${rowIndex}`, [updatedRow]);
+    const updatedRow = toPmsSheetRow({
+      trackerId,
+      zone,
+      areaName,
+      taskName,
+      resourceName,
+      doerName,
+      category,
+      plannedStartDate,
+      plannedEndDate,
+      actualStartDate,
+      actualEndDate,
+    });
+
+    await updateSheetRow(
+      SHEET_ID,
+      quoteSheetRange(project, `A${rowIndex}:K${rowIndex}`),
+      [updatedRow]
+    );
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
     const err = error as Error;
-    console.error('API Error (PUT PMS Schedule):', err);
+    console.error('API Error (PUT PMS Tracker):', err);
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const rowIndexStr = searchParams.get('rowIndex');
+    const projectParam = searchParams.get('project');
+
+    if (!rowIndexStr) {
+      return NextResponse.json({ error: 'Missing Row Index' }, { status: 400 });
+    }
+    if (!projectParam?.trim()) {
+      return NextResponse.json({ error: 'Missing project query parameter.' }, { status: 400 });
+    }
+
+    const project = sanitizeSheetTitle(projectParam);
+    const rowIndex = parseInt(rowIndexStr, 10);
+
+    if (!(await sheetExists(SHEET_ID, project))) {
+      return NextResponse.json(
+        { error: `Project sheet "${project}" not found.` },
+        { status: 404 }
+      );
+    }
+
+    await deleteSheetRow(SHEET_ID, project, rowIndex - 1);
+
+    return NextResponse.json({ success: true });
+  } catch (error: unknown) {
+    const err = error as Error;
+    console.error('API Error (DELETE PMS Tracker):', err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }

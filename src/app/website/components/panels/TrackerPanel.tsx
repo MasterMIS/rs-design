@@ -28,9 +28,9 @@ export function TrackerPanel({ items }: { items: MergedTrackerRow[] }) {
               <thead>
                 <tr>
                   <th>Task</th>
+                  <th>Zone</th>
                   <th>Area</th>
                   <th>Category</th>
-                  <th>TAT (days)</th>
                   <th>Plan Start</th>
                   <th>Plan End</th>
                   <th>Actual Start</th>
@@ -44,9 +44,9 @@ export function TrackerPanel({ items }: { items: MergedTrackerRow[] }) {
                       <strong>{item.taskName}</strong>
                       <span className={styles.tableSub}>{item.trackerId}</span>
                     </td>
+                    <td>{item.zone || '—'}</td>
                     <td>{item.areaName}</td>
                     <td>{item.category}</td>
-                    <td>{item.tat || '—'}</td>
                     <td>{formatDate(item.planStartDate)}</td>
                     <td>{formatDate(item.planEndDate)}</td>
                     <td>{formatDate(item.actualStartDate)}</td>

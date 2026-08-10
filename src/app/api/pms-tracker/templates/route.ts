@@ -1,30 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSheetsData, appendSheetsData, updateSheetRow, deleteSheetRow } from '@/lib/google-sheets';
 import { CONFIG } from '@/lib/config';
+import {
+  nextPmsTrackerId,
+  parsePmsRows,
+  quoteSheetRange,
+  toPmsSheetRow,
+} from '@/lib/pms-tracker';
 
 const SHEET_ID = CONFIG.PMS_TRACKER.SHEET_ID;
 const SHEET_NAME = CONFIG.PMS_TRACKER.TEMPLATES_SHEET;
 
 export async function GET() {
   try {
-    const data = await getSheetsData(SHEET_ID, `${SHEET_NAME}!A2:G1000`);
-
-    if (!data || data.length === 0) return NextResponse.json([]);
-
-    const items = data.map((row: string[], index: number) => {
-      return {
-        rowIndex: index + 2,
-        id: row[0] || `PMS-TPL-${index + 2}`,
-        trackerId: row[0] || `PMS-TPL-${index + 2}`,
-        areaName: row[1] || '',
-        taskName: row[2] || '',
-        resourceName: row[3] || '',
-        doerName: row[4] || '',
-        category: row[5] || 'Uncategorized',
-        tat: row[6] || '0',
-      };
-    }).filter((t: any) => t.taskName);
-
+    const data = await getSheetsData(SHEET_ID, quoteSheetRange(SHEET_NAME, 'A2:K1000'));
+    const items = parsePmsRows(data as string[][] | undefined);
     return NextResponse.json(items);
   } catch (error: unknown) {
     const err = error as Error;
@@ -36,25 +26,49 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { trackerId, areaName, taskName, resourceName, doerName, category, tat } = body;
+    const {
+      trackerId,
+      zone,
+      areaName,
+      taskName,
+      resourceName,
+      doerName,
+      category,
+      plannedStartDate,
+      plannedEndDate,
+      actualStartDate,
+      actualEndDate,
+    } = body;
 
     if (!taskName) {
       return NextResponse.json({ error: 'Task Name is required.' }, { status: 400 });
     }
 
-    const newRow = [
-      trackerId || '',
-      areaName || '',
-      taskName || '',
-      resourceName || '',
-      doerName || '',
-      category || 'Uncategorized',
-      tat || '0'
-    ];
+    let finalTrackerId = trackerId || '';
+    if (!finalTrackerId.trim()) {
+      const existing = parsePmsRows(
+        (await getSheetsData(SHEET_ID, quoteSheetRange(SHEET_NAME, 'A2:K1000'))) as string[][]
+      );
+      finalTrackerId = nextPmsTrackerId(existing);
+    }
 
-    await appendSheetsData(SHEET_ID, `${SHEET_NAME}!A2`, [newRow]);
+    const newRow = toPmsSheetRow({
+      trackerId: finalTrackerId,
+      zone,
+      areaName,
+      taskName,
+      resourceName,
+      doerName,
+      category,
+      plannedStartDate: plannedStartDate || '',
+      plannedEndDate: plannedEndDate || '',
+      actualStartDate: actualStartDate || '',
+      actualEndDate: actualEndDate || '',
+    });
 
-    return NextResponse.json({ success: true });
+    await appendSheetsData(SHEET_ID, quoteSheetRange(SHEET_NAME, 'A2'), [newRow]);
+
+    return NextResponse.json({ success: true, trackerId: finalTrackerId });
   } catch (error: unknown) {
     const err = error as Error;
     console.error('API Error (POST PMS Template):', err);
@@ -71,23 +85,43 @@ export async function PUT(request: NextRequest) {
     const rowIndex = parseInt(rowIndexStr);
 
     const body = await request.json();
-    const { trackerId, areaName, taskName, resourceName, doerName, category, tat } = body;
+    const {
+      trackerId,
+      zone,
+      areaName,
+      taskName,
+      resourceName,
+      doerName,
+      category,
+      plannedStartDate,
+      plannedEndDate,
+      actualStartDate,
+      actualEndDate,
+    } = body;
 
     if (!taskName) {
       return NextResponse.json({ error: 'Task Name is required.' }, { status: 400 });
     }
 
-    const updatedRow = [
-      trackerId || '',
-      areaName || '',
-      taskName || '',
-      resourceName || '',
-      doerName || '',
-      category || 'Uncategorized',
-      tat || '0'
-    ];
+    const updatedRow = toPmsSheetRow({
+      trackerId,
+      zone,
+      areaName,
+      taskName,
+      resourceName,
+      doerName,
+      category,
+      plannedStartDate: plannedStartDate || '',
+      plannedEndDate: plannedEndDate || '',
+      actualStartDate: actualStartDate || '',
+      actualEndDate: actualEndDate || '',
+    });
 
-    await updateSheetRow(SHEET_ID, `${SHEET_NAME}!A${rowIndex}:G${rowIndex}`, [updatedRow]);
+    await updateSheetRow(
+      SHEET_ID,
+      quoteSheetRange(SHEET_NAME, `A${rowIndex}:K${rowIndex}`),
+      [updatedRow]
+    );
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {

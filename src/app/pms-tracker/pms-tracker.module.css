@@ -26,6 +26,48 @@
 .headerActions {
   display: flex;
   gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.modeSwitch {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--bg-main);
+  border: 1px solid var(--border-color);
+  gap: 2px;
+}
+
+.modeSwitchBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-main);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.modeSwitchBtn:hover {
+  color: var(--primary);
+}
+
+.modeSwitchActive {
+  background: var(--banner-bg, var(--primary));
+  color: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+.modeSwitchActive:hover {
+  color: white;
 }
 
 .addButton {
@@ -172,38 +214,62 @@
   color: white;
 }
 
-/* Forms */
+/* Forms — labels always fixed on the input outline (override global floating labels) */
 .formGroup {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin-bottom: 12px;
+  margin-top: 4px;
+  margin-bottom: 14px;
+  padding-top: 10px;
 }
 
-.formGroup>label {
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: var(--text-heading);
-  display: flex;
+.formGroup > label,
+.formGroup > .outlineLabel,
+.modalBody .formGroup > label,
+.modalBody .formGroup > .outlineLabel {
+  position: absolute !important;
+  top: 2px !important;
+  left: 12px !important;
+  z-index: 10 !important;
+  margin: 0 !important;
+  padding: 0 6px !important;
+  transform: none !important;
+  font-size: 0.75rem !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: #4f46e5 !important;
+  background-color: var(--bg-card, #fff) !important;
+  pointer-events: none;
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
+  line-height: 1.2;
+  transition: none !important;
+}
+
+.outlineLabel .requiredMark,
+.formGroup > label .requiredMark {
+  color: #ef4444;
+  font-size: 0.85rem;
 }
 
 .formGroup input,
 .formGroup select {
-  padding: 10px 14px;
+  width: 100%;
+  padding: 14px;
   border-radius: 10px;
   border: 2px solid #cbd5e1;
   background-color: transparent;
   color: var(--text-heading);
   font-size: 0.95rem;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
-  width: 100%;
 }
 
 .formGroup input:focus,
 .formGroup select:focus {
-  border-color: #4f46e5;
+  border-color: var(--primary, #4f46e5);
   box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
   outline: none;
 }
@@ -248,7 +314,7 @@
 }
 
 .modalBody {
-  padding: 16px 20px;
+  padding: 16px 20px 8px;
 }
 
 .modalActions {
@@ -385,13 +451,326 @@
   overflow: hidden;
 }
 
+.doubleSidebar {
+  display: flex;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border-color);
+}
+
+.zoneSidebar,
+.categorySidebar,
 .templateSidebar {
-  width: 280px;
-  min-width: 280px;
+  width: 200px;
+  min-width: 180px;
   background-color: var(--bg-card);
   padding: 16px 0;
   display: flex;
   flex-direction: column;
+}
+
+.zoneSidebar {
+  border-right: 1px solid var(--border-color);
+}
+
+.categorySidebar {
+  width: 220px;
+}
+
+.installCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  text-align: center;
+  padding: 48px 24px;
+  background: var(--bg-card);
+  border: 1px dashed var(--border-color);
+  border-radius: 16px;
+  max-width: 560px;
+  margin: 24px auto;
+}
+
+.installCardRich {
+  align-items: stretch;
+  text-align: left;
+  max-width: 640px;
+  padding: 28px;
+  border: 1px solid rgba(79, 70, 229, 0.18);
+  background:
+    radial-gradient(120% 80% at 0% 0%, rgba(79, 70, 229, 0.08), transparent 55%),
+    radial-gradient(100% 70% at 100% 0%, rgba(16, 185, 129, 0.06), transparent 50%),
+    var(--bg-card);
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
+}
+
+.installCard h3 {
+  margin: 0;
+  color: var(--text-heading);
+  font-size: 1.25rem;
+}
+
+.installCard p {
+  margin: 0;
+  color: var(--text-light);
+  font-size: 0.92rem;
+  line-height: 1.5;
+  max-width: none;
+}
+
+.installIcon,
+.installIconWrap {
+  color: var(--primary);
+}
+
+.installHero {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.installHeroIcon {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: #4f46e5;
+  background: linear-gradient(145deg, rgba(79, 70, 229, 0.14), rgba(79, 70, 229, 0.05));
+  border: 1px solid rgba(79, 70, 229, 0.2);
+}
+
+.installHeroText {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.installHeroText h3 {
+  font-size: 1.35rem;
+}
+
+.installField {
+  width: 100%;
+  margin-top: 8px;
+  margin-bottom: 4px;
+}
+
+.installPreviewRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid var(--border-color);
+}
+
+.installStat {
+  font-size: 0.84rem;
+  color: var(--text-main);
+}
+
+.installStat strong {
+  color: #4f46e5;
+  font-weight: 800;
+}
+
+.installStatDot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #94a3b8;
+}
+
+.installPreviewMuted {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.84rem;
+  color: var(--text-light);
+}
+
+.installPrimaryBtn {
+  width: 100%;
+  justify-content: center;
+  padding: 12px 18px;
+  font-size: 0.95rem;
+  margin-top: 4px;
+}
+
+.installPrimaryBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.installProgressPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.installProgressHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.installProgressLabel {
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-light);
+}
+
+.installProgressPct {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #4f46e5;
+  font-variant-numeric: tabular-nums;
+}
+
+.installProgressTrack {
+  width: 100%;
+  height: 10px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  overflow: hidden;
+}
+
+.installProgressFill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #6366f1, #22c55e);
+  transition: width 0.25s ease;
+  box-shadow: 0 0 12px rgba(99, 102, 241, 0.35);
+}
+
+.installProgressMeta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.78rem;
+  color: var(--text-light);
+  font-weight: 600;
+}
+
+.installLogBox {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 12px;
+  border-radius: 12px;
+  background: #0f172a;
+  border: 1px solid #1e293b;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.installLogRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: #cbd5e1;
+  animation: installLogIn 0.28s ease;
+}
+
+.installLogRow svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.installLog_info {
+  color: #94a3b8;
+}
+
+.installLog_run {
+  color: #93c5fd;
+}
+
+.installLog_ok {
+  color: #86efac;
+}
+
+.installLog_warn {
+  color: #fca5a5;
+}
+
+@keyframes installLogIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.installSourceField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  max-width: 360px;
+  text-align: left;
+}
+
+.installSourceField label {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-heading);
+}
+
+.installSourceField select {
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 2px solid #cbd5e1;
+  background: transparent;
+  font-size: 0.95rem;
+  width: 100%;
+}
+
+.formRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.inlinePlanEditors {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.emptyContent {
+  color: var(--text-light);
+  padding: 20px;
+  text-align: center;
+  background-color: var(--bg-card);
+  border-radius: 12px;
+  border: 1px dashed var(--border-color);
+}
+
+.emptyContentBox {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 200px;
+  background-color: var(--bg-card);
+  border-radius: 12px;
+  border: 1px dashed var(--border-color);
 }
 
 .sidebarTitle {
@@ -647,9 +1026,20 @@
   align-items: center;
   gap: 12px;
   flex: 0 0 auto;
-  min-width: 360px;
-  max-width: 46%;
+  min-width: 0;
+  max-width: 48%;
   padding-left: 8px;
+  overflow: visible;
+}
+
+.cardActionsStack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  min-width: 110px;
 }
 
 .datesCol {
@@ -707,12 +1097,15 @@
   flex: 0 0 auto;
   display: flex;
   align-items: center;
+  justify-content: center;
+  width: 100%;
 }
 
 .workStartBtn,
 .workEndBtn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   padding: 8px 14px;
   border-radius: 8px;
@@ -722,6 +1115,7 @@
   cursor: pointer;
   transition: all 0.2s ease;
   white-space: nowrap;
+  min-width: 108px;
 }
 
 .workStartBtn {
@@ -750,6 +1144,7 @@
 .workDoneBadge {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   padding: 8px 14px;
   border-radius: 8px;
@@ -757,6 +1152,7 @@
   color: #15803d;
   font-size: 0.8rem;
   font-weight: 700;
+  min-width: 108px;
 }
 
 .spinIcon {
@@ -881,13 +1277,45 @@
   animation: spin 1s linear infinite;
 }
 
+@media (max-width: 1100px) {
+  .doubleSidebar {
+    flex-direction: column;
+    width: 240px;
+  }
+  .zoneSidebar,
+  .categorySidebar {
+    width: 100%;
+    border-right: none;
+  }
+  .zoneSidebar {
+    border-bottom: 1px solid var(--border-color);
+  }
+}
+
 @media (max-width: 800px) {
   .templateLayout {
     flex-direction: column;
   }
-  .templateSidebar {
+  .doubleSidebar {
     width: 100%;
-    min-width: 100%;
+    flex-direction: row;
+    border-right: none;
+    border-bottom: 1px solid var(--border-color);
+  }
+  .zoneSidebar,
+  .categorySidebar,
+  .templateSidebar {
+    width: 50%;
+    min-width: 0;
+  }
+  .formRow {
+    grid-template-columns: 1fr;
+  }
+  .scheduleRightCol {
+    flex-direction: column;
+    align-items: flex-start;
+    min-width: 0;
+    max-width: 100%;
   }
 }
 
@@ -1046,6 +1474,13 @@
   display: flex;
   gap: 8px;
   flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+.cardActionsStack .templateActions {
+  margin-top: 0;
 }
 
 .savePlanBtn {

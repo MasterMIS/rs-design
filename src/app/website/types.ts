@@ -117,10 +117,11 @@ export interface DrawingPlannedDate {
 export interface TrackerTemplate {
   id: string;
   trackerId: string;
+  zone?: string;
   areaName: string;
   taskName: string;
   category: string;
-  tat: string;
+  tat?: string;
 }
 
 export interface TrackerScheduleItem {
@@ -138,6 +139,21 @@ export interface TrackerPlannedDate {
   endDate: string;
 }
 
+/** Installed project-sheet task (dates on the row). */
+export interface TrackerProjectTask {
+  id: string;
+  rowIndex?: number;
+  trackerId: string;
+  zone?: string;
+  areaName: string;
+  taskName: string;
+  category: string;
+  plannedStartDate?: string;
+  plannedEndDate?: string;
+  actualStartDate?: string;
+  actualEndDate?: string;
+}
+
 export interface ClientPortalData {
   projectsList: Project[];
   requirements: Requirement[];
@@ -149,9 +165,7 @@ export interface ClientPortalData {
   drawingTemplates: DrawingTemplate[];
   drawingSchedule: DrawingScheduleItem[];
   drawingPlanned: DrawingPlannedDate[];
-  trackerTemplates: TrackerTemplate[];
-  trackerSchedule: TrackerScheduleItem[];
-  trackerPlanned: TrackerPlannedDate[];
+  trackerTasks: TrackerProjectTask[];
 }
 
 export interface MergedDrawingRow {
@@ -173,6 +187,7 @@ export interface MergedTrackerRow {
   id: string;
   trackerId: string;
   taskName: string;
+  zone?: string;
   areaName: string;
   category: string;
   tat: string;
