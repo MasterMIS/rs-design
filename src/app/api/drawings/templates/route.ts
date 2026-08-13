@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSheetsData, appendSheetsData, updateSheetRow, deleteSheetRow } from '@/lib/google-sheets';
 import { CONFIG } from '@/lib/config';
 import {
+  drawingRowA1,
+  DRAWING_SHEET_DATA_RANGE,
   nextDrawingNo,
   parseDrawingRows,
   quoteSheetRange,
@@ -13,7 +15,7 @@ const SHEET_NAME = CONFIG.DRAWING_SCHEDULE.TEMPLATES_SHEET;
 
 export async function GET() {
   try {
-    const data = await getSheetsData(SHEET_ID, quoteSheetRange(SHEET_NAME, 'A2:N1000'));
+    const data = await getSheetsData(SHEET_ID, quoteSheetRange(SHEET_NAME, DRAWING_SHEET_DATA_RANGE));
     const items = parseDrawingRows(data as string[][] | undefined);
     return NextResponse.json(items);
   } catch (error: unknown) {
@@ -28,7 +30,6 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const {
       drawingNo,
-      zone,
       areaName,
       drawingName,
       resourceName,
@@ -50,14 +51,13 @@ export async function POST(request: NextRequest) {
     let finalDrawingNo = drawingNo || '';
     if (!finalDrawingNo.trim()) {
       const existing = parseDrawingRows(
-        (await getSheetsData(SHEET_ID, quoteSheetRange(SHEET_NAME, 'A2:N1000'))) as string[][]
+        (await getSheetsData(SHEET_ID, quoteSheetRange(SHEET_NAME, DRAWING_SHEET_DATA_RANGE))) as string[][]
       );
       finalDrawingNo = nextDrawingNo(existing);
     }
 
     const newRow = toDrawingSheetRow({
       drawingNo: finalDrawingNo,
-      zone,
       areaName,
       drawingName,
       resourceName,
@@ -93,7 +93,6 @@ export async function PUT(request: NextRequest) {
     const body = await request.json();
     const {
       drawingNo,
-      zone,
       areaName,
       drawingName,
       resourceName,
@@ -114,7 +113,6 @@ export async function PUT(request: NextRequest) {
 
     const updatedRow = toDrawingSheetRow({
       drawingNo,
-      zone,
       areaName,
       drawingName,
       resourceName,
@@ -131,7 +129,7 @@ export async function PUT(request: NextRequest) {
 
     await updateSheetRow(
       SHEET_ID,
-      quoteSheetRange(SHEET_NAME, `A${rowIndex}:N${rowIndex}`),
+      quoteSheetRange(SHEET_NAME, drawingRowA1(rowIndex)),
       [updatedRow]
     );
 

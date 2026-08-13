@@ -525,7 +525,33 @@
   border: 1px dashed var(--border-color);
 }
 
-/* Right Sidebar */
+/* Advanced Filters Modal */
+.filterModalContent {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px 20px;
+  max-height: min(60vh, 480px);
+  overflow-y: auto;
+  overflow-x: visible;
+  padding-right: 4px;
+}
+
+.filterModalFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-color);
+}
+
+@media (max-width: 640px) {
+  .filterModalContent {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Right Sidebar (legacy, unused) */
 .rightSidebarOverlay {
   position: fixed;
   top: 0;
@@ -594,6 +620,13 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  position: relative;
+  z-index: 1;
+}
+
+.filterSection:focus-within,
+.filterSection:has(.filterDropdownBody) {
+  z-index: 20;
 }
 
 .filterDropdownHeader {
@@ -614,15 +647,17 @@
 }
 
 .filterDropdownBody {
+  position: fixed;
+  z-index: 10050;
   display: flex;
   flex-direction: column;
   gap: 10px;
   padding: 12px;
   border: 1px solid var(--border-color);
-  border-top: none;
-  border-radius: 0 0 6px 6px;
-  background-color: var(--bg-main, #f8f9fa);
-  margin-top: -8px;
+  border-radius: 8px;
+  background-color: var(--bg-card, #ffffff);
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.16);
+  margin-top: 0;
 }
 
 .filterSectionTitle {

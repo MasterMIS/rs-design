@@ -117,7 +117,6 @@ export interface DrawingPlannedDate {
 export interface TrackerTemplate {
   id: string;
   trackerId: string;
-  zone?: string;
   areaName: string;
   taskName: string;
   category: string;
@@ -144,7 +143,6 @@ export interface TrackerProjectTask {
   id: string;
   rowIndex?: number;
   trackerId: string;
-  zone?: string;
   areaName: string;
   taskName: string;
   category: string;
@@ -159,7 +157,6 @@ export interface DrawingProjectTask {
   id: string;
   rowIndex?: number;
   drawingNo: string;
-  zone?: string;
   areaName: string;
   drawingName: string;
   category: string;
@@ -188,7 +185,6 @@ export interface MergedDrawingRow {
   id: string;
   drawingNo: string;
   drawingName: string;
-  zone?: string;
   areaName: string;
   category: string;
   planStartDate: string;
@@ -202,7 +198,6 @@ export interface MergedTrackerRow {
   id: string;
   trackerId: string;
   taskName: string;
-  zone?: string;
   areaName: string;
   category: string;
   tat: string;

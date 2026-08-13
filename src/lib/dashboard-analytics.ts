@@ -374,20 +374,6 @@ export function buildCategorySummaryRowsFromTrackerTasks(
   return aggregateByLabel(tasks, (row) => normalizeCategory(row.category), today);
 }
 
-export function buildZoneSummaryRowsFromDrawingTasks(
-  tasks: MergedDrawingDoerTask[],
-  today = new Date()
-): SummaryStatsRow[] {
-  return aggregateByLabel(tasks, (row) => normalizeZone(row.zone), today);
-}
-
-export function buildZoneSummaryRowsFromTrackerTasks(
-  tasks: MergedTrackerDoerTask[],
-  today = new Date()
-): SummaryStatsRow[] {
-  return aggregateByLabel(tasks, (row) => normalizeZone(row.zone), today);
-}
-
 export function buildZoneCategoryRowsFromDrawingTasks(
   tasks: MergedDrawingDoerTask[],
   today = new Date()

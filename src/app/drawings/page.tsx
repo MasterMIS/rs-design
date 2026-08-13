@@ -3,15 +3,22 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Plus, Search, Edit2, Trash2, Settings,
-  CheckSquare, Calendar, User, Grid, LayoutTemplate, Loader2, Download, MapPin,
+  CheckSquare, Calendar, User, Grid, LayoutTemplate, Loader2, Download,
   Sparkles, CheckCircle2, Circle, AlertCircle, X, UploadCloud, FileText,
 } from 'lucide-react';
 import styles from './drawings.module.css';
 import Modal from '@/components/Modal';
+import MultiSelectFilter from '@/components/MultiSelectFilter';
 import { useProject } from '@/context/ProjectContext';
 import { useAuth } from '@/context/AuthContext';
 import { CONFIG } from '@/lib/config';
 import Link from 'next/link';
+
+const NO_AREA_LABEL = 'No Area';
+
+function getAreaLabel(areaName?: string) {
+  return areaName?.trim() || NO_AREA_LABEL;
+}
 
 interface InstallLog {
   id: string;
@@ -22,7 +29,6 @@ interface InstallLog {
 interface SourcePreview {
   label: string;
   drawingCount: number;
-  zones: number;
   categories: number;
 }
 
@@ -30,7 +36,6 @@ interface DrawingItem {
   id: string;
   rowIndex: number;
   drawingNo: string;
-  zone: string;
   areaName: string;
   drawingName: string;
   resourceName: string;
@@ -47,7 +52,6 @@ interface DrawingItem {
 
 interface DrawingForm {
   drawingNo: string;
-  zone: string;
   areaName: string;
   drawingName: string;
   resourceName: string;
@@ -65,7 +69,6 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const emptyForm = (defaults?: Partial<DrawingForm>): DrawingForm => ({
   drawingNo: '',
-  zone: defaults?.zone || '',
   areaName: '',
   drawingName: '',
   resourceName: '',
@@ -81,15 +84,6 @@ const emptyForm = (defaults?: Partial<DrawingForm>): DrawingForm => ({
 
 function sortCategories(cats: string[]) {
   return [...cats].sort((a, b) => a.localeCompare(b));
-}
-
-function sortZones(zones: string[]) {
-  return [...zones].sort((a, b) => {
-    const numA = a.match(/(\d+)/);
-    const numB = b.match(/(\d+)/);
-    if (numA && numB) return parseInt(numA[1], 10) - parseInt(numB[1], 10);
-    return a.localeCompare(b);
-  });
 }
 
 export default function DrawingsPage() {
@@ -113,8 +107,8 @@ export default function DrawingsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [savingRowId, setSavingRowId] = useState<string | null>(null);
 
-  const [selectedZone, setSelectedZone] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [areaFilter, setAreaFilter] = useState<string[]>([]);
   const [searchItemName, setSearchItemName] = useState('');
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -221,39 +215,35 @@ export default function DrawingsPage() {
 
   useEffect(() => {
     setPlanDrafts({});
-    setSelectedZone(null);
     setSelectedCategory(null);
+    setAreaFilter([]);
   }, [activeProjectName, activeMode]);
 
-  const zones = useMemo(() => {
-    const set = new Set(workingItems.map((t) => t.zone?.trim() || 'Unassigned Zone'));
-    return sortZones(Array.from(set));
+  const categories = useMemo(() => {
+    const set = new Set(workingItems.map((t) => t.category || 'Uncategorized'));
+    return sortCategories(Array.from(set));
   }, [workingItems]);
 
-  const activeZone = (selectedZone && zones.includes(selectedZone))
-    ? selectedZone
-    : zones[0] || null;
+  const areaOptions = useMemo(() => {
+    const set = new Set(workingItems.map((t) => getAreaLabel(t.areaName)));
+    return Array.from(set).sort((a, b) => {
+      if (a === NO_AREA_LABEL) return 1;
+      if (b === NO_AREA_LABEL) return -1;
+      return a.localeCompare(b);
+    });
+  }, [workingItems]);
 
-  const categoriesInZone = useMemo(() => {
-    if (!activeZone) return [];
-    const set = new Set(
-      workingItems
-        .filter((t) => (t.zone?.trim() || 'Unassigned Zone') === activeZone)
-        .map((t) => t.category || 'Uncategorized')
-    );
-    return sortCategories(Array.from(set));
-  }, [workingItems, activeZone]);
-
-  const activeCategory = (selectedCategory && categoriesInZone.includes(selectedCategory))
+  const activeCategory = (selectedCategory && categories.includes(selectedCategory))
     ? selectedCategory
-    : categoriesInZone[0] || null;
+    : categories[0] || null;
 
   const visibleItems = useMemo(() => {
-    if (!activeZone || !activeCategory) return [];
+    if (!activeCategory) return [];
     return workingItems.filter((item) => {
-      const zone = item.zone?.trim() || 'Unassigned Zone';
       const category = item.category || 'Uncategorized';
-      if (zone !== activeZone || category !== activeCategory) return false;
+      if (category !== activeCategory) return false;
+      const areaLabel = getAreaLabel(item.areaName);
+      if (areaFilter.length > 0 && !areaFilter.includes(areaLabel)) return false;
       const q = searchItemName.toLowerCase();
       if (!q) return true;
       return (
@@ -262,33 +252,17 @@ export default function DrawingsPage() {
         item.areaName.toLowerCase().includes(q)
       );
     });
-  }, [workingItems, activeZone, activeCategory, searchItemName]);
+  }, [workingItems, activeCategory, areaFilter, searchItemName]);
 
-  const categoryHasPlanDates = (zone: string, category: string) => {
+  const categoryHasPlanDates = (category: string) => {
     if (!isProjectMode || !activeProjectName) return true;
     const items = projectDrawings.filter(
-      (t) =>
-        (t.zone?.trim() || 'Unassigned Zone') === zone &&
-        (t.category || 'Uncategorized') === category
+      (t) => (t.category || 'Uncategorized') === category
     );
     if (items.length === 0) return true;
     return items.every(
       (t) => t.plannedStartDate?.trim() && t.plannedEndDate?.trim()
     );
-  };
-
-  const zoneHasMissingPlans = (zone: string) => {
-    if (!isProjectMode || !activeProjectName) return false;
-    const cats = sortCategories(
-      Array.from(
-        new Set(
-          projectDrawings
-            .filter((t) => (t.zone?.trim() || 'Unassigned Zone') === zone)
-            .map((t) => t.category || 'Uncategorized')
-        )
-      )
-    );
-    return cats.some((c) => !categoryHasPlanDates(zone, c));
   };
 
   const sourceLabel =
@@ -311,7 +285,6 @@ export default function DrawingsPage() {
         setSourcePreview({
           label: 'Template (master)',
           drawingCount: items.length,
-          zones: new Set(items.map((t) => t.zone?.trim() || 'Unassigned Zone')).size,
           categories: new Set(items.map((t) => t.category || 'Uncategorized')).size,
         });
         return;
@@ -319,7 +292,7 @@ export default function DrawingsPage() {
 
       const res = await fetch(`/api/drawings?project=${encodeURIComponent(source)}`);
       if (!res.ok) {
-        setSourcePreview({ label: `Project: ${source}`, drawingCount: 0, zones: 0, categories: 0 });
+        setSourcePreview({ label: `Project: ${source}`, drawingCount: 0, categories: 0 });
         return;
       }
       const data = await res.json();
@@ -327,7 +300,6 @@ export default function DrawingsPage() {
       setSourcePreview({
         label: `Project: ${source}`,
         drawingCount: list.length,
-        zones: new Set(list.map((t) => t.zone?.trim() || 'Unassigned Zone')).size,
         categories: new Set(list.map((t) => t.category || 'Uncategorized')).size,
       });
     } catch {
@@ -372,13 +344,12 @@ export default function DrawingsPage() {
         ({
           label: sourceLabel,
           drawingCount: 0,
-          zones: 0,
           categories: 0,
         } as SourcePreview);
 
       if (preview.drawingCount > 0) {
         pushInstallLog(
-          `Found ${preview.drawingCount} drawings · ${preview.zones} zones · ${preview.categories} categories`,
+          `Found ${preview.drawingCount} drawings · ${preview.categories} categories`,
           'ok'
         );
       } else {
@@ -442,7 +413,6 @@ export default function DrawingsPage() {
     setEditingItem(null);
     setForm(
       emptyForm({
-        zone: activeZone && activeZone !== 'Unassigned Zone' ? activeZone : '',
         category: activeCategory || 'Architecture',
       })
     );
@@ -453,7 +423,6 @@ export default function DrawingsPage() {
     setEditingItem(item);
     setForm({
       drawingNo: item.drawingNo,
-      zone: item.zone,
       areaName: item.areaName,
       drawingName: item.drawingName,
       resourceName: item.resourceName,
@@ -477,7 +446,6 @@ export default function DrawingsPage() {
 
   const buildPayload = (item: DrawingItem, patch: Partial<DrawingItem>) => ({
     drawingNo: item.drawingNo,
-    zone: item.zone,
     areaName: item.areaName,
     drawingName: item.drawingName,
     resourceName: item.resourceName,
@@ -708,14 +676,6 @@ export default function DrawingsPage() {
 
   const showNoProject = isProjectMode && !activeProjectName;
 
-  const allZoneOptions = useMemo(() => {
-    const set = new Set([
-      ...templates.map((t) => t.zone).filter(Boolean),
-      ...projectDrawings.map((t) => t.zone).filter(Boolean),
-    ]);
-    return sortZones(Array.from(set));
-  }, [templates, projectDrawings]);
-
   const allCategoryOptions = useMemo(() => {
     const set = new Set([
       ...templates.map((t) => t.category).filter(Boolean),
@@ -776,15 +736,23 @@ export default function DrawingsPage() {
             </button>
           </div>
           {!showInstallGate && !showNoProject && (
-            <div className={styles.searchBox}>
-              <Search size={18} className={styles.searchIcon} />
-              <input
-                type="text"
-                placeholder="Search drawings..."
-                value={searchItemName}
-                onChange={(e) => setSearchItemName(e.target.value)}
+            <>
+              <MultiSelectFilter
+                label="Area Name"
+                options={areaOptions}
+                selectedValues={areaFilter}
+                onChange={setAreaFilter}
               />
-            </div>
+              <div className={styles.searchBox}>
+                <Search size={18} className={styles.searchIcon} />
+                <input
+                  type="text"
+                  placeholder="Search drawings..."
+                  value={searchItemName}
+                  onChange={(e) => setSearchItemName(e.target.value)}
+                />
+              </div>
+            </>
           )}
           {(isTemplateMode || (isProjectMode && installed && activeProjectName)) && (
             <button className={styles.addButton} onClick={openAddModal}>
@@ -859,10 +827,6 @@ export default function DrawingsPage() {
                     </span>
                     <span className={styles.installStatDot} />
                     <span className={styles.installStat}>
-                      <strong>{sourcePreview.zones}</strong> zones
-                    </span>
-                    <span className={styles.installStatDot} />
-                    <span className={styles.installStat}>
                       <strong>{sourcePreview.categories}</strong> categories
                     </span>
                   </>
@@ -925,42 +889,11 @@ export default function DrawingsPage() {
       ) : (
         <div className={styles.templateLayout}>
           <div className={styles.doubleSidebar}>
-            <div className={styles.zoneSidebar}>
-              <h3 className={styles.sidebarTitle}>Zones</h3>
-              <div className={styles.sidebarList}>
-                {zones.map((zone) => {
-                  const missing = zoneHasMissingPlans(zone);
-                  return (
-                    <button
-                      key={zone}
-                      className={`${styles.sidebarItem} ${activeZone === zone ? styles.active : ''}`}
-                      onClick={() => {
-                        setSelectedZone(zone);
-                        setSelectedCategory(null);
-                      }}
-                    >
-                      <MapPin size={16} style={{ marginRight: 8, flexShrink: 0 }} />
-                      <span className={styles.sidebarItemLabel}>{zone}</span>
-                      {missing && (
-                        <span className={styles.missingDateDot} aria-label="Planned dates not set" />
-                      )}
-                    </button>
-                  );
-                })}
-                {zones.length === 0 && (
-                  <p className={styles.emptySidebar}>No zones found.</p>
-                )}
-              </div>
-            </div>
-
             <div className={styles.categorySidebar}>
               <h3 className={styles.sidebarTitle}>Categories</h3>
               <div className={styles.sidebarList}>
-                {categoriesInZone.map((cat) => {
-                  const missing =
-                    activeZone &&
-                    isProjectMode &&
-                    !categoryHasPlanDates(activeZone, cat);
+                {categories.map((cat) => {
+                  const missing = isProjectMode && !categoryHasPlanDates(cat);
                   return (
                     <button
                       key={cat}
@@ -975,8 +908,8 @@ export default function DrawingsPage() {
                     </button>
                   );
                 })}
-                {categoriesInZone.length === 0 && (
-                  <p className={styles.emptySidebar}>No categories in this zone.</p>
+                {categories.length === 0 && (
+                  <p className={styles.emptySidebar}>No categories found.</p>
                 )}
               </div>
             </div>
@@ -1000,7 +933,7 @@ export default function DrawingsPage() {
               </div>
             )}
 
-            {activeCategory && activeZone ? (
+            {activeCategory ? (
               visibleItems.length > 0 ? (
                 <div className={styles.tableContainer}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -1046,9 +979,6 @@ export default function DrawingsPage() {
                               )}
                             </div>
                             <div className={styles.taskMetaRow}>
-                              <span className={styles.metaTag}>
-                                <MapPin size={14} /> {item.zone || 'No Zone'}
-                              </span>
                               <span className={styles.metaTag}>
                                 <Grid size={14} /> {item.areaName || 'No Area'}
                               </span>
@@ -1280,20 +1210,6 @@ export default function DrawingsPage() {
         width="520px"
       >
         <form onSubmit={submitItem} className={`${styles.modalBody} ${styles.fixedOutlineForm}`}>
-          <div className={styles.formGroup} data-has-value="true">
-            <label className={styles.outlineLabel}>Zone</label>
-            <input
-              list="zone-list"
-              value={form.zone}
-              onChange={(e) => setForm({ ...form, zone: e.target.value })}
-              placeholder="e.g. Zone-1"
-            />
-            <datalist id="zone-list">
-              {allZoneOptions.map((z) => (
-                <option key={z} value={z} />
-              ))}
-            </datalist>
-          </div>
           <div className={styles.formGroup} data-has-value="true">
             <label className={styles.outlineLabel}>
               Category <span className={styles.requiredMark}>*</span>

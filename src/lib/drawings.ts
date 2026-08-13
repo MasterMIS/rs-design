@@ -5,7 +5,6 @@ export { quoteSheetRange, sanitizeSheetTitle };
 
 export const DRAWING_HEADERS = [
   'Drawing No.',
-  'Zone',
   'Area Name',
   'Drawing Name',
   'Resource Name',
@@ -20,6 +19,13 @@ export const DRAWING_HEADERS = [
   'Drawing Image',
 ] as const;
 
+export const DRAWING_SHEET_DATA_RANGE = 'A2:M1000';
+export const DRAWING_SHEET_FULL_RANGE = 'A1:M1000';
+
+export function drawingRowA1(rowIndex: number) {
+  return `A${rowIndex}:M${rowIndex}`;
+}
+
 export const DRAWING_LEGACY_SHEETS = new Set([
   CONFIG.DRAWING_SCHEDULE.TEMPLATES_SHEET,
   CONFIG.DRAWING_SCHEDULE.SUBMISSIONS_SHEET,
@@ -30,7 +36,6 @@ export interface DrawingRow {
   rowIndex: number;
   id: string;
   drawingNo: string;
-  zone: string;
   areaName: string;
   drawingName: string;
   resourceName: string;
@@ -56,19 +61,18 @@ export function parseDrawingRows(data: string[][] | null | undefined): DrawingRo
         rowIndex,
         id: drawingNo || `DRW-ROW-${rowIndex}`,
         drawingNo,
-        zone: row[1] || '',
-        areaName: row[2] || '',
-        drawingName: row[3] || '',
-        resourceName: row[4] || '',
-        doerName: row[5] || '',
-        category: row[6] || 'Uncategorized',
-        plannedStartDate: row[7] || '',
-        plannedEndDate: row[8] || '',
-        actualStartDate: row[9] || '',
-        actualEndDate: row[10] || '',
-        revisionNo: row[11] || '0',
-        lastUpdated: row[12] || '',
-        drawingImage: row[13] || '',
+        areaName: row[1] || '',
+        drawingName: row[2] || '',
+        resourceName: row[3] || '',
+        doerName: row[4] || '',
+        category: row[5] || 'Uncategorized',
+        plannedStartDate: row[6] || '',
+        plannedEndDate: row[7] || '',
+        actualStartDate: row[8] || '',
+        actualEndDate: row[9] || '',
+        revisionNo: row[10] || '0',
+        lastUpdated: row[11] || '',
+        drawingImage: row[12] || '',
       };
     })
     .filter((t) => t.drawingName.trim());
@@ -76,7 +80,6 @@ export function parseDrawingRows(data: string[][] | null | undefined): DrawingRo
 
 export function toDrawingSheetRow(item: {
   drawingNo?: string;
-  zone?: string;
   areaName?: string;
   drawingName?: string;
   resourceName?: string;
@@ -92,7 +95,6 @@ export function toDrawingSheetRow(item: {
 }): string[] {
   return [
     item.drawingNo || '',
-    item.zone || '',
     item.areaName || '',
     item.drawingName || '',
     item.resourceName || '',
@@ -111,7 +113,6 @@ export function toDrawingSheetRow(item: {
 /** Structure-only copy for install: blank dates, revision, image. */
 export function toDrawingInstallSheetRow(item: DrawingRow | {
   drawingNo?: string;
-  zone?: string;
   areaName?: string;
   drawingName?: string;
   resourceName?: string;
@@ -120,7 +121,6 @@ export function toDrawingInstallSheetRow(item: DrawingRow | {
 }): string[] {
   return toDrawingSheetRow({
     drawingNo: item.drawingNo,
-    zone: item.zone,
     areaName: item.areaName,
     drawingName: item.drawingName,
     resourceName: item.resourceName,

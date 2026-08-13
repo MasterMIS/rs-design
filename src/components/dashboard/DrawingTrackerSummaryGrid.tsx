@@ -6,8 +6,6 @@ import {
   Briefcase,
   FolderKanban,
   Layers,
-  MapPin,
-  PenTool,
 } from 'lucide-react';
 import type { SummaryStatsRow } from '@/lib/dashboard-analytics';
 import { SummaryStatsTable } from './SummaryStatsTable';
@@ -18,8 +16,6 @@ export interface DrawingTrackerSummaryData {
   trackerByProject: SummaryStatsRow[];
   drawingByCategory: SummaryStatsRow[];
   trackerByCategory: SummaryStatsRow[];
-  drawingByZone: SummaryStatsRow[];
-  trackerByZone: SummaryStatsRow[];
 }
 
 interface DrawingTrackerSummaryGridProps {
@@ -46,16 +42,6 @@ const TABLE_THEMES = {
     icon: <FolderKanban size={18} />,
     accentColor: '#ea580c',
     accentBg: 'linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)',
-  },
-  drawingZone: {
-    icon: <MapPin size={18} />,
-    accentColor: '#0ea5e9',
-    accentBg: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
-  },
-  trackerZone: {
-    icon: <PenTool size={18} />,
-    accentColor: '#db2777',
-    accentBg: 'linear-gradient(135deg, #fdf2f8 0%, #fce7f3 100%)',
   },
 } as const;
 
@@ -87,20 +73,6 @@ export function DrawingTrackerSummaryGrid({ data }: DrawingTrackerSummaryGridPro
         label: 'Category',
         rows: data.trackerByCategory,
         theme: TABLE_THEMES.trackerCategory,
-      },
-    },
-    {
-      drawing: {
-        title: 'Drawing',
-        label: 'Zone',
-        rows: data.drawingByZone,
-        theme: TABLE_THEMES.drawingZone,
-      },
-      tracker: {
-        title: 'Tracker',
-        label: 'Zone',
-        rows: data.trackerByZone,
-        theme: TABLE_THEMES.trackerZone,
       },
     },
   ];

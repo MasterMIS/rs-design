@@ -4,9 +4,10 @@ import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { 
   Plus, Edit2, Trash2, CheckCircle, Clock, Search, ArrowLeft, 
-  CheckCircle2, AlertCircle, Briefcase, User, CalendarDays, FileText, Download, PenTool
+  CheckCircle2, AlertCircle, Briefcase, User, CalendarDays, FileText, Download, PenTool, Printer
 } from 'lucide-react';
 import { exportToCSV } from '@/utils/exportCsv';
+import { exportDoerTasksPdf } from '@/utils/exportPdf';
 import styles from '../em.module.css';
 import Modal from '@/components/Modal';
 import MultiSelectFilter from '@/components/MultiSelectFilter';
@@ -79,7 +80,7 @@ export default function DesignPage() {
 
   const workTypeOptions = [
     '2D Drawing', '3D Drawing', 'Architectal Drawing', 
-    'MEP Drawing', 'Selection', 'Design Demo', 'Office Work', 'BOQ'
+    'MEP Drawing', 'Selection', 'Design Demo', 'Office Work', 'BOQ', 'Marketing'
   ];
 
   const projectOptions = useMemo(
@@ -338,7 +339,7 @@ export default function DesignPage() {
   });
 
   const uniqueProjects = Array.from(new Set(tasks.map(t => t.project_name).filter(Boolean)));
-  const uniqueTypes = Array.from(new Set(tasks.map(t => t.work_type).filter(Boolean)));
+  const uniqueTypes = Array.from(new Set([...workTypeOptions, ...tasks.map(t => t.work_type).filter(Boolean)]));
   const uniqueDoers = Array.from(new Set(tasks.map(t => t.doer_name).filter(Boolean)));
   const uniqueStatuses = ['Pending', 'In Progress', 'Completed'];
 
@@ -390,6 +391,26 @@ export default function DesignPage() {
           <>
           <button onClick={() => exportToCSV(filteredTasks, 'Design_Tasks')} style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: 'var(--bg-card)', color: 'var(--text-main)', padding: '10px 16px', borderRadius: '8px', border: '1px solid var(--border-color)', cursor: 'pointer', fontWeight: 600 }}>
             <Download size={16} /> Export CSV
+          </button>
+          <button
+            onClick={() => exportDoerTasksPdf({
+              title: 'Design Tasks',
+              filename: 'Design_Tasks',
+              tasks: filteredTasks,
+              getDoerName: (task) => task.doer_name,
+              columns: [
+                { header: 'Project Name', getValue: (task) => task.project_name || '-', width: 2.2 },
+                { header: 'Work Type', getValue: (task) => task.work_type || '-', width: 1.5 },
+                { header: 'Work / Drawing', getValue: (task) => task.work_name || '-', width: 2.2 },
+                { header: 'Doer Name', getValue: (task) => task.doer_name || '-', width: 1.6 },
+                { header: 'Planned Date', getValue: (task) => task.planned_date || '-', width: 1.2 },
+                { header: 'Actual Date', getValue: (task) => task.actual_date || '-', width: 1.2 },
+                { header: 'Status', getValue: (task) => task.status || 'Pending', width: 1.1 },
+              ],
+            })}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: 'var(--bg-card)', color: 'var(--text-main)', padding: '10px 16px', borderRadius: '8px', border: '1px solid var(--border-color)', cursor: 'pointer', fontWeight: 600 }}
+          >
+            <Printer size={16} /> Print
           </button>
           <button onClick={handleOpenCreate} style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: 'var(--primary)', color: 'white', padding: '10px 16px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
             <Plus size={16} /> Add Task

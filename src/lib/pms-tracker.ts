@@ -2,7 +2,6 @@ import { CONFIG } from '@/lib/config';
 
 export const PMS_HEADERS = [
   'Tracker ID',
-  'Zone',
   'Area Name',
   'Task Name',
   'Resource Name',
@@ -14,6 +13,13 @@ export const PMS_HEADERS = [
   'Actual End Date',
 ] as const;
 
+export const PMS_SHEET_DATA_RANGE = 'A2:J1000';
+export const PMS_SHEET_FULL_RANGE = 'A1:J1000';
+
+export function pmsRowA1(rowIndex: number) {
+  return `A${rowIndex}:J${rowIndex}`;
+}
+
 export const PMS_LEGACY_SHEETS = new Set([
   CONFIG.PMS_TRACKER.TEMPLATES_SHEET,
   CONFIG.PMS_TRACKER.SUBMISSIONS_SHEET,
@@ -24,7 +30,6 @@ export interface PmsTrackerRow {
   rowIndex: number;
   id: string;
   trackerId: string;
-  zone: string;
   areaName: string;
   taskName: string;
   resourceName: string;
@@ -62,16 +67,15 @@ export function parsePmsRows(data: string[][] | null | undefined): PmsTrackerRow
         rowIndex,
         id: trackerId || `PMS-ROW-${rowIndex}`,
         trackerId,
-        zone: row[1] || '',
-        areaName: row[2] || '',
-        taskName: row[3] || '',
-        resourceName: row[4] || '',
-        doerName: row[5] || '',
-        category: row[6] || 'Uncategorized',
-        plannedStartDate: row[7] || '',
-        plannedEndDate: row[8] || '',
-        actualStartDate: row[9] || '',
-        actualEndDate: row[10] || '',
+        areaName: row[1] || '',
+        taskName: row[2] || '',
+        resourceName: row[3] || '',
+        doerName: row[4] || '',
+        category: row[5] || 'Uncategorized',
+        plannedStartDate: row[6] || '',
+        plannedEndDate: row[7] || '',
+        actualStartDate: row[8] || '',
+        actualEndDate: row[9] || '',
       };
     })
     .filter((t) => t.taskName.trim());
@@ -79,7 +83,6 @@ export function parsePmsRows(data: string[][] | null | undefined): PmsTrackerRow
 
 export function toPmsSheetRow(item: {
   trackerId?: string;
-  zone?: string;
   areaName?: string;
   taskName?: string;
   resourceName?: string;
@@ -92,7 +95,6 @@ export function toPmsSheetRow(item: {
 }): string[] {
   return [
     item.trackerId || '',
-    item.zone || '',
     item.areaName || '',
     item.taskName || '',
     item.resourceName || '',
@@ -108,7 +110,6 @@ export function toPmsSheetRow(item: {
 /** Structure-only copy for install: blank planned/actual dates. */
 export function toInstallSheetRow(item: PmsTrackerRow | {
   trackerId?: string;
-  zone?: string;
   areaName?: string;
   taskName?: string;
   resourceName?: string;
@@ -117,7 +118,6 @@ export function toInstallSheetRow(item: PmsTrackerRow | {
 }): string[] {
   return toPmsSheetRow({
     trackerId: item.trackerId,
-    zone: item.zone,
     areaName: item.areaName,
     taskName: item.taskName,
     resourceName: item.resourceName,

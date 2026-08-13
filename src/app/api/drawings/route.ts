@@ -9,6 +9,8 @@ import {
 } from '@/lib/google-sheets';
 import { CONFIG } from '@/lib/config';
 import {
+  drawingRowA1,
+  DRAWING_SHEET_DATA_RANGE,
   isDrawingProjectSheetTitle,
   nextDrawingNo,
   parseDrawingRows,
@@ -21,7 +23,7 @@ import {
 const SHEET_ID = CONFIG.DRAWING_SCHEDULE.SHEET_ID;
 
 async function loadProjectDrawings(project: string): Promise<DrawingRow[]> {
-  const data = await getSheetsData(SHEET_ID, quoteSheetRange(project, 'A2:N1000'));
+  const data = await getSheetsData(SHEET_ID, quoteSheetRange(project, DRAWING_SHEET_DATA_RANGE));
   return parseDrawingRows(data as string[][] | undefined);
 }
 
@@ -87,7 +89,6 @@ export async function POST(request: NextRequest) {
 
     const {
       drawingNo,
-      zone,
       areaName,
       drawingName,
       resourceName,
@@ -114,7 +115,6 @@ export async function POST(request: NextRequest) {
 
     const newRow = toDrawingSheetRow({
       drawingNo: finalDrawingNo,
-      zone,
       areaName,
       drawingName,
       resourceName,
@@ -165,7 +165,6 @@ export async function PUT(request: NextRequest) {
     const body = await request.json();
     const {
       drawingNo,
-      zone,
       areaName,
       drawingName,
       resourceName,
@@ -187,7 +186,6 @@ export async function PUT(request: NextRequest) {
 
     const updatedRow = toDrawingSheetRow({
       drawingNo,
-      zone,
       areaName,
       drawingName,
       resourceName,
@@ -204,7 +202,7 @@ export async function PUT(request: NextRequest) {
 
     await updateSheetRow(
       SHEET_ID,
-      quoteSheetRange(project, `A${rowIndex}:N${rowIndex}`),
+      quoteSheetRange(project, drawingRowA1(rowIndex)),
       [updatedRow]
     );
 

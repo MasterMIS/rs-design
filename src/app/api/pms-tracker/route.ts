@@ -12,6 +12,8 @@ import {
   isProjectSheetTitle,
   nextPmsTrackerId,
   parsePmsRows,
+  pmsRowA1,
+  PMS_SHEET_DATA_RANGE,
   quoteSheetRange,
   sanitizeSheetTitle,
   toPmsSheetRow,
@@ -21,7 +23,7 @@ import {
 const SHEET_ID = CONFIG.PMS_TRACKER.SHEET_ID;
 
 async function loadProjectTasks(project: string): Promise<PmsTrackerRow[]> {
-  const data = await getSheetsData(SHEET_ID, quoteSheetRange(project, 'A2:K1000'));
+  const data = await getSheetsData(SHEET_ID, quoteSheetRange(project, PMS_SHEET_DATA_RANGE));
   return parsePmsRows(data as string[][] | undefined);
 }
 
@@ -87,7 +89,6 @@ export async function POST(request: NextRequest) {
 
     const {
       trackerId,
-      zone,
       areaName,
       taskName,
       resourceName,
@@ -111,7 +112,6 @@ export async function POST(request: NextRequest) {
 
     const newRow = toPmsSheetRow({
       trackerId: finalTrackerId,
-      zone,
       areaName,
       taskName,
       resourceName,
@@ -159,7 +159,6 @@ export async function PUT(request: NextRequest) {
     const body = await request.json();
     const {
       trackerId,
-      zone,
       areaName,
       taskName,
       resourceName,
@@ -177,7 +176,6 @@ export async function PUT(request: NextRequest) {
 
     const updatedRow = toPmsSheetRow({
       trackerId,
-      zone,
       areaName,
       taskName,
       resourceName,
@@ -191,7 +189,7 @@ export async function PUT(request: NextRequest) {
 
     await updateSheetRow(
       SHEET_ID,
-      quoteSheetRange(project, `A${rowIndex}:K${rowIndex}`),
+      quoteSheetRange(project, pmsRowA1(rowIndex)),
       [updatedRow]
     );
 

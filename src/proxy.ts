@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   // Retrieve the origin from the request, or default to *
   const origin = request.headers.get('origin') ?? '*';
 

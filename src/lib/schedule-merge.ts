@@ -45,7 +45,6 @@ export interface DrawingProjectTask {
   id: string;
   rowIndex?: number;
   drawingNo: string;
-  zone?: string;
   areaName?: string;
   drawingName?: string;
   resourceName?: string;
@@ -71,7 +70,6 @@ export interface MergedDrawingDoerTask {
   project: string;
   drawingNo: string;
   drawingName: string;
-  zone: string;
   areaName: string;
   category: string;
   resourceName: string;
@@ -106,7 +104,6 @@ export interface TrackerTemplateFull extends TrackerTemplateRow {
   resourceName?: string;
   doerName?: string;
   tat?: string;
-  zone?: string;
 }
 
 export interface TrackerPlannedRow {
@@ -122,7 +119,6 @@ export interface TrackerProjectTask {
   id: string;
   rowIndex?: number;
   trackerId: string;
-  zone?: string;
   areaName?: string;
   taskName?: string;
   resourceName?: string;
@@ -145,7 +141,6 @@ export interface MergedTrackerDoerTask {
   project: string;
   trackerId: string;
   taskName: string;
-  zone: string;
   areaName: string;
   category: string;
   resourceName: string;
@@ -433,7 +428,6 @@ export function buildDrawingDoerTasksFromProjects(
         project: bundle.project,
         drawingNo: drawing.drawingNo,
         drawingName: drawing.drawingName || drawing.drawingNo,
-        zone: drawing.zone || '',
         areaName: drawing.areaName || '',
         category: drawing.category || 'Uncategorized',
         resourceName: drawing.resourceName || '',
@@ -487,7 +481,6 @@ export function buildDrawingDoerTasks(
         project: projectName,
         drawingNo: tpl.drawingNo,
         drawingName: tpl.drawingName || tpl.drawingNo,
-        zone: '',
         areaName: tpl.areaName || '',
         category: tpl.category,
         resourceName: tpl.resourceName || '',
@@ -542,7 +535,6 @@ export function buildTrackerDoerTasks(
         project: projectName,
         trackerId: tpl.trackerId,
         taskName: tpl.taskName || tpl.trackerId,
-        zone: tpl.zone || '',
         areaName: tpl.areaName || '',
         category: tpl.category,
         resourceName: tpl.resourceName || '',
@@ -588,7 +580,6 @@ export function buildTrackerDoerTasksFromProjects(
         project: bundle.project,
         trackerId: task.trackerId,
         taskName: task.taskName || task.trackerId,
-        zone: task.zone || '',
         areaName: task.areaName || '',
         category: task.category,
         resourceName: task.resourceName || '',

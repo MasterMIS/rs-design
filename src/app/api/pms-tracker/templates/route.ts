@@ -4,6 +4,8 @@ import { CONFIG } from '@/lib/config';
 import {
   nextPmsTrackerId,
   parsePmsRows,
+  pmsRowA1,
+  PMS_SHEET_DATA_RANGE,
   quoteSheetRange,
   toPmsSheetRow,
 } from '@/lib/pms-tracker';
@@ -13,7 +15,7 @@ const SHEET_NAME = CONFIG.PMS_TRACKER.TEMPLATES_SHEET;
 
 export async function GET() {
   try {
-    const data = await getSheetsData(SHEET_ID, quoteSheetRange(SHEET_NAME, 'A2:K1000'));
+    const data = await getSheetsData(SHEET_ID, quoteSheetRange(SHEET_NAME, PMS_SHEET_DATA_RANGE));
     const items = parsePmsRows(data as string[][] | undefined);
     return NextResponse.json(items);
   } catch (error: unknown) {
@@ -28,7 +30,6 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const {
       trackerId,
-      zone,
       areaName,
       taskName,
       resourceName,
@@ -47,14 +48,13 @@ export async function POST(request: NextRequest) {
     let finalTrackerId = trackerId || '';
     if (!finalTrackerId.trim()) {
       const existing = parsePmsRows(
-        (await getSheetsData(SHEET_ID, quoteSheetRange(SHEET_NAME, 'A2:K1000'))) as string[][]
+        (await getSheetsData(SHEET_ID, quoteSheetRange(SHEET_NAME, PMS_SHEET_DATA_RANGE))) as string[][]
       );
       finalTrackerId = nextPmsTrackerId(existing);
     }
 
     const newRow = toPmsSheetRow({
       trackerId: finalTrackerId,
-      zone,
       areaName,
       taskName,
       resourceName,
@@ -87,7 +87,6 @@ export async function PUT(request: NextRequest) {
     const body = await request.json();
     const {
       trackerId,
-      zone,
       areaName,
       taskName,
       resourceName,
@@ -105,7 +104,6 @@ export async function PUT(request: NextRequest) {
 
     const updatedRow = toPmsSheetRow({
       trackerId,
-      zone,
       areaName,
       taskName,
       resourceName,
@@ -119,7 +117,7 @@ export async function PUT(request: NextRequest) {
 
     await updateSheetRow(
       SHEET_ID,
-      quoteSheetRange(SHEET_NAME, `A${rowIndex}:K${rowIndex}`),
+      quoteSheetRange(SHEET_NAME, pmsRowA1(rowIndex)),
       [updatedRow]
     );
 

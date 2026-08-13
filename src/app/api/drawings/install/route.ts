@@ -9,6 +9,8 @@ import {
 import { CONFIG } from '@/lib/config';
 import {
   DRAWING_HEADERS,
+  DRAWING_SHEET_DATA_RANGE,
+  DRAWING_SHEET_FULL_RANGE,
   parseDrawingRows,
   quoteSheetRange,
   sanitizeSheetTitle,
@@ -70,7 +72,7 @@ export async function POST(request: NextRequest) {
 
     const sourceData = await getSheetsData(
       SHEET_ID,
-      quoteSheetRange(sourceSheet, 'A2:N1000')
+      quoteSheetRange(sourceSheet, DRAWING_SHEET_DATA_RANGE)
     );
     const sourceRows = parseDrawingRows(sourceData as string[][] | undefined);
 
@@ -90,7 +92,7 @@ export async function POST(request: NextRequest) {
 
     await clearAndWriteRange(
       SHEET_ID,
-      quoteSheetRange(project, 'A1:N1000'),
+      quoteSheetRange(project, DRAWING_SHEET_FULL_RANGE),
       values
     );
 

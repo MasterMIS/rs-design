@@ -4,9 +4,10 @@ import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { 
   Plus, Edit2, Trash2, CheckCircle, Clock, Search, ArrowLeft, 
-  CheckCircle2, AlertCircle, Briefcase, User, CalendarDays, FileText, Download, Activity
+  CheckCircle2, AlertCircle, Briefcase, User, CalendarDays, FileText, Download, Activity, Printer
 } from 'lucide-react';
 import { exportToCSV } from '@/utils/exportCsv';
+import { exportDoerTasksPdf } from '@/utils/exportPdf';
 import styles from '../em.module.css';
 import Modal from '@/components/Modal';
 import MultiSelectFilter from '@/components/MultiSelectFilter';
@@ -398,6 +399,27 @@ export default function ExecutionPage() {
           <>
           <button onClick={() => exportToCSV(filteredTasks, 'Execution_Tasks')} style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: 'var(--bg-card)', color: 'var(--text-main)', padding: '10px 16px', borderRadius: '8px', border: '1px solid var(--border-color)', cursor: 'pointer', fontWeight: 600 }}>
             <Download size={16} /> Export CSV
+          </button>
+          <button
+            onClick={() => exportDoerTasksPdf({
+              title: 'Execution Tasks',
+              filename: 'Execution_Tasks',
+              tasks: filteredTasks,
+              getDoerName: (task) => task.doer,
+              columns: [
+                { header: 'Supervisor', getValue: (task) => task.supervisor_name || '-', width: 1.6 },
+                { header: 'Work Period', getValue: (task) => `${task.work_from || '-'} to ${task.work_to || '-'}`, width: 1.8 },
+                { header: 'Project Name', getValue: (task) => task.project_name || '-', width: 2 },
+                { header: 'Work Name', getValue: (task) => task.work_name || '-', width: 2 },
+                { header: 'Doer', getValue: (task) => task.doer || '-', width: 1.4 },
+                { header: 'Remark', getValue: (task) => task.remark || '-', width: 1.8 },
+                { header: 'Actual Date', getValue: (task) => task.actual_date || '-', width: 1.2 },
+                { header: 'Status', getValue: (task) => task.status || 'Pending', width: 1.1 },
+              ],
+            })}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: 'var(--bg-card)', color: 'var(--text-main)', padding: '10px 16px', borderRadius: '8px', border: '1px solid var(--border-color)', cursor: 'pointer', fontWeight: 600 }}
+          >
+            <Printer size={16} /> Print
           </button>
           <button onClick={handleOpenCreate} style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: 'var(--primary)', color: 'white', padding: '10px 16px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
             <Plus size={16} /> Add Task

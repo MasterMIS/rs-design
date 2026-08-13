@@ -16,6 +16,14 @@ import {
   SALES_PIPELINE_OPTS,
 } from '@/lib/sales-pipeline';
 
+const BUILDER_NAME_OPTIONS = [
+  'CLUB HOUSE',
+  'COMMUNITY HALL',
+  'SWIMMIMG POLL',
+  'LOBBY',
+  'ROOF TOP',
+] as const;
+
 interface Lead {
   rowIndex: number;
   id: string;
@@ -63,19 +71,70 @@ interface Lead {
 const FilterSection = ({ title, options, selected, onChange }: { title: string, options: string[], selected: string[], onChange: (val: string) => void }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
+  const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLDivElement>(null);
   const filteredOptions = options.filter(o => o.toLowerCase().includes(search.toLowerCase()));
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const updatePosition = () => {
+      if (!triggerRef.current) return;
+      const rect = triggerRef.current.getBoundingClientRect();
+      const menuHeight = 220;
+      const openUp = window.innerHeight - rect.bottom < menuHeight && rect.top > menuHeight;
+      setMenuStyle({
+        position: 'fixed',
+        left: rect.left,
+        width: Math.max(rect.width, 180),
+        top: openUp ? undefined : rect.bottom + 4,
+        bottom: openUp ? window.innerHeight - rect.top + 4 : undefined,
+        zIndex: 10050,
+      });
+    };
+
+    updatePosition();
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    };
+  }, [isOpen]);
+
   return (
-    <div className={styles.filterSection}>
+    <div className={styles.filterSection} ref={wrapperRef}>
       <h4 className={styles.filterSectionTitle}>{title}</h4>
-      <div className={styles.filterDropdownHeader} onClick={() => setIsOpen(!isOpen)}>
+      <div
+        ref={triggerRef}
+        className={styles.filterDropdownHeader}
+        onClick={() => setIsOpen(!isOpen)}
+      >
         <span style={{ color: selected.length > 0 ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
           {selected.length > 0 ? `${selected.length} selected` : 'Select options...'}
         </span>
         <ChevronRight size={16} style={{ transform: isOpen ? 'rotate(90deg)' : 'none', transition: '0.2s' }} />
       </div>
       {isOpen && (
-        <div className={styles.filterDropdownBody}>
-          <input type="text" placeholder="Search..." value={search} onChange={e => setSearch(e.target.value)} className={styles.filterSearchInput} />
+        <div className={styles.filterDropdownBody} style={menuStyle}>
+          <input
+            type="text"
+            placeholder="Search..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className={styles.filterSearchInput}
+            onClick={(e) => e.stopPropagation()}
+          />
           <div className={styles.filterOptionsList}>
             {filteredOptions.map(opt => (
               <label key={opt} className={styles.filterOptionLabel}>
@@ -233,7 +292,10 @@ export default function SalesPage() {
   const uniqueSalesman = useMemo(() => Array.from(new Set(leads.map(l => l.salesman).filter(Boolean))), [leads]);
   const uniqueReferenceBy = useMemo(() => Array.from(new Set(leads.map(l => l.referenceBy).filter(Boolean))), [leads]);
   const uniqueGeneratedBy = useMemo(() => Array.from(new Set(leads.map(l => l.generatedBy).filter(Boolean))), [leads]);
-  const uniqueNameOfBuilder = useMemo(() => Array.from(new Set(leads.map(l => l.nameOfBuilder).filter(Boolean))), [leads]);
+  const uniqueNameOfBuilder = useMemo(() => {
+    const fromLeads = leads.map((l) => l.nameOfBuilder).filter(Boolean);
+    return Array.from(new Set([...BUILDER_NAME_OPTIONS, ...fromLeads]));
+  }, [leads]);
 
   const fetchUsers = async () => {
     try {
@@ -1130,13 +1192,16 @@ export default function SalesPage() {
                     <label className={styles.outlineLabel}>Name Of Builder</label>
                     <div className={styles.inputWithIcon}>
                       <HardHat size={16} className={styles.inputIcon} />
-                      <input 
-                        type="text" 
-                        name="nameOfBuilder" 
-                        value={formData.nameOfBuilder} 
-                        onChange={handleInputChange} 
-                        placeholder="If applicable"
-                      />
+                      <select
+                        name="nameOfBuilder"
+                        value={formData.nameOfBuilder}
+                        onChange={handleInputChange}
+                      >
+                        <option value="">Select Name Of Builder</option>
+                        {BUILDER_NAME_OPTIONS.map((option) => (
+                          <option key={option} value={option}>{option}</option>
+                        ))}
+                      </select>
                     </div>
                   </div>
                 </div>
@@ -1153,35 +1218,46 @@ export default function SalesPage() {
             </form>
       </Modal>
 
-      {/* Right Advanced Filter Sidebar */}
-      {isRightSidebarOpen && (
-        <div className={styles.rightSidebarOverlay} onClick={() => setIsRightSidebarOpen(false)}>
-          <div className={styles.rightSidebar} onClick={e => e.stopPropagation()}>
-            <div className={styles.rightSidebarHeader}>
-              <h3>Advanced Filters</h3>
-              <button className={styles.closeSidebarBtn} onClick={() => setIsRightSidebarOpen(false)}>
-                <X size={20} />
-              </button>
-            </div>
-            <div className={styles.rightSidebarContent}>
-              <FilterSection title="Lead Type" options={['Hotel', 'Club House', 'Residence', 'Office', 'Showroom']} selected={selectedLeadTypes} onChange={handleLeadTypeToggle} />
-              <FilterSection title="City Type" options={uniqueCityTypes} selected={filterCityTypes} onChange={(val) => { setFilterCityTypes(prev => prev.includes(val) ? prev.filter(t => t !== val) : [...prev, val]); setCurrentPage(1); }} />
-              <FilterSection title="Type of Client" options={uniqueClientTypes} selected={filterClientTypes} onChange={(val) => { setFilterClientTypes(prev => prev.includes(val) ? prev.filter(t => t !== val) : [...prev, val]); setCurrentPage(1); }} />
-              <FilterSection title="Salesman" options={uniqueSalesman} selected={filterSalesman} onChange={(val) => { setFilterSalesman(prev => prev.includes(val) ? prev.filter(t => t !== val) : [...prev, val]); setCurrentPage(1); }} />
-              <FilterSection title="Reference By" options={uniqueReferenceBy} selected={filterReferenceBy} onChange={(val) => { setFilterReferenceBy(prev => prev.includes(val) ? prev.filter(t => t !== val) : [...prev, val]); setCurrentPage(1); }} />
-              <FilterSection title="Generated By" options={uniqueGeneratedBy} selected={filterGeneratedBy} onChange={(val) => { setFilterGeneratedBy(prev => prev.includes(val) ? prev.filter(t => t !== val) : [...prev, val]); setCurrentPage(1); }} />
-              <FilterSection title="Name Of Builder" options={uniqueNameOfBuilder} selected={filterNameOfBuilder} onChange={(val) => { setFilterNameOfBuilder(prev => prev.includes(val) ? prev.filter(t => t !== val) : [...prev, val]); setCurrentPage(1); }} />
-            </div>
-            <div className={styles.rightSidebarFooter}>
-              <button className={styles.clearFiltersBtn} onClick={() => { 
-                setSelectedLeadTypes([]); setFilterCityTypes([]); setFilterClientTypes([]); 
-                setFilterSalesman([]); setFilterReferenceBy([]); setFilterGeneratedBy([]); setFilterNameOfBuilder([]); 
-              }}>Clear All</button>
-              <button className={styles.applyFiltersBtn} onClick={() => setIsRightSidebarOpen(false)}>Apply</button>
-            </div>
-          </div>
+      <Modal
+        isOpen={isRightSidebarOpen}
+        onClose={() => setIsRightSidebarOpen(false)}
+        title="Advanced Filters"
+        width="680px"
+      >
+        <div className={styles.filterModalContent}>
+          <FilterSection title="Lead Type" options={['Hotel', 'Club House', 'Residence', 'Office', 'Showroom']} selected={selectedLeadTypes} onChange={handleLeadTypeToggle} />
+          <FilterSection title="City Type" options={uniqueCityTypes} selected={filterCityTypes} onChange={(val) => { setFilterCityTypes(prev => prev.includes(val) ? prev.filter(t => t !== val) : [...prev, val]); setCurrentPage(1); }} />
+          <FilterSection title="Type of Client" options={uniqueClientTypes} selected={filterClientTypes} onChange={(val) => { setFilterClientTypes(prev => prev.includes(val) ? prev.filter(t => t !== val) : [...prev, val]); setCurrentPage(1); }} />
+          <FilterSection title="Salesman" options={uniqueSalesman} selected={filterSalesman} onChange={(val) => { setFilterSalesman(prev => prev.includes(val) ? prev.filter(t => t !== val) : [...prev, val]); setCurrentPage(1); }} />
+          <FilterSection title="Reference By" options={uniqueReferenceBy} selected={filterReferenceBy} onChange={(val) => { setFilterReferenceBy(prev => prev.includes(val) ? prev.filter(t => t !== val) : [...prev, val]); setCurrentPage(1); }} />
+          <FilterSection title="Generated By" options={uniqueGeneratedBy} selected={filterGeneratedBy} onChange={(val) => { setFilterGeneratedBy(prev => prev.includes(val) ? prev.filter(t => t !== val) : [...prev, val]); setCurrentPage(1); }} />
+          <FilterSection title="Name Of Builder" options={uniqueNameOfBuilder} selected={filterNameOfBuilder} onChange={(val) => { setFilterNameOfBuilder(prev => prev.includes(val) ? prev.filter(t => t !== val) : [...prev, val]); setCurrentPage(1); }} />
         </div>
-      )}
+        <div className={styles.filterModalFooter}>
+          <button
+            type="button"
+            className={styles.clearFiltersBtn}
+            onClick={() => {
+              setSelectedLeadTypes([]);
+              setFilterCityTypes([]);
+              setFilterClientTypes([]);
+              setFilterSalesman([]);
+              setFilterReferenceBy([]);
+              setFilterGeneratedBy([]);
+              setFilterNameOfBuilder([]);
+            }}
+          >
+            Clear All
+          </button>
+          <button
+            type="button"
+            className={styles.applyFiltersBtn}
+            onClick={() => setIsRightSidebarOpen(false)}
+          >
+            Apply
+          </button>
+        </div>
+      </Modal>
 
       {/* Step Completion Bottom Sheet Modal */}
       {isStepModalOpen && currentStepLead && (

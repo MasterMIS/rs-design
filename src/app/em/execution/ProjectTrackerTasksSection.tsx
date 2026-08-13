@@ -110,8 +110,7 @@ export function ProjectTrackerTasksSection({
         row.project.toLowerCase().includes(searchTerm.toLowerCase()) ||
         row.taskName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         row.doerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        row.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        row.zone.toLowerCase().includes(searchTerm.toLowerCase());
+        row.category.toLowerCase().includes(searchTerm.toLowerCase());
 
       const status = row.completed
         ? 'Completed'
@@ -176,7 +175,6 @@ export function ProjectTrackerTasksSection({
 
       const payload = {
         trackerId: row.trackerId,
-        zone: row.zone,
         areaName: row.areaName,
         taskName: row.taskName,
         resourceName: row.resourceName,
@@ -377,7 +375,6 @@ export function ProjectTrackerTasksSection({
               <tr>
                 <th>Project</th>
                 <th>Task</th>
-                <th>Zone</th>
                 <th>Area</th>
                 <th>Category</th>
                 <th>Doer</th>
@@ -392,7 +389,7 @@ export function ProjectTrackerTasksSection({
             <tbody>
               {paginatedRows.length === 0 ? (
                 <tr>
-                  <td colSpan={12} className={styles.sectionEmpty}>
+                  <td colSpan={11} className={styles.sectionEmpty}>
                     No project tracker tasks found. Install tasks on each project sheet first.
                   </td>
                 </tr>
@@ -424,7 +421,6 @@ export function ProjectTrackerTasksSection({
                         <strong>{row.taskName}</strong>
                         <span className={styles.cellSub}>{row.trackerId}</span>
                       </td>
-                      <td>{row.zone || '—'}</td>
                       <td>{row.areaName || '—'}</td>
                       <td>{row.category}</td>
                       <td>
@@ -494,7 +490,7 @@ export function ProjectTrackerTasksSection({
       )}
 
       <p className={styles.sectionFootnote}>
-        Need full zone/category view?{' '}
+        Need the full category view?{' '}
         <Link href="/pms-tracker">Open Project Tracker</Link> in the project.
       </p>
     </>

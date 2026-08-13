@@ -29,8 +29,6 @@ import {
   buildTeamWorkloadRows,
   buildTodayPlanCounts,
   buildUpcoming7DayCounts,
-  buildZoneSummaryRowsFromDrawingTasks,
-  buildZoneSummaryRowsFromTrackerTasks,
   type MomRecord,
   type QuotationRecord,
   type SiteVisitRecord,
@@ -286,8 +284,6 @@ export default function Dashboard() {
       trackerByProject: buildProjectSummaryRowsFromTrackerTasks(trackerTasks),
       drawingByCategory: buildCategorySummaryRowsFromDrawingTasks(drawingTasks),
       trackerByCategory: buildCategorySummaryRowsFromTrackerTasks(trackerTasks),
-      drawingByZone: buildZoneSummaryRowsFromDrawingTasks(drawingTasks),
-      trackerByZone: buildZoneSummaryRowsFromTrackerTasks(trackerTasks),
     }),
     [drawingTasks, trackerTasks]
   );

@@ -28,7 +28,6 @@ export function DrawingsPanel({ items }: { items: MergedDrawingRow[] }) {
               <thead>
                 <tr>
                   <th>Drawing</th>
-                  <th>Zone</th>
                   <th>Area</th>
                   <th>Category</th>
                   <th>Plan Start</th>
@@ -45,7 +44,6 @@ export function DrawingsPanel({ items }: { items: MergedDrawingRow[] }) {
                       <strong>{item.drawingName}</strong>
                       <span className={styles.tableSub}>{item.drawingNo}</span>
                     </td>
-                    <td>{item.zone || '—'}</td>
                     <td>{item.areaName || '—'}</td>
                     <td>{item.category}</td>
                     <td>{formatDate(item.planStartDate)}</td>

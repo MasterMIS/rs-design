@@ -9,6 +9,8 @@ import {
 import { CONFIG } from '@/lib/config';
 import {
   PMS_HEADERS,
+  PMS_SHEET_DATA_RANGE,
+  PMS_SHEET_FULL_RANGE,
   parsePmsRows,
   quoteSheetRange,
   sanitizeSheetTitle,
@@ -70,7 +72,7 @@ export async function POST(request: NextRequest) {
 
     const sourceData = await getSheetsData(
       SHEET_ID,
-      quoteSheetRange(sourceSheet, 'A2:K1000')
+      quoteSheetRange(sourceSheet, PMS_SHEET_DATA_RANGE)
     );
     const sourceRows = parsePmsRows(sourceData as string[][] | undefined);
 
@@ -90,7 +92,7 @@ export async function POST(request: NextRequest) {
 
     await clearAndWriteRange(
       SHEET_ID,
-      quoteSheetRange(project, 'A1:K1000'),
+      quoteSheetRange(project, PMS_SHEET_FULL_RANGE),
       values
     );
 

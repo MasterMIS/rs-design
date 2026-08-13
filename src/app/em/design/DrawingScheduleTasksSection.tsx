@@ -107,8 +107,7 @@ export function DrawingScheduleTasksSection({ onToast, embedded = false }: Drawi
         row.project.toLowerCase().includes(searchTerm.toLowerCase()) ||
         row.drawingName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         row.doerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        row.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        row.zone.toLowerCase().includes(searchTerm.toLowerCase());
+        row.category.toLowerCase().includes(searchTerm.toLowerCase());
 
       const status = row.completed
         ? 'Completed'
@@ -173,7 +172,6 @@ export function DrawingScheduleTasksSection({ onToast, embedded = false }: Drawi
 
       const payload = {
         drawingNo: row.drawingNo,
-        zone: row.zone,
         areaName: row.areaName,
         drawingName: row.drawingName,
         resourceName: row.resourceName,
@@ -376,7 +374,6 @@ export function DrawingScheduleTasksSection({ onToast, embedded = false }: Drawi
               <tr>
                 <th>Project</th>
                 <th>Drawing</th>
-                <th>Zone</th>
                 <th>Area</th>
                 <th>Category</th>
                 <th>Doer</th>
@@ -391,7 +388,7 @@ export function DrawingScheduleTasksSection({ onToast, embedded = false }: Drawi
             <tbody>
               {paginatedRows.length === 0 ? (
                 <tr>
-                  <td colSpan={12} className={styles.sectionEmpty}>
+                  <td colSpan={11} className={styles.sectionEmpty}>
                     No drawing schedule tasks found. Install drawings on each project sheet first.
                   </td>
                 </tr>
@@ -423,7 +420,6 @@ export function DrawingScheduleTasksSection({ onToast, embedded = false }: Drawi
                         <strong>{row.drawingName}</strong>
                         <span className={styles.cellSub}>{row.drawingNo}</span>
                       </td>
-                      <td>{row.zone || '—'}</td>
                       <td>{row.areaName || '—'}</td>
                       <td>{row.category}</td>
                       <td>
