@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
-import { Plus, Edit2, Trash2, X, BarChart3, Search, Filter, ChevronLeft, ChevronRight, User, Phone, MapPin, Building, Briefcase, HardHat, Users, Calendar, Fingerprint, Tag, Download, Home, Store, CheckSquare, XCircle } from 'lucide-react';
+import { Plus, Edit2, Trash2, X, BarChart3, Search, Filter, ChevronLeft, ChevronRight, ChevronDown, User, Phone, MapPin, Building, Briefcase, HardHat, Users, Calendar, Fingerprint, Tag, Download, Home, Store, CheckSquare, XCircle } from 'lucide-react';
 import styles from './sales.module.css';
 import Modal from '@/components/Modal';
 import { useAuth } from '@/context/AuthContext';
@@ -221,6 +221,10 @@ export default function SalesPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
   const [usersList, setUsersList] = useState<{ name: string; status?: string }[]>([]);
+  const [leadTypeOptions, setLeadTypeOptions] = useState<string[]>([]);
+  const [isLeadTypeModalOpen, setIsLeadTypeModalOpen] = useState(false);
+  const [newLeadTypeName, setNewLeadTypeName] = useState('');
+  const [isAddingLeadType, setIsAddingLeadType] = useState(false);
 
   // Filtering & Pagination
   const [searchQuery, setSearchQuery] = useState('');
@@ -236,6 +240,7 @@ export default function SalesPage() {
   const [filterNameOfBuilder, setFilterNameOfBuilder] = useState<string[]>([]);
   const [timeFilter, setTimeFilter] = useState<'delayed' | 'today' | 'tomorrow' | 'lost' | null>(null);
   const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(false);
+  const [isTimeDropdownOpen, setIsTimeDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -263,7 +268,19 @@ export default function SalesPage() {
   useEffect(() => {
     fetchLeads();
     fetchUsers();
+    fetchLeadTypes();
   }, []);
+
+  useEffect(() => {
+    if (!isTimeDropdownOpen) return;
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsTimeDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isTimeDropdownOpen]);
 
   const userNames = useMemo(
     () =>
@@ -306,6 +323,50 @@ export default function SalesPage() {
       }
     } catch (error) {
       console.error('Error fetching users:', error);
+    }
+  };
+
+  const fetchLeadTypes = async () => {
+    try {
+      const response = await fetch('/api/sales/lead-types');
+      if (response.ok) {
+        const data = await response.json();
+        setLeadTypeOptions(Array.isArray(data) ? data.filter(Boolean) : []);
+      }
+    } catch (error) {
+      console.error('Error fetching lead types:', error);
+    }
+  };
+
+  const handleAddLeadType = async () => {
+    const trimmed = newLeadTypeName.trim();
+    if (!trimmed) {
+      alert('Lead type name is required.');
+      return;
+    }
+
+    setIsAddingLeadType(true);
+    try {
+      const response = await fetch('/api/sales/lead-types', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: trimmed }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        alert(data.error || 'Failed to add lead type.');
+        return;
+      }
+
+      await fetchLeadTypes();
+      setFormData((prev) => ({ ...prev, leadType: trimmed }));
+      setNewLeadTypeName('');
+      setIsLeadTypeModalOpen(false);
+    } catch (error) {
+      console.error('Error adding lead type:', error);
+      alert('Failed to add lead type.');
+    } finally {
+      setIsAddingLeadType(false);
     }
   };
 
@@ -608,7 +669,10 @@ export default function SalesPage() {
     currentPage * itemsPerPage
   );
 
-  const leadTypesList = ['All Types', 'Hotel', 'Club House', 'Residence', 'Office', 'Showroom'];
+  const leadTypesList = useMemo(
+    () => ['All Types', ...leadTypeOptions],
+    [leadTypeOptions]
+  );
   const timeList = ['All Time', 'Delayed', 'Today', 'Tomorrow', 'Lost'];
 
   const activeLeadTypePill = selectedLeadTypes.length === 1 ? selectedLeadTypes[0] : 'All Types';
@@ -628,15 +692,18 @@ export default function SalesPage() {
 
   const leadTypeCounts = useMemo(() => {
     const counts: Record<string, number> = {};
-    leadTypesList.forEach(lt => counts[lt] = 0);
-    // Only count non-lost for lead types
-    const activeLeads = leads.filter(l => !isSalesLeadLost(l));
+    leadTypesList.forEach((lt) => {
+      counts[lt] = 0;
+    });
+    const activeLeads = leads.filter((l) => !isSalesLeadLost(l));
     counts['All Types'] = activeLeads.length;
-    activeLeads.forEach(l => {
-      if (l.leadType && counts[l.leadType] !== undefined) counts[l.leadType]++;
+    activeLeads.forEach((l) => {
+      if (!l.leadType) return;
+      if (counts[l.leadType] === undefined) counts[l.leadType] = 0;
+      counts[l.leadType]++;
     });
     return counts;
-  }, [leads]);
+  }, [leads, leadTypesList]);
 
   const timeCounts = useMemo(() => {
     const counts: Record<string, number> = { 'All Time': 0, 'Delayed': 0, 'Today': 0, 'Tomorrow': 0, 'Lost': 0 };
@@ -717,6 +784,46 @@ export default function SalesPage() {
                 value={searchQuery}
                 onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
               />
+            </div>
+
+            <div>
+              <div className={styles.dropdownContainer} ref={dropdownRef}>
+                <button
+                  type="button"
+                  className={styles.dropdownBtn}
+                  onClick={() => setIsTimeDropdownOpen((open) => !open)}
+                >
+                  <Calendar size={16} />
+                  {activeTimeFilterPill}
+                  {timeCounts[activeTimeFilterPill] > 0 && (
+                    <span className={styles.timeFilterCount}>{timeCounts[activeTimeFilterPill]}</span>
+                  )}
+                  <ChevronDown size={14} />
+                </button>
+                {isTimeDropdownOpen && (
+                  <div className={styles.dropdownMenu}>
+                    {timeList.map((time) => {
+                      const isActive = activeTimeFilterPill === time;
+                      return (
+                        <button
+                          key={time}
+                          type="button"
+                          className={`${styles.dropdownItem} ${isActive ? styles.dropdownItemActive : ''}`}
+                          onClick={() => {
+                            handleTimeFilterPillClick(time);
+                            setIsTimeDropdownOpen(false);
+                          }}
+                        >
+                          <span>{time}</span>
+                          {timeCounts[time] > 0 && (
+                            <span className={styles.timeFilterCount}>{timeCounts[time]}</span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
 
             <div>
@@ -827,12 +934,12 @@ export default function SalesPage() {
         <div className={styles.quickFiltersWrapper}>
           <div className={styles.quickFiltersContainer} style={{ display: 'flex', gap: '20px', padding: '10px 0', border: 'none', background: 'transparent', boxShadow: 'none' }}>
             
-            <div className={styles.toggleSwitchContainer} style={{ flex: 1.5, padding: '4px' }}>
+            <div className={styles.toggleSwitchContainer} style={{ flex: 1, padding: '4px' }}>
               <div 
                 className={styles.toggleSwitchSliderDynamic} 
                 style={{ 
-                  width: `calc((100% - 8px) / 6)`,
-                  left: `calc(4px + ${leadTypesList.indexOf(activeLeadTypePill) > -1 ? leadTypesList.indexOf(activeLeadTypePill) : 0} * ((100% - 8px) / 6))`,
+                  width: `calc((100% - 8px) / ${Math.max(leadTypesList.length, 1)})`,
+                  left: `calc(4px + ${Math.max(leadTypesList.indexOf(activeLeadTypePill), 0)} * ((100% - 8px) / ${Math.max(leadTypesList.length, 1)}))`,
                   background: getLeadTypeColor(activeLeadTypePill)
                 }} 
               />
@@ -849,31 +956,6 @@ export default function SalesPage() {
                     {type} {leadTypeCounts[type] > 0 && <span className={styles.filterBadgeDynamic} style={{ background: isActive ? 'rgba(255,255,255,0.3)' : `${baseColor}15`, color: isActive ? '#fff' : baseColor }}>{leadTypeCounts[type]}</span>}
                   </button>
                 );
-              })}
-            </div>
-
-            <div className={styles.toggleSwitchContainer} style={{ flex: 1, padding: '4px' }}>
-              <div 
-                className={styles.toggleSwitchSliderDynamic} 
-                style={{ 
-                  width: `calc((100% - 8px) / ${timeList.length})`,
-                  left: `calc(4px + ${timeList.indexOf(activeTimeFilterPill) > -1 ? timeList.indexOf(activeTimeFilterPill) : 0} * ((100% - 8px) / ${timeList.length}))`,
-                  background: getTimeFilterColor(activeTimeFilterPill)
-                }} 
-              />
-              {timeList.map((time, idx) => {
-                const isActive = activeTimeFilterPill === time;
-                const baseColor = getTimeFilterColor(time);
-                return (
-                  <button 
-                    key={idx}
-                    onClick={() => handleTimeFilterPillClick(time)}
-                    className={`${styles.toggleSwitchBtn} ${isActive ? styles.active : ''}`}
-                    style={{ color: isActive ? '#fff' : '#6c757d' }}
-                  >
-                    {time} {timeCounts[time] > 0 && <span className={styles.filterBadgeDynamic} style={{ background: isActive ? 'rgba(255,255,255,0.3)' : `${baseColor}15`, color: isActive ? '#fff' : baseColor }}>{timeCounts[time]}</span>}
-                  </button>
-                )
               })}
             </div>
           </div>
@@ -1156,20 +1238,35 @@ export default function SalesPage() {
                   </div>
                   <div className={styles.formGroup}>
                     <label className={styles.outlineLabel}>Lead Type</label>
-                    <div className={styles.inputWithIcon}>
-                      <Tag size={16} className={styles.inputIcon} />
-                      <select 
-                        name="leadType" 
-                        value={formData.leadType} 
-                        onChange={handleInputChange}
+                    <div className={styles.leadTypeFieldRow}>
+                      <div className={styles.inputWithIcon}>
+                        <Tag size={16} className={styles.inputIcon} />
+                        <select
+                          name="leadType"
+                          value={formData.leadType}
+                          onChange={handleInputChange}
+                        >
+                          <option value="">Select Lead Type</option>
+                          {leadTypeOptions.map((type) => (
+                            <option key={type} value={type}>{type}</option>
+                          ))}
+                          {formData.leadType &&
+                            !leadTypeOptions.includes(formData.leadType) && (
+                              <option value={formData.leadType}>{formData.leadType}</option>
+                            )}
+                        </select>
+                      </div>
+                      <button
+                        type="button"
+                        className={styles.addLeadTypeBtn}
+                        title="Add Lead Type"
+                        onClick={() => {
+                          setNewLeadTypeName('');
+                          setIsLeadTypeModalOpen(true);
+                        }}
                       >
-                        <option value="">Select Lead Type</option>
-                        <option value="Hotel">Hotel</option>
-                        <option value="Club House">Club House</option>
-                        <option value="Residence">Residence</option>
-                        <option value="Office">Office</option>
-                        <option value="Showroom">Showroom</option>
-                      </select>
+                        <Plus size={18} />
+                      </button>
                     </div>
                   </div>
                   <div className={styles.formGroup}>
@@ -1192,16 +1289,13 @@ export default function SalesPage() {
                     <label className={styles.outlineLabel}>Name Of Builder</label>
                     <div className={styles.inputWithIcon}>
                       <HardHat size={16} className={styles.inputIcon} />
-                      <select
+                      <input
+                        type="text"
                         name="nameOfBuilder"
                         value={formData.nameOfBuilder}
                         onChange={handleInputChange}
-                      >
-                        <option value="">Select Name Of Builder</option>
-                        {BUILDER_NAME_OPTIONS.map((option) => (
-                          <option key={option} value={option}>{option}</option>
-                        ))}
-                      </select>
+                        placeholder="If applicable"
+                      />
                     </div>
                   </div>
                 </div>
@@ -1219,13 +1313,56 @@ export default function SalesPage() {
       </Modal>
 
       <Modal
+        isOpen={isLeadTypeModalOpen}
+        onClose={() => {
+          if (!isAddingLeadType) setIsLeadTypeModalOpen(false);
+        }}
+        title="Add Lead Type"
+        width="420px"
+      >
+        <div className={styles.modalBody}>
+          <div className={styles.formGroup}>
+            <label className={styles.outlineLabel}>Lead Type Name *</label>
+            <div className={styles.inputWithIcon}>
+              <Tag size={16} className={styles.inputIcon} />
+              <input
+                type="text"
+                value={newLeadTypeName}
+                onChange={(e) => setNewLeadTypeName(e.target.value)}
+                placeholder="Enter lead type"
+                autoFocus
+              />
+            </div>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '24px' }}>
+            <button
+              type="button"
+              onClick={() => setIsLeadTypeModalOpen(false)}
+              disabled={isAddingLeadType}
+              style={{ padding: '10px 16px', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'transparent', color: 'var(--text-main)', cursor: 'pointer', fontWeight: 600 }}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleAddLeadType}
+              disabled={isAddingLeadType}
+              style={{ padding: '10px 16px', borderRadius: '8px', border: 'none', backgroundColor: 'var(--primary)', color: 'white', cursor: 'pointer', fontWeight: 600, opacity: isAddingLeadType ? 0.7 : 1 }}
+            >
+              {isAddingLeadType ? 'Adding...' : 'Add Lead Type'}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
         isOpen={isRightSidebarOpen}
         onClose={() => setIsRightSidebarOpen(false)}
         title="Advanced Filters"
         width="680px"
       >
         <div className={styles.filterModalContent}>
-          <FilterSection title="Lead Type" options={['Hotel', 'Club House', 'Residence', 'Office', 'Showroom']} selected={selectedLeadTypes} onChange={handleLeadTypeToggle} />
+          <FilterSection title="Lead Type" options={leadTypeOptions} selected={selectedLeadTypes} onChange={handleLeadTypeToggle} />
           <FilterSection title="City Type" options={uniqueCityTypes} selected={filterCityTypes} onChange={(val) => { setFilterCityTypes(prev => prev.includes(val) ? prev.filter(t => t !== val) : [...prev, val]); setCurrentPage(1); }} />
           <FilterSection title="Type of Client" options={uniqueClientTypes} selected={filterClientTypes} onChange={(val) => { setFilterClientTypes(prev => prev.includes(val) ? prev.filter(t => t !== val) : [...prev, val]); setCurrentPage(1); }} />
           <FilterSection title="Salesman" options={uniqueSalesman} selected={filterSalesman} onChange={(val) => { setFilterSalesman(prev => prev.includes(val) ? prev.filter(t => t !== val) : [...prev, val]); setCurrentPage(1); }} />

@@ -177,17 +177,42 @@
 }
 
 .dropdownItem {
+  width: 100%;
   padding: 8px 16px;
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 10px;
   cursor: pointer;
   color: var(--text-primary);
   font-size: 0.9rem;
+  background: transparent;
+  border: none;
+  text-align: left;
 }
 
 .dropdownItem:hover {
   background: var(--bg-hover);
+}
+
+.dropdownItemActive {
+  background: rgba(59, 175, 218, 0.12);
+  color: #3bafda;
+  font-weight: 600;
+}
+
+.timeFilterCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(59, 175, 218, 0.15);
+  color: #3bafda;
+  font-size: 0.75rem;
+  font-weight: 700;
 }
 
 .dropdownItem input[type="checkbox"] {
@@ -489,6 +514,37 @@
   display: flex;
   align-items: center;
   width: 100%;
+}
+
+.leadTypeFieldRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.leadTypeFieldRow .inputWithIcon {
+  flex: 1;
+  min-width: 0;
+}
+
+.addLeadTypeBtn {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-card, #fff);
+  color: var(--primary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.addLeadTypeBtn:hover {
+  border-color: var(--primary);
+  background: rgba(99, 102, 241, 0.08);
 }
 
 .inputIcon {
