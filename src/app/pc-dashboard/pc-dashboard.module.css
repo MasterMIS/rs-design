@@ -59,6 +59,25 @@
   color: var(--text-main);
 }
 
+.headerFilters {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.headerFilterItem {
+  width: 220px;
+  min-width: 180px;
+  flex: 0 0 220px;
+  position: relative;
+  z-index: 1;
+}
+
+.headerFilterItem:focus-within {
+  z-index: 20;
+}
+
 .content {
   display: flex;
   flex-direction: column;

@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import GlobalLoading from '@/components/GlobalLoading';
+import MultiSelectFilter from '@/components/MultiSelectFilter';
 import {
   buildPcDashboardTasks,
   DELAYED_RANGE_OPTIONS,
@@ -109,8 +110,8 @@ export default function PcDashboardPage() {
 
   const [priorityFilter, setPriorityFilter] = useState<'all' | PcTaskPriority>('all');
   const [delayedRangeFilter, setDelayedRangeFilter] = useState<DelayedRangeFilter>('all');
-  const [selectedModule, setSelectedModule] = useState<'all' | PcTaskSource>('all');
-  const [selectedDoer, setSelectedDoer] = useState<'all' | string>('all');
+  const [selectedModules, setSelectedModules] = useState<string[]>([]);
+  const [selectedDoers, setSelectedDoers] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -175,6 +176,28 @@ export default function PcDashboardPage() {
     [doerCounts]
   );
 
+  const sectionOptions = useMemo(
+    () => MODULE_OPTIONS.map(({ label }) => label),
+    []
+  );
+
+  const doerOptions = useMemo(
+    () => doerTabs.map(({ doer }) => doer),
+    [doerTabs]
+  );
+
+  const toggleModuleFilter = (label: string) => {
+    setSelectedModules((prev) =>
+      prev.includes(label) ? prev.filter((item) => item !== label) : [...prev, label]
+    );
+  };
+
+  const toggleDoerFilter = (doer: string) => {
+    setSelectedDoers((prev) =>
+      prev.includes(doer) ? prev.filter((item) => item !== doer) : [...prev, doer]
+    );
+  };
+
   const filteredTasks = useMemo(() => {
     return allTasks.filter((task) => {
       if (priorityFilter !== 'all' && task.priority !== priorityFilter) return false;
@@ -185,8 +208,8 @@ export default function PcDashboardPage() {
       ) {
         return false;
       }
-      if (selectedModule !== 'all' && task.source !== selectedModule) return false;
-      if (selectedDoer !== 'all' && task.doer !== selectedDoer) return false;
+      if (selectedModules.length > 0 && !selectedModules.includes(task.moduleLabel)) return false;
+      if (selectedDoers.length > 0 && !selectedDoers.includes(task.doer)) return false;
 
       if (searchTerm.trim()) {
         const q = searchTerm.toLowerCase();
@@ -204,13 +227,13 @@ export default function PcDashboardPage() {
 
       return true;
     });
-  }, [allTasks, priorityFilter, delayedRangeFilter, selectedModule, selectedDoer, searchTerm]);
+  }, [allTasks, priorityFilter, delayedRangeFilter, selectedModules, selectedDoers, searchTerm]);
 
   const totalPages = Math.max(1, Math.ceil(filteredTasks.length / ITEMS_PER_PAGE));
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [priorityFilter, delayedRangeFilter, selectedModule, selectedDoer, searchTerm]);
+  }, [priorityFilter, delayedRangeFilter, selectedModules, selectedDoers, searchTerm]);
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -242,6 +265,26 @@ export default function PcDashboardPage() {
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <div className={styles.headerFilters}>
+            <div className={styles.headerFilterItem}>
+              <MultiSelectFilter
+                label="Section"
+                options={sectionOptions}
+                selectedValues={selectedModules}
+                onChange={setSelectedModules}
+                fullWidth
+              />
+            </div>
+            <div className={styles.headerFilterItem}>
+              <MultiSelectFilter
+                label="Doer"
+                options={doerOptions}
+                selectedValues={selectedDoers}
+                onChange={setSelectedDoers}
+                fullWidth
+              />
+            </div>
+          </div>
           <div className={styles.todayBadge}>
             <CalendarDays size={16} />
             {formatTodayLabel(today)}
@@ -319,9 +362,9 @@ export default function PcDashboardPage() {
                   <tbody>
                     <tr
                       className={
-                        selectedModule === 'all' ? styles.filterRowActive : styles.filterRow
+                        selectedModules.length === 0 ? styles.filterRowActive : styles.filterRow
                       }
-                      onClick={() => setSelectedModule('all')}
+                      onClick={() => setSelectedModules([])}
                     >
                       <td>
                         <span className={styles.filterDot} style={{ background: '#0f766e' }} />
@@ -333,7 +376,7 @@ export default function PcDashboardPage() {
                     </tr>
                     {MODULE_OPTIONS.map(({ value, label }) => {
                       const count = stats.byModule[value] || 0;
-                      const isActive = selectedModule === value;
+                      const isActive = selectedModules.includes(label);
                       const accent = MODULE_ACCENT_COLORS[value];
                       return (
                         <tr
@@ -347,7 +390,7 @@ export default function PcDashboardPage() {
                           }
                           onClick={() => {
                             if (count === 0) return;
-                            setSelectedModule(isActive ? 'all' : value);
+                            toggleModuleFilter(label);
                           }}
                           title={count === 0 ? 'No tasks' : `Filter ${label}`}
                         >
@@ -381,8 +424,8 @@ export default function PcDashboardPage() {
                 <table className={styles.filterTable}>
                   <tbody>
                     <tr
-                      className={selectedDoer === 'all' ? styles.filterRowActive : styles.filterRow}
-                      onClick={() => setSelectedDoer('all')}
+                      className={selectedDoers.length === 0 ? styles.filterRowActive : styles.filterRow}
+                      onClick={() => setSelectedDoers([])}
                     >
                       <td>
                         <span className={styles.filterDot} style={{ background: '#0891b2' }} />
@@ -393,13 +436,13 @@ export default function PcDashboardPage() {
                       </td>
                     </tr>
                     {doerTabs.map(({ doer, count }, index) => {
-                      const isActive = selectedDoer === doer;
+                      const isActive = selectedDoers.includes(doer);
                       const accent = DOER_COLORS[index % DOER_COLORS.length];
                       return (
                         <tr
                           key={doer}
                           className={isActive ? styles.filterRowActive : styles.filterRow}
-                          onClick={() => setSelectedDoer(isActive ? 'all' : doer)}
+                          onClick={() => toggleDoerFilter(doer)}
                           title={`Filter ${doer}`}
                         >
                           <td>
