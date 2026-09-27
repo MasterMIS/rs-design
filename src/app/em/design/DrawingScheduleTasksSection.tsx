@@ -5,9 +5,10 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   Briefcase,
-  CheckCircle,
+  CheckCircle2,
   Clock,
   ExternalLink,
+  Loader2,
   PenTool,
   Search,
   User,
@@ -24,6 +25,7 @@ import {
 } from '@/lib/schedule-merge';
 import MultiSelectFilter from '@/components/MultiSelectFilter';
 import styles from '../em.module.css';
+import { CircleCheck } from './UltimateChecklistSection';
 
 interface DrawingScheduleTasksSectionProps {
   onToast: (message: string) => void;
@@ -43,7 +45,8 @@ export function DrawingScheduleTasksSection({ onToast, embedded = false }: Drawi
   const router = useRouter();
 
   const [loading, setLoading] = useState(true);
-  const [savingKey, setSavingKey] = useState<string | null>(null);
+  const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
+  const [bulkAction, setBulkAction] = useState<'start' | 'work_end' | null>(null);
   const [bundles, setBundles] = useState<DrawingProjectBundle[]>([]);
   const [projectNames, setProjectNames] = useState<string[]>([]);
 
@@ -56,8 +59,8 @@ export function DrawingScheduleTasksSection({ onToast, embedded = false }: Drawi
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
 
-  const fetchDrawingData = async () => {
-    setLoading(true);
+  const fetchDrawingData = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const [allRes, projRes] = await Promise.all([
         fetch('/api/drawings?all=1'),
@@ -83,7 +86,7 @@ export function DrawingScheduleTasksSection({ onToast, embedded = false }: Drawi
     } catch (err) {
       console.error('Failed to load drawing schedule tasks', err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -135,6 +138,13 @@ export function DrawingScheduleTasksSection({ onToast, embedded = false }: Drawi
   const totalPages = Math.ceil(filteredRows.length / itemsPerPage) || 1;
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedRows = filteredRows.slice(startIndex, startIndex + itemsPerPage);
+  const canStartRow = (row: MergedDrawingDoerTask) => !row.actualStartDate?.trim() && !row.completed && !!row.rowIndex;
+  const canEndRow = (row: MergedDrawingDoerTask) => !!row.actualStartDate?.trim() && !row.actualEndDate?.trim() && !row.completed && !!row.rowIndex;
+  const selectableRows = filteredRows.filter((row) => canStartRow(row) || canEndRow(row));
+  const selectedRows = selectableRows.filter((row) => selectedKeys.includes(row.key));
+  const selectedStartRows = selectedRows.filter(canStartRow);
+  const selectedEndRows = selectedRows.filter(canEndRow);
+  const allSelectableSelected = selectableRows.length > 0 && selectableRows.every((row) => selectedKeys.includes(row.key));
 
   const uniqueProjects = useMemo(
     () => Array.from(new Set(roleFilteredRows.map((r) => r.project))).sort(),
@@ -147,68 +157,80 @@ export function DrawingScheduleTasksSection({ onToast, embedded = false }: Drawi
     [roleFilteredRows]
   );
 
-  const handleWorkAction = async (
-    row: MergedDrawingDoerTask,
+  const applyWorkAction = async (
+    rows: MergedDrawingDoerTask[],
     action: 'start' | 'work_end'
   ) => {
-    if (!row.rowIndex) {
-      alert('Drawing row is missing. Open the project drawing schedule to fix it.');
-      return;
-    }
+    const today = new Date().toISOString().split('T')[0];
+    const eligible = rows.filter((row) => {
+      if (!row.rowIndex) return false;
+      if (action === 'start') return !row.actualStartDate?.trim() && !row.completed;
+      return !!row.actualStartDate?.trim() && !row.actualEndDate?.trim() && !row.completed;
+    });
+    if (!eligible.length) return;
 
-    setSavingKey(row.key);
+    setBulkAction(action);
     try {
-      const today = new Date().toISOString().split('T')[0];
-      let actualStartDate = row.actualStartDate || '';
-      let actualEndDate = row.actualEndDate || '';
-
-      if (action === 'start' && !actualStartDate) {
-        actualStartDate = today;
-      } else if (action === 'work_end' && actualStartDate && !actualEndDate) {
-        actualEndDate = today;
-      } else {
-        return;
-      }
-
-      const payload = {
-        drawingNo: row.drawingNo,
-        areaName: row.areaName,
-        drawingName: row.drawingName,
-        resourceName: row.resourceName,
-        doerName: row.doerName,
-        category: row.category,
-        plannedStartDate: row.planStartDate,
-        plannedEndDate: row.planEndDate,
-        actualStartDate,
-        actualEndDate,
-        revisionNo: row.revisionNo || '0',
-        drawingImage: row.drawingImage || '',
-      };
-
-      const res = await fetch(
-        `/api/drawings?project=${encodeURIComponent(row.project)}&rowIndex=${row.rowIndex}`,
-        {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        }
-      );
-
-      if (res.ok) {
-        onToast(
-          action === 'start'
-            ? 'Drawing work started.'
-            : 'Drawing work marked complete.'
+      const results = await Promise.all(eligible.map(async (row) => {
+        const actualStartDate = action === 'start' ? today : row.actualStartDate;
+        const actualEndDate = action === 'work_end' ? today : row.actualEndDate;
+        const res = await fetch(
+          `/api/drawings?project=${encodeURIComponent(row.project)}&rowIndex=${row.rowIndex}`,
+          {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              drawingNo: row.drawingNo,
+              areaName: row.areaName,
+              drawingName: row.drawingName,
+              resourceName: row.resourceName,
+              doerName: row.doerName,
+              category: row.category,
+              plannedStartDate: row.planStartDate,
+              plannedEndDate: row.planEndDate,
+              actualStartDate,
+              actualEndDate,
+              revisionNo: row.revisionNo || '0',
+              drawingImage: row.drawingImage || '',
+            }),
+          }
         );
-        await fetchDrawingData();
-      } else {
-        alert('Failed to update drawing schedule.');
+        return { row, ok: res.ok, actualStartDate, actualEndDate };
+      }));
+
+      const done = results.filter((result) => result.ok);
+      if (results.some((result) => !result.ok)) {
+        alert('Some drawings could not be updated.');
       }
+      if (!done.length) return;
+
+      const doneKeys = new Set(done.map((result) => result.row.key));
+      setBundles((current) => current.map((bundle) => ({
+        ...bundle,
+        drawings: bundle.drawings.map((drawing) => {
+          const match = done.find((result) => (
+            result.row.project === bundle.project && result.row.rowIndex === drawing.rowIndex
+          ));
+          if (!match) return drawing;
+          return {
+            ...drawing,
+            actualStartDate: match.actualStartDate,
+            actualEndDate: match.actualEndDate,
+          };
+        }),
+      })));
+      setSelectedKeys((current) => current.filter((key) => !doneKeys.has(key)));
+      onToast(
+        action === 'start'
+          ? (done.length > 1 ? `${done.length} drawings started.` : 'Drawing work started.')
+          : (done.length > 1 ? `${done.length} drawings marked complete.` : 'Drawing work marked complete.')
+      );
+      void fetchDrawingData(true);
     } catch (err) {
       console.error(err);
       alert('An error occurred while updating.');
     } finally {
-      setSavingKey(null);
+      setBulkAction(null);
     }
   };
 
@@ -326,8 +348,34 @@ export function DrawingScheduleTasksSection({ onToast, embedded = false }: Drawi
             )}
           </div>
         </div>
-
-        <div className={styles.sectionPagination}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+          {(selectedStartRows.length > 0 || selectedEndRows.length > 0) && (
+            <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+              {selectedStartRows.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => applyWorkAction(selectedStartRows, 'start')}
+                  disabled={bulkAction !== null}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', backgroundColor: '#3bafda', color: 'white', padding: '8px 14px', borderRadius: '8px', border: 'none', cursor: bulkAction ? 'wait' : 'pointer', fontWeight: 600, opacity: bulkAction ? 0.85 : 1 }}
+                >
+                  {bulkAction === 'start' ? <Loader2 size={16} className={styles.spin} /> : <Clock size={16} />}
+                  {bulkAction === 'start' ? 'Starting...' : `Start selected (${selectedStartRows.length})`}
+                </button>
+              )}
+              {selectedEndRows.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => applyWorkAction(selectedEndRows, 'work_end')}
+                  disabled={bulkAction !== null}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', backgroundColor: 'var(--primary)', color: 'white', padding: '8px 14px', borderRadius: '8px', border: 'none', cursor: bulkAction ? 'wait' : 'pointer', fontWeight: 600, opacity: bulkAction ? 0.85 : 1 }}
+                >
+                  {bulkAction === 'work_end' ? <Loader2 size={16} className={styles.spin} /> : <CheckCircle2 size={16} />}
+                  {bulkAction === 'work_end' ? 'Completing...' : `Work end selected (${selectedEndRows.length})`}
+                </button>
+              )}
+            </div>
+          )}
+          <div className={styles.sectionPagination}>
           <span>Show</span>
           <select
             value={itemsPerPage}
@@ -362,6 +410,7 @@ export function DrawingScheduleTasksSection({ onToast, embedded = false }: Drawi
           >
             Next
           </button>
+          </div>
         </div>
       </div>
 
@@ -382,7 +431,16 @@ export function DrawingScheduleTasksSection({ onToast, embedded = false }: Drawi
                 <th>Actual Start</th>
                 <th>Actual End</th>
                 <th>Status</th>
-                <th style={{ textAlign: 'right' }}>Actions</th>
+                <th style={{ textAlign: 'right', width: '96px' }}>
+                  <CircleCheck
+                    light
+                    label="Select all open drawings"
+                    checked={allSelectableSelected}
+                    onToggle={() => {
+                      setSelectedKeys(allSelectableSelected ? [] : selectableRows.map((row) => row.key));
+                    }}
+                  />
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -399,17 +457,19 @@ export function DrawingScheduleTasksSection({ onToast, embedded = false }: Drawi
                     : row.actualStartDate?.trim()
                       ? 'In Progress'
                       : 'Pending';
-                  const isSaving = savingKey === row.key;
-                  const canStart = !row.actualStartDate?.trim() && !row.completed;
-                  const canEnd =
-                    !!row.actualStartDate?.trim() &&
-                    !row.actualEndDate?.trim() &&
-                    !row.completed;
+                  const open = canStartRow(row) || canEndRow(row);
+                  const toggleRow = () => {
+                    setSelectedKeys((current) => (
+                      current.includes(row.key) ? current.filter((key) => key !== row.key) : [...current, row.key]
+                    ));
+                  };
 
                   return (
                     <tr
                       key={row.key}
                       className={row.completed ? styles.rowCompleted : undefined}
+                      onClick={open && !bulkAction ? toggleRow : undefined}
+                      style={open ? { cursor: 'pointer' } : undefined}
                     >
                       <td>
                         <span className={styles.cellWithIcon}>
@@ -447,32 +507,20 @@ export function DrawingScheduleTasksSection({ onToast, embedded = false }: Drawi
                       </td>
                       <td>
                         <div className={styles.rowActions}>
-                          {canStart && (
-                            <button
-                              type="button"
-                              title="Start work"
-                              disabled={isSaving}
-                              onClick={() => handleWorkAction(row, 'start')}
-                              className={styles.actionStart}
-                            >
-                              <Clock size={16} /> Start
-                            </button>
-                          )}
-                          {canEnd && (
-                            <button
-                              type="button"
-                              title="Mark work end"
-                              disabled={isSaving}
-                              onClick={() => handleWorkAction(row, 'work_end')}
-                              className={styles.actionComplete}
-                            >
-                              <CheckCircle size={16} /> Work End
-                            </button>
+                          {open && (
+                            <CircleCheck
+                              label={`Select ${row.drawingName}`}
+                              checked={selectedKeys.includes(row.key)}
+                              onToggle={toggleRow}
+                            />
                           )}
                           <button
                             type="button"
                             title="Open in project drawing schedule"
-                            onClick={() => openInProject(row)}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              openInProject(row);
+                            }}
                             className={styles.actionLink}
                           >
                             <ExternalLink size={16} />

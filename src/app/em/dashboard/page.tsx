@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, CheckCircle2, Clock, AlertCircle, Trophy, TrendingDown, Globe, PenTool, Hammer, LineChart as LineChartIcon, Briefcase, FileText, User, Calendar, Activity, LayoutGrid, Filter } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Clock, AlertCircle, Trophy, TrendingDown, Globe, PenTool, Hammer, ListChecks, LineChart as LineChartIcon, Briefcase, FileText, User, Calendar, Activity, LayoutGrid, Filter } from 'lucide-react';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, LineChart, Line, CartesianGrid, LabelList } from 'recharts';
 import styles from './dashboard.module.css';
 import GlobalLoading from '@/components/GlobalLoading';
@@ -12,6 +12,7 @@ import PeriodDateFilter from '@/components/PeriodDateFilter';
 import { useAuth } from '@/context/AuthContext';
 import { getPeriodRange, matchQuickDatePreset, getQuickDatePeriod, type DatePeriodValue, type QuickDatePreset } from '@/lib/date-period';
 import { canViewAllEmTasks, isTaskAssignedToUser } from '@/lib/em-access';
+import type { ChecklistViewRow } from '@/lib/ultimate-checklist';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#ec4899', '#14b8a6', '#f97316'];
 const STATUS_COLORS = { 'Completed': '#10b981', 'Pending': '#3b82f6', 'Delayed': '#ef4444' };
@@ -29,13 +30,27 @@ const getStartOfDay = (d: Date) => {
   return newD;
 };
 
+function checklistToDashboardTask(row: ChecklistViewRow) {
+  const completedOn = row.completed_at?.match(/^(\d{1,2}\/\d{1,2}\/\d{4})/)?.[1] || '';
+  return {
+    project_name: row.category || 'Ultimate Checklist',
+    work_name: row.task,
+    work_type: row.frequency,
+    doer_name: row.doer_name,
+    planned_date: row.occurrence_date,
+    actual_date: row.status === 'Completed' ? completedOn : '',
+    status: row.status === 'Completed' ? 'Completed' : 'Pending',
+  };
+}
+
 export default function EMDashboard() {
   const { user } = useAuth();
   const [designTasks, setDesignTasks] = useState<any[]>([]);
   const [executionTasks, setExecutionTasks] = useState<any[]>([]);
+  const [checklistTasks, setChecklistTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [activeTab, setActiveTab] = useState<'All' | 'Design' | 'Execution'>('All');
+  const [activeTab, setActiveTab] = useState<'All' | 'Design' | 'Execution' | 'Checklist'>('All');
   const [datePeriod, setDatePeriod] = useState<DatePeriodValue>({
     active: false,
     period: 'month',
@@ -50,15 +65,18 @@ export default function EMDashboard() {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const [designRes, execRes] = await Promise.all([
+        const [designRes, execRes, checklistRes] = await Promise.all([
           fetch('/api/em/design'),
-          fetch('/api/em/execution')
+          fetch('/api/em/execution'),
+          fetch('/api/em/ultimate-checklist/checklist'),
         ]);
         const dData = await designRes.json();
         const eData = await execRes.json();
+        const cData = await checklistRes.json();
 
         if (Array.isArray(dData)) setDesignTasks(dData);
         if (Array.isArray(eData)) setExecutionTasks(eData);
+        if (Array.isArray(cData)) setChecklistTasks(cData.map(checklistToDashboardTask));
       } catch (err) {
         console.error('Failed to load dashboard data', err);
       } finally {
@@ -68,8 +86,8 @@ export default function EMDashboard() {
     fetchData();
   }, []);
 
-  const allProjects = Array.from(new Set([...designTasks, ...executionTasks].map(t => t.project_name).filter(Boolean))).sort();
-  const allDoers = Array.from(new Set([...designTasks, ...executionTasks].map(t => t.doer_name || t.supervisor_name).filter(Boolean))).sort();
+  const allProjects = Array.from(new Set([...designTasks, ...executionTasks, ...checklistTasks].map(t => t.project_name).filter(Boolean))).sort();
+  const allDoers = Array.from(new Set([...designTasks, ...executionTasks, ...checklistTasks].map(t => t.doer_name || t.supervisor_name).filter(Boolean))).sort();
   const allStatuses = ['Completed', 'Pending', 'Hold', 'Cancelled'];
 
   const activeFilterCount = useMemo(() => {
@@ -100,11 +118,13 @@ export default function EMDashboard() {
   const filteredData = useMemo(() => {
     let rawData: any[] = [];
     if (activeTab === 'All') {
-      rawData = [...designTasks, ...executionTasks];
+      rawData = [...designTasks, ...executionTasks, ...checklistTasks];
     } else if (activeTab === 'Design') {
       rawData = [...designTasks];
-    } else {
+    } else if (activeTab === 'Execution') {
       rawData = [...executionTasks];
+    } else {
+      rawData = [...checklistTasks];
     }
 
     return rawData.filter(t => {
@@ -127,7 +147,7 @@ export default function EMDashboard() {
 
       return true;
     });
-  }, [designTasks, executionTasks, activeTab, datePeriod, selectedProjects, selectedDoers, selectedStatuses, user]);
+  }, [designTasks, executionTasks, checklistTasks, activeTab, datePeriod, selectedProjects, selectedDoers, selectedStatuses, user]);
 
   // Helpers
   const today = getStartOfDay(new Date());
@@ -433,6 +453,7 @@ export default function EMDashboard() {
         <button className={`${styles.tab} ${activeTab === 'All' ? styles.active : ''}`} onClick={() => setActiveTab('All')}><Globe size={18} /> All Modules</button>
         <button className={`${styles.tab} ${activeTab === 'Design' ? styles.active : ''}`} onClick={() => setActiveTab('Design')}><PenTool size={18} /> Design</button>
         <button className={`${styles.tab} ${activeTab === 'Execution' ? styles.active : ''}`} onClick={() => setActiveTab('Execution')}><Hammer size={18} /> Execution</button>
+        <button className={`${styles.tab} ${activeTab === 'Checklist' ? styles.active : ''}`} onClick={() => setActiveTab('Checklist')}><ListChecks size={18} /> Ultimate Checklist</button>
       </div>
 
       {/* 1. EXECUTIVE SUMMARY */}

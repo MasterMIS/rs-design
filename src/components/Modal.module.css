@@ -59,6 +59,15 @@
   color: var(--danger);
 }
 
+.dangerHeader .closeButton {
+  background: rgba(241, 85, 108, 0.12);
+  color: var(--danger);
+}
+
+.dangerHeader .closeButton:hover {
+  background: rgba(241, 85, 108, 0.22);
+}
+
 .dangerIcon {
   color: var(--danger);
 }

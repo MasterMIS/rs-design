@@ -36,6 +36,7 @@ import {
   type SalesLead,
 } from '@/lib/pc-dashboard';
 import type { DrawingProjectBundle, TrackerProjectBundle } from '@/lib/schedule-merge';
+import type { ChecklistViewRow } from '@/lib/ultimate-checklist';
 import styles from './pc-dashboard.module.css';
 
 const MODULE_COLORS: Record<PcTaskSource, string> = {
@@ -43,6 +44,7 @@ const MODULE_COLORS: Record<PcTaskSource, string> = {
   tracker: 'linear-gradient(to right, #059669, #10b981)',
   em_design: 'linear-gradient(to right, #8a2387, #e94057)',
   em_execution: 'linear-gradient(to right, #f27121, #e94057)',
+  checklist: 'linear-gradient(to right, #4338ca, #6366f1)',
   sales: 'linear-gradient(to right, #ff9966, #ff5e62)',
   hrms: 'linear-gradient(to right, #00c6ff, #0072ff)',
 };
@@ -52,6 +54,7 @@ const MODULE_ACCENT_COLORS: Record<PcTaskSource, string> = {
   tracker: '#059669',
   em_design: '#c026d3',
   em_execution: '#ea580c',
+  checklist: '#4338ca',
   sales: '#f97316',
   hrms: '#0284c7',
 };
@@ -124,6 +127,7 @@ export default function PcDashboardPage() {
           trackerBundles,
           emDesignTasks,
           emExecutionTasks,
+          checklistTasks,
           salesLeads,
           hrmsCandidates,
         ] = await Promise.all([
@@ -139,6 +143,7 @@ export default function PcDashboardPage() {
           }),
           fetchJson<EmDesignTask>('/api/em/design'),
           fetchJson<EmExecutionTask>('/api/em/execution'),
+          fetchJson<ChecklistViewRow>('/api/em/ultimate-checklist/checklist'),
           fetchJson<SalesLead>('/api/sales'),
           fetchJson<HrmsCandidate>('/api/hrms'),
         ]);
@@ -148,6 +153,7 @@ export default function PcDashboardPage() {
           trackerBundles,
           emDesignTasks,
           emExecutionTasks,
+          checklistTasks,
           salesLeads,
           hrmsCandidates,
         });

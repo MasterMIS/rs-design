@@ -20,12 +20,14 @@ import {
   type DrawingProjectBundle,
   type TrackerProjectBundle,
 } from '@/lib/schedule-merge';
+import type { ChecklistViewRow } from '@/lib/ultimate-checklist';
 
 export type PcTaskSource =
   | 'drawing'
   | 'tracker'
   | 'em_design'
   | 'em_execution'
+  | 'checklist'
   | 'sales'
   | 'hrms';
 
@@ -107,6 +109,7 @@ export interface PcDashboardRawData {
   trackerBundles: TrackerProjectBundle[];
   emDesignTasks: EmDesignTask[];
   emExecutionTasks: EmExecutionTask[];
+  checklistTasks?: ChecklistViewRow[];
   salesLeads: SalesLead[];
   hrmsCandidates: HrmsCandidate[];
 }
@@ -116,6 +119,7 @@ const MODULE_LABELS: Record<PcTaskSource, string> = {
   tracker: 'PMS Tracker',
   em_design: 'EM Design',
   em_execution: 'EM Execution',
+  checklist: 'Checklist',
   sales: 'Sales',
   hrms: 'HRMS',
 };
@@ -125,6 +129,7 @@ const MODULE_LINKS: Record<PcTaskSource, string> = {
   tracker: '/pms-tracker',
   em_design: '/em/design',
   em_execution: '/em/execution',
+  checklist: '/em/design?tab=ultimate',
   sales: '/sales',
   hrms: '/hrms',
 };
@@ -350,6 +355,40 @@ export function normalizeEmExecutionTasks(
   return results;
 }
 
+export function normalizeChecklistTasks(
+  rows: ChecklistViewRow[],
+  today = new Date()
+): PcTask[] {
+  const results: PcTask[] = [];
+
+  for (const row of rows) {
+    if (row.status === 'Completed') continue;
+
+    const dueDate = parseFlexibleDate(row.occurrence_date);
+    if (!dueDate) continue;
+
+    const priority = classifyDueDate(dueDate, today);
+    if (!priority) continue;
+
+    results.push({
+      id: `checklist-${row.task_id}-${row.occurrence_date}`,
+      source: 'checklist',
+      moduleLabel: MODULE_LABELS.checklist,
+      project: row.category || 'Checklist',
+      taskName: row.task || 'Checklist task',
+      doer: getDoerLabel(row.doer_name),
+      dueDate,
+      dueDateLabel: formatDueLabel(dueDate),
+      priority,
+      daysOverdue: daysOverdue(dueDate, today),
+      statusLabel: row.status === 'Overdue' ? 'Overdue' : 'Pending',
+      linkHref: MODULE_LINKS.checklist,
+    });
+  }
+
+  return results;
+}
+
 function normalizePipelineTasks(
   source: 'sales' | 'hrms',
   records: Array<SalesLead | HrmsCandidate>,
@@ -439,6 +478,7 @@ export function buildPcDashboardTasks(
     ...normalizeTrackerTasks(raw.trackerBundles, today),
     ...normalizeEmDesignTasks(raw.emDesignTasks, today),
     ...normalizeEmExecutionTasks(raw.emExecutionTasks, today),
+    ...normalizeChecklistTasks(raw.checklistTasks || [], today),
     ...normalizeSalesLeads(raw.salesLeads, today),
     ...normalizeHrmsCandidates(raw.hrmsCandidates, today),
   ];

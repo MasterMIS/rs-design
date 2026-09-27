@@ -91,5 +91,10 @@ export const CONFIG = {
     SHEET_ID: '1qID9Lo3VE0Z8sXsc3QQe44R-HWqi34CWrXMZ0g1e1rs',
     SHEET_NAME: 'Sales',
     DROPDOWN_SHEET: 'Dropdown',
-  }
+  },
+  ULTIMATE_CHECKLIST: {
+    SHEET_ID: '1I7sTfIunmdkG3w0GOhp0iebPp8q0oBomFrp6i3Oh5uM',
+    MASTER_SHEET: 'Master',
+    CHECKLIST_SHEET: 'Checklist',
+  },
 };

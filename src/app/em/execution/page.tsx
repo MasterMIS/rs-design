@@ -3,8 +3,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { 
-  Plus, Edit2, Trash2, CheckCircle, Clock, Search, ArrowLeft, 
-  CheckCircle2, AlertCircle, Briefcase, User, CalendarDays, FileText, Download, Activity, Printer
+  Plus, Edit2, Trash2, Clock, Search, ArrowLeft, 
+  CheckCircle2, AlertCircle, Briefcase, User, CalendarDays, FileText, Download, Activity, Printer, Loader2
 } from 'lucide-react';
 import { exportToCSV } from '@/utils/exportCsv';
 import { exportDoerTasksPdf } from '@/utils/exportPdf';
@@ -16,6 +16,7 @@ import { useAuth } from '@/context/AuthContext';
 import { filterProjectsForUser } from '@/lib/project-access';
 import { canViewAllEmTasks, isTaskAssignedToUser } from '@/lib/em-access';
 import { ProjectTrackerTasksSection } from './ProjectTrackerTasksSection';
+import { CircleCheck } from '../design/UltimateChecklistSection';
 
 type ExecutionTaskDraft = {
   id: string;
@@ -79,6 +80,8 @@ export default function ExecutionPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [toastMessage, setToastMessage] = useState('');
+  const [selectedTaskKeys, setSelectedTaskKeys] = useState<number[]>([]);
+  const [bulkSaving, setBulkSaving] = useState(false);
   const [projectsList, setProjectsList] = useState<any[]>([]);
   const [usersList, setUsersList] = useState<any[]>([]);
 
@@ -280,29 +283,36 @@ export default function ExecutionPage() {
     }
   };
 
-  const handleMarkComplete = async (task: any) => {
-    const today = new Date().toLocaleDateString('en-GB'); // DD/MM/YYYY
-    const payload = {
-      ...task,
-      status: 'Completed',
-      actual_date: today
-    };
-    
-    setIsSaving(true);
+  const completeExecutionTasks = async (rows: any[]) => {
+    const pending = rows.filter((task) => task.status !== 'Completed');
+    if (!pending.length) return;
+    const today = new Date().toLocaleDateString('en-GB');
+    setBulkSaving(true);
     try {
-      const res = await fetch(`/api/em/execution?rowIndex=${task.rowIndex}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (res.ok) {
-        showToast('Task marked as completed!');
-        fetchTasks(true);
+      const results = await Promise.all(pending.map(async (task) => {
+        const res = await fetch(`/api/em/execution?rowIndex=${task.rowIndex}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...task, status: 'Completed', actual_date: today }),
+        });
+        return { rowIndex: task.rowIndex as number, ok: res.ok };
+      }));
+      const done = new Set(results.filter((result) => result.ok).map((result) => result.rowIndex));
+      if (results.some((result) => !result.ok)) {
+        alert('Some tasks could not be completed.');
+      }
+      if (done.size > 0) {
+        setTasks((current) => current.map((task) => (
+          done.has(task.rowIndex) ? { ...task, status: 'Completed', actual_date: today } : task
+        )));
+        setSelectedTaskKeys((current) => current.filter((key) => !done.has(key)));
+        showToast(done.size > 1 ? `${done.size} tasks completed.` : 'Task marked as completed!');
+        void fetchTasks(true);
       }
     } catch (err) {
       console.error(err);
     } finally {
-      setIsSaving(false);
+      setBulkSaving(false);
     }
   };
 
@@ -354,6 +364,9 @@ export default function ExecutionPage() {
   const totalPages = Math.ceil(filteredTasks.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedTasks = filteredTasks.slice(startIndex, startIndex + itemsPerPage);
+  const openExecutionTasks = filteredTasks.filter((task) => task.status !== 'Completed');
+  const selectedExecutionTasks = openExecutionTasks.filter((task) => selectedTaskKeys.includes(task.rowIndex));
+  const allOpenSelected = openExecutionTasks.length > 0 && openExecutionTasks.every((task) => selectedTaskKeys.includes(task.rowIndex));
 
   return (
     <div className={styles.container}>
@@ -470,6 +483,17 @@ export default function ExecutionPage() {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            {selectedExecutionTasks.length > 0 && (
+              <button
+                type="button"
+                onClick={() => completeExecutionTasks(selectedExecutionTasks)}
+                disabled={bulkSaving}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', backgroundColor: 'var(--primary)', color: 'white', padding: '8px 14px', borderRadius: '8px', border: 'none', cursor: bulkSaving ? 'wait' : 'pointer', fontWeight: 600, opacity: bulkSaving ? 0.85 : 1, flexShrink: 0 }}
+              >
+                {bulkSaving ? <Loader2 size={16} className={styles.spin} /> : <CheckCircle2 size={16} />}
+                {bulkSaving ? 'Completing...' : `Complete selected (${selectedExecutionTasks.length})`}
+              </button>
+            )}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', color: 'var(--text-light)' }}>
               <span>Show</span>
               <select value={itemsPerPage} onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }} style={{ padding: '4px 8px', borderRadius: '6px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-card)', color: 'var(--text-main)', outline: 'none' }}>
@@ -497,59 +521,79 @@ export default function ExecutionPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
               <thead>
                 <tr style={{ background: 'linear-gradient(90deg, var(--primary) 0%, var(--primary-dark) 100%)', color: 'white' }}>
-                  <th style={{ padding: '16px', fontWeight: 600, fontSize: '0.85rem' }}>Supervisor Name</th>
-                  <th style={{ padding: '16px', fontWeight: 600, fontSize: '0.85rem' }}>Work Period</th>
-                  <th style={{ padding: '16px', fontWeight: 600, fontSize: '0.85rem' }}>Project Name</th>
-                  <th style={{ padding: '16px', fontWeight: 600, fontSize: '0.85rem' }}>Work Name</th>
-                  <th style={{ padding: '16px', fontWeight: 600, fontSize: '0.85rem' }}>Doer</th>
-                  <th style={{ padding: '16px', fontWeight: 600, fontSize: '0.85rem' }}>Remark</th>
-                  <th style={{ padding: '16px', fontWeight: 600, fontSize: '0.85rem' }}>Actual Date</th>
-                  <th style={{ padding: '16px', fontWeight: 600, fontSize: '0.85rem' }}>Status</th>
-                  <th style={{ padding: '16px', fontWeight: 600, fontSize: '0.85rem', textAlign: 'right' }}>Actions</th>
+                  <th style={{ padding: '8px 12px', fontWeight: 600, fontSize: '0.85rem' }}>Supervisor Name</th>
+                  <th style={{ padding: '8px 12px', fontWeight: 600, fontSize: '0.85rem' }}>Work Period</th>
+                  <th style={{ padding: '8px 12px', fontWeight: 600, fontSize: '0.85rem' }}>Project Name</th>
+                  <th style={{ padding: '8px 12px', fontWeight: 600, fontSize: '0.85rem' }}>Work Name</th>
+                  <th style={{ padding: '8px 12px', fontWeight: 600, fontSize: '0.85rem' }}>Doer</th>
+                  <th style={{ padding: '8px 12px', fontWeight: 600, fontSize: '0.85rem' }}>Remark</th>
+                  <th style={{ padding: '8px 12px', fontWeight: 600, fontSize: '0.85rem' }}>Actual Date</th>
+                  <th style={{ padding: '8px 12px', fontWeight: 600, fontSize: '0.85rem' }}>Status</th>
+                  <th style={{ padding: '8px 12px', fontWeight: 600, fontSize: '0.85rem', textAlign: 'right', width: '120px' }}>
+                    <CircleCheck
+                      light
+                      label="Select all open tasks"
+                      checked={allOpenSelected}
+                      onToggle={() => {
+                        setSelectedTaskKeys(allOpenSelected ? [] : openExecutionTasks.map((task) => task.rowIndex));
+                      }}
+                    />
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {paginatedTasks.length === 0 ? (
                   <tr><td colSpan={9} style={{ padding: '30px', textAlign: 'center', color: 'var(--text-light)' }}>No tasks found.</td></tr>
                 ) : (
-                  paginatedTasks.map((task, i) => (
-                    <tr key={i} style={{ borderBottom: '1px solid var(--border-color)', transition: 'background-color 0.2s', backgroundColor: task.status === 'Completed' ? 'rgba(16, 185, 129, 0.05)' : 'transparent' }}>
-                      <td style={{ padding: '16px', fontSize: '0.9rem', fontWeight: 500 }}>
+                  paginatedTasks.map((task, i) => {
+                    const open = task.status !== 'Completed';
+                    const toggleRow = () => {
+                      setSelectedTaskKeys((current) => (
+                        current.includes(task.rowIndex) ? current.filter((key) => key !== task.rowIndex) : [...current, task.rowIndex]
+                      ));
+                    };
+                    return (
+                    <tr
+                      key={task.rowIndex ?? i}
+                      onClick={open && !bulkSaving ? toggleRow : undefined}
+                      style={{ borderBottom: '1px solid var(--border-color)', transition: 'background-color 0.2s', backgroundColor: task.status === 'Completed' ? 'rgba(16, 185, 129, 0.05)' : 'transparent', cursor: open ? 'pointer' : undefined }}
+                    >
+                      <td style={{ padding: '8px 12px', fontSize: '0.9rem', fontWeight: 500 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <User size={16} style={{ color: '#3bafda' }} /> {task.supervisor_name}
                         </div>
                       </td>
-                      <td style={{ padding: '16px', fontSize: '0.9rem', color: 'var(--text-light)' }}>
+                      <td style={{ padding: '8px 12px', fontSize: '0.9rem', color: 'var(--text-light)' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <Clock size={16} style={{ color: '#10b981' }} /> {task.work_from || '-'} to {task.work_to || '-'}
                         </div>
                       </td>
-                      <td style={{ padding: '16px', fontSize: '0.9rem' }}>
+                      <td style={{ padding: '8px 12px', fontSize: '0.9rem' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <Briefcase size={16} style={{ color: '#4b6cb7' }} /> {task.project_name}
                         </div>
                       </td>
-                      <td style={{ padding: '16px', fontSize: '0.9rem' }}>
+                      <td style={{ padding: '8px 12px', fontSize: '0.9rem' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <FileText size={16} style={{ color: '#f7b84b' }} /> {task.work_name}
                         </div>
                       </td>
-                      <td style={{ padding: '16px', fontSize: '0.9rem' }}>
+                      <td style={{ padding: '8px 12px', fontSize: '0.9rem' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <User size={16} style={{ color: '#3bafda' }} /> {task.doer}
                         </div>
                       </td>
-                      <td style={{ padding: '16px', fontSize: '0.9rem' }}>
+                      <td style={{ padding: '8px 12px', fontSize: '0.9rem' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <FileText size={16} style={{ color: '#f7b84b' }} /> {task.remark}
                         </div>
                       </td>
-                      <td style={{ padding: '16px', fontSize: '0.9rem', color: task.actual_date ? 'var(--text-main)' : 'var(--text-light)' }}>
+                      <td style={{ padding: '8px 12px', fontSize: '0.9rem', color: task.actual_date ? 'var(--text-main)' : 'var(--text-light)' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <CalendarDays size={16} style={{ color: '#10b981' }} /> {task.actual_date || '-'}
                         </div>
                       </td>
-                      <td style={{ padding: '16px' }}>
+                      <td style={{ padding: '8px 12px' }}>
                         <span style={{ 
                           padding: '4px 8px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 600,
                           backgroundColor: task.status === 'Completed' ? 'rgba(16, 185, 129, 0.15)' : (task.status === 'In Progress' ? 'rgba(59, 175, 218, 0.15)' : 'rgba(241, 85, 108, 0.15)'),
@@ -560,23 +604,26 @@ export default function ExecutionPage() {
                           {task.status || 'Pending'}
                         </span>
                       </td>
-                      <td style={{ padding: '16px', textAlign: 'right' }}>
-                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                          {task.status !== 'Completed' && (
-                            <button onClick={() => handleMarkComplete(task)} title="Mark Complete" style={{ background: 'none', border: 'none', color: '#10b981', cursor: 'pointer', padding: '4px', borderRadius: '4px' }}>
-                              <CheckCircle size={18} />
-                            </button>
+                      <td style={{ padding: '8px 12px', textAlign: 'right' }}>
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', alignItems: 'center' }}>
+                          {open && (
+                            <CircleCheck
+                              label={`Select ${task.work_name || 'task'}`}
+                              checked={selectedTaskKeys.includes(task.rowIndex)}
+                              onToggle={toggleRow}
+                            />
                           )}
-                          <button onClick={() => handleOpenEdit(task)} title="Edit" style={{ background: 'none', border: 'none', color: 'var(--text-light)', cursor: 'pointer', padding: '4px', borderRadius: '4px' }}>
+                          <button onClick={(event) => { event.stopPropagation(); handleOpenEdit(task); }} title="Edit" style={{ background: 'none', border: 'none', color: 'var(--text-light)', cursor: 'pointer', padding: '4px', borderRadius: '4px' }}>
                             <Edit2 size={18} />
                           </button>
-                          <button onClick={() => handleDelete(task.rowIndex)} title="Delete" style={{ background: 'none', border: 'none', color: '#f1556c', cursor: 'pointer', padding: '4px', borderRadius: '4px' }}>
+                          <button onClick={(event) => { event.stopPropagation(); handleDelete(task.rowIndex); }} title="Delete" style={{ background: 'none', border: 'none', color: '#f1556c', cursor: 'pointer', padding: '4px', borderRadius: '4px' }}>
                             <Trash2 size={18} />
                           </button>
                         </div>
                       </td>
                     </tr>
-                  ))
+                    );
+                  })
                 )}
               </tbody>
             </table>
