@@ -559,8 +559,7 @@ export default function DesignPage() {
                     return (
                     <tr
                       key={task.rowIndex ?? i}
-                      onClick={open && !bulkSaving ? toggleRow : undefined}
-                      style={{ borderBottom: '1px solid var(--border-color)', transition: 'background-color 0.2s', backgroundColor: task.status === 'Completed' ? 'rgba(16, 185, 129, 0.05)' : 'transparent', cursor: open ? 'pointer' : undefined }}
+                      style={{ borderBottom: '1px solid var(--border-color)', transition: 'background-color 0.2s', backgroundColor: task.status === 'Completed' ? 'rgba(16, 185, 129, 0.05)' : 'transparent' }}
                     >
                       <td style={{ padding: '8px 12px', fontSize: '0.9rem', fontWeight: 500 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>

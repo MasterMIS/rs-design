@@ -468,8 +468,6 @@ export function DrawingScheduleTasksSection({ onToast, embedded = false }: Drawi
                     <tr
                       key={row.key}
                       className={row.completed ? styles.rowCompleted : undefined}
-                      onClick={open && !bulkAction ? toggleRow : undefined}
-                      style={open ? { cursor: 'pointer' } : undefined}
                     >
                       <td>
                         <span className={styles.cellWithIcon}>

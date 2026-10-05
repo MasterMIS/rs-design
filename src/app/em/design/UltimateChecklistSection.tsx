@@ -732,8 +732,6 @@ export function UltimateChecklistSection({ onToast }: UltimateChecklistSectionPr
                       <tr
                         key={key}
                         className={row.status === 'Completed' ? styles.rowCompleted : undefined}
-                        onClick={open && !bulkSaving ? toggleRow : undefined}
-                        style={open ? { cursor: 'pointer' } : undefined}
                       >
                         <td>{row.category || '—'}</td>
                         <td>{row.task || '—'}</td>
