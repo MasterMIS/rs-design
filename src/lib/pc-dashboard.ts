@@ -8,6 +8,7 @@ import {
   getPendingStepStatus,
   HRMS_STEP_NAMES,
   isSalesLeadClosed,
+  isSalesLeadDisqualified,
   isSalesLeadLost,
   normalizeHrmsFollowUpDate,
   SALES_MAX_STEP,
@@ -91,10 +92,10 @@ export interface SalesLead extends PipelineRecord {
   id?: string;
   name?: string;
   salesman?: string;
-  lost_remark?: string;
-  planned_6?: string;
-  actual_6?: string;
-  status_6?: string;
+  meeting_mode_2?: string;
+  meeting_type_3?: string;
+  status_5?: string;
+  remark_5?: string;
 }
 
 export interface HrmsCandidate extends PipelineRecord {
@@ -445,7 +446,10 @@ function normalizePipelineTasks(
 
 export function normalizeSalesLeads(leads: SalesLead[], today = new Date()): PcTask[] {
   const activeLeads = leads.filter(
-    (lead) => !isSalesLeadLost(lead) && !isSalesLeadClosed(lead)
+    (lead) =>
+      !isSalesLeadLost(lead) &&
+      !isSalesLeadClosed(lead) &&
+      !isSalesLeadDisqualified(lead)
   );
   return normalizePipelineTasks('sales', activeLeads, today, {
     stepNames: SALES_STEP_NAMES,

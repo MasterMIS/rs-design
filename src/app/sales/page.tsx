@@ -2,15 +2,18 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
-import { Plus, Edit2, Trash2, X, BarChart3, Search, Filter, ChevronLeft, ChevronRight, ChevronDown, User, Phone, MapPin, Building, Briefcase, HardHat, Users, Calendar, Fingerprint, Tag, Download, Home, Store, CheckSquare, XCircle } from 'lucide-react';
+import { Plus, Edit2, Trash2, X, BarChart3, Search, Filter, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, User, Phone, MapPin, Building, Briefcase, HardHat, Users, Calendar, Fingerprint, Tag, Download, Home, Store, CheckSquare, CheckCircle2, Clock3, XCircle } from 'lucide-react';
 import styles from './sales.module.css';
 import Modal from '@/components/Modal';
 import { useAuth } from '@/context/AuthContext';
 import {
   getNextStepInfo,
   getPendingStepStatus,
+  getSalesLeadOutcome,
   getStepName,
   isSalesLeadActive,
+  isSalesLeadClosed,
+  isSalesLeadDisqualified,
   isSalesLeadLost,
   SALES_MAX_STEP,
   SALES_PIPELINE_OPTS,
@@ -41,20 +44,23 @@ interface Lead {
   planned_1?: string;
   actual_1?: string;
   status_1?: string;
+  next_follow_up_date_1?: string;
+  remarks_1?: string;
   planned_2?: string;
   actual_2?: string;
   status_2?: string;
+  meeting_mode_2?: string;
   next_follow_up_date_2?: string;
   remarks_2?: string;
   planned_3?: string;
   actual_3?: string;
   status_3?: string;
+  meeting_type_3?: string;
   next_follow_up_date_3?: string;
   remark_3?: string;
   planned_4?: string;
   actual_4?: string;
   status_4?: string;
-  meeting_mode_4?: string;
   next_follow_up_date_4?: string;
   remark_4?: string;
   planned_5?: string;
@@ -62,10 +68,6 @@ interface Lead {
   status_5?: string;
   next_follow_up_date_5?: string;
   remark_5?: string;
-  planned_6?: string;
-  actual_6?: string;
-  status_6?: string;
-  lost_remark?: string;
 }
 
 const FilterSection = ({ title, options, selected, onChange }: { title: string, options: string[], selected: string[], onChange: (val: string) => void }) => {
@@ -150,45 +152,396 @@ const FilterSection = ({ title, options, selected, onChange }: { title: string, 
   );
 };
 
-const StepCountdown = ({ lead, handleOpenStepModal }: { lead: Lead, handleOpenStepModal: (lead: Lead) => void }) => {
+const DISQUALIFIED_LEADS_PILL = 'Disqualified Leads';
+
+type StepChoiceOption = {
+  id: string;
+  label: string;
+  activeClass: string;
+};
+
+const StepChoiceButtons = ({
+  options,
+  value,
+  onChange,
+}: {
+  options: StepChoiceOption[];
+  value: string;
+  onChange: (id: string) => void;
+}) => (
+  <div className={styles.stepChoiceButtons}>
+    {options.map((opt) => (
+      <button
+        key={opt.id}
+        type="button"
+        onClick={() => onChange(opt.id)}
+        className={`${styles.stepChoiceBtn} ${
+          value === opt.id ? `${styles.stepChoiceBtnActive} ${opt.activeClass}` : ''
+        }`}
+      >
+        {opt.label}
+      </button>
+    ))}
+  </div>
+);
+
+const LeadDueSummary = ({ lead }: { lead: Lead }) => {
   const [now, setNow] = useState(new Date());
   useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 1000);
+    const timer = setInterval(() => setNow(new Date()), 60_000);
     return () => clearInterval(timer);
   }, []);
-  
+
+  const outcome = getSalesLeadOutcome(lead);
+  if (outcome === 'disqualified') {
+    return (
+      <div className={`${styles.leadDueSummary} ${styles.leadDueSummaryTerminal}`}>
+        <span className={styles.leadDueStatus} style={{ color: '#e74c3c' }}>
+          Disqualified
+        </span>
+      </div>
+    );
+  }
+
+  if (outcome === 'lost') {
+    return (
+      <div className={`${styles.leadDueSummary} ${styles.leadDueSummaryTerminal}`}>
+        <span className={styles.leadDueStatus} style={{ color: '#e74c3c' }}>
+          Lost
+        </span>
+        {lead.remark_5?.trim() && (
+          <>
+            <span className={styles.leadDueSep}>·</span>
+            <span className={styles.leadDuePlanned} title={lead.remark_5}>
+              {lead.remark_5.length > 40 ? `${lead.remark_5.slice(0, 40)}…` : lead.remark_5}
+            </span>
+          </>
+        )}
+      </div>
+    );
+  }
+
+  if (outcome === 'won') {
+    return (
+      <div className={`${styles.leadDueSummary} ${styles.leadDueSummaryTerminal}`}>
+        <span className={styles.leadDueStatus} style={{ color: '#1abc9c' }}>
+          Won
+        </span>
+      </div>
+    );
+  }
+
+  if (!isSalesLeadActive(lead)) return null;
+
   const status = getPendingStepStatus(lead, { ...SALES_PIPELINE_OPTS, now });
   if (!status) return null;
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginRight: '10px', background: 'var(--bg-hover)', padding: '4px 10px', borderRadius: '8px' }}>
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-        <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{status.stepName}</span>
-          <span style={{ fontSize: '0.85rem', fontWeight: 700, color: status.isDelayed ? '#f1556c' : '#1abc9c' }}>
-            ({status.timeText})
-          </span>
+    <div className={styles.leadDueSummary} title={status.isFollowUp ? 'Follow-up date' : 'Planned step date'}>
+      <span className={styles.leadDuePlanned}>{status.formattedPlannedDate}</span>
+      <span className={styles.leadDueSep}>·</span>
+      <span
+        className={styles.leadDueDelay}
+        style={{ color: status.isDelayed ? '#f1556c' : '#1abc9c' }}
+      >
+        {status.timeText}
+      </span>
+    </div>
+  );
+};
+
+type LeadDetailSegment = {
+  key: string;
+  icon: React.ReactNode;
+  color: string;
+  label: string;
+  value: string;
+  valueStyle?: React.CSSProperties;
+  /** Fills remaining columns on a 5-column row (e.g. address in cols 3–5). */
+  spanCols?: number;
+};
+
+const PIPELINE_DATE_KEYS = new Set<string>([
+  'planned_1', 'actual_1', 'next_follow_up_date_1',
+  'planned_2', 'actual_2', 'next_follow_up_date_2',
+  'planned_3', 'actual_3', 'next_follow_up_date_3',
+  'planned_4', 'actual_4', 'next_follow_up_date_4',
+  'planned_5', 'actual_5', 'next_follow_up_date_5',
+]);
+
+function formatPipelineDateTime(value?: string): string {
+  if (!value?.trim()) return '';
+  const raw = value.trim();
+  const normalized = /^\d{4}-\d{2}-\d{2}$/.test(raw) ? `${raw}T00:00:00` : raw;
+  const d = new Date(normalized);
+  if (Number.isNaN(d.getTime())) return raw;
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = new Intl.DateTimeFormat('en-GB', { month: 'short' }).format(d);
+  const year = String(d.getFullYear()).slice(-2);
+  const hours = String(d.getHours()).padStart(2, '0');
+  const mins = String(d.getMinutes()).padStart(2, '0');
+  return `${day} ${month} ${year} ${hours}:${mins}`;
+}
+
+type StepHistoryField = { key: keyof Lead; label: string };
+
+const STEP_HISTORY_FIELDS: Record<number, StepHistoryField[]> = {
+  1: [
+    { key: 'planned_1', label: 'Planned' },
+    { key: 'actual_1', label: 'Actual' },
+    { key: 'status_1', label: 'Status' },
+    { key: 'next_follow_up_date_1', label: 'Next follow-up' },
+    { key: 'remarks_1', label: 'Remarks' },
+  ],
+  2: [
+    { key: 'planned_2', label: 'Planned' },
+    { key: 'actual_2', label: 'Actual' },
+    { key: 'status_2', label: 'Status' },
+    { key: 'meeting_mode_2', label: 'Channel' },
+    { key: 'next_follow_up_date_2', label: 'Next follow-up' },
+    { key: 'remarks_2', label: 'Remarks' },
+  ],
+  3: [
+    { key: 'planned_3', label: 'Planned' },
+    { key: 'actual_3', label: 'Actual' },
+    { key: 'status_3', label: 'Status' },
+    { key: 'meeting_type_3', label: 'Presentation' },
+    { key: 'next_follow_up_date_3', label: 'Next follow-up' },
+    { key: 'remark_3', label: 'Remarks' },
+  ],
+  4: [
+    { key: 'planned_4', label: 'Planned' },
+    { key: 'actual_4', label: 'Actual' },
+    { key: 'status_4', label: 'Status' },
+    { key: 'next_follow_up_date_4', label: 'Next follow-up' },
+    { key: 'remark_4', label: 'Remarks' },
+  ],
+  5: [
+    { key: 'planned_5', label: 'Planned' },
+    { key: 'actual_5', label: 'Actual' },
+    { key: 'status_5', label: 'Status' },
+    { key: 'next_follow_up_date_5', label: 'Next follow-up' },
+    { key: 'remark_5', label: 'Remarks' },
+  ],
+};
+
+const LeadStepHistory = ({ lead }: { lead: Lead }) => {
+  const currentStep = getNextStepInfo(lead, SALES_MAX_STEP).step;
+  const hasAnyHistory = [1, 2, 3, 4, 5].some((step) =>
+    STEP_HISTORY_FIELDS[step].some((f) => String(lead[f.key] ?? '').trim())
+  );
+
+  if (!hasAnyHistory) {
+    return <p className={styles.stepHistoryEmpty}>No step history recorded yet.</p>;
+  }
+
+  return (
+    <div className={styles.stepHistoryTrack}>
+      {[1, 2, 3, 4, 5].map((step) => {
+        const fullTitle = getStepName(step);
+        const shortTitle = fullTitle.replace(/^Step \d+ —\s*/i, '');
+        const fields = STEP_HISTORY_FIELDS[step].map((f) => {
+          const raw = String(lead[f.key] ?? '').trim();
+          const display = raw
+            ? PIPELINE_DATE_KEYS.has(f.key)
+              ? formatPipelineDateTime(raw)
+              : raw
+            : '—';
+          return { label: f.label, display };
+        });
+        const actualKey = `actual_${step}` as keyof Lead;
+        const hasActual = Boolean(String(lead[actualKey] ?? '').trim());
+        const isCurrent = step === currentStep && currentStep <= SALES_MAX_STEP;
+        const stepHasData = fields.some((f) => f.display !== '—');
+
+        return (
+          <div
+            key={step}
+            className={`${styles.stepHistoryCard} ${isCurrent ? styles.stepHistoryCardCurrent : ''} ${
+              hasActual ? styles.stepHistoryCardDone : ''
+            } ${!stepHasData ? styles.stepHistoryCardMuted : ''}`}
+          >
+            <div className={styles.stepHistoryCardHead}>
+              <span className={styles.stepHistoryStBadge}>ST {step}</span>
+              {hasActual ? (
+                <CheckCircle2 size={16} className={styles.stepHistoryIconDone} aria-hidden />
+              ) : (
+                <Clock3 size={16} className={styles.stepHistoryIconPending} aria-hidden />
+              )}
+            </div>
+            <div className={styles.stepHistoryCardTitle} title={fullTitle}>
+              {shortTitle}
+            </div>
+            <div className={styles.stepHistoryCardBody}>
+              {fields.map((field) => (
+                <div key={field.label} className={styles.stepHistoryFieldRow}>
+                  <span className={styles.stepHistoryFieldLabel}>{field.label}</span>
+                  <span className={styles.stepHistoryFieldValue}>{field.display}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+const LeadRowCard = ({
+  lead,
+  onComplete,
+  onEdit,
+  onDelete,
+}: {
+  lead: Lead;
+  onComplete: (lead: Lead) => void;
+  onEdit: (lead: Lead) => void;
+  onDelete: (rowIndex: number) => void;
+}) => {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className={`${styles.leadCard} ${expanded ? styles.leadCardExpanded : ''}`}>
+      <div className={styles.cardHeader}>
+        <div className={styles.cardHeaderLeft}>
+          <span className={styles.leadId}>{lead.id}</span>
+          <span className={styles.leadName}>{lead.name}</span>
+          {lead.leadType && (
+            <span
+              className={styles.leadTypeBadge}
+              style={{
+                backgroundColor: 'rgba(59, 175, 218, 0.1)',
+                color: '#3bafda',
+              }}
+            >
+              {lead.leadType}
+            </span>
+          )}
         </div>
-        <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', marginTop: '4px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-          {status.isFollowUp ? 'FOLLOW UP' : 'PLANNED'}: {status.formattedPlannedDate}
+        <LeadDueSummary lead={lead} />
+        <div className={styles.cardActions}>
+          {isSalesLeadActive(lead) && (
+            <button
+              className={`${styles.iconBtn} ${styles.complete}`}
+              onClick={() => onComplete(lead)}
+              title={`Complete step for ${lead.name}`}
+            >
+              <CheckSquare size={16} color="#1abc9c" />
+            </button>
+          )}
+          <button
+            type="button"
+            className={`${styles.iconBtn} ${expanded ? styles.expandActive : ''}`}
+            onClick={() => setExpanded((e) => !e)}
+            title={expanded ? 'Hide step history' : 'Show step history'}
+            aria-expanded={expanded}
+          >
+            {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          </button>
+          <button className={`${styles.iconBtn} ${styles.edit}`} onClick={() => onEdit(lead)} title="Edit Lead">
+            <Edit2 size={16} />
+          </button>
+          <button
+            className={`${styles.iconBtn} ${styles.delete}`}
+            onClick={() => onDelete(lead.rowIndex)}
+            title="Delete Lead"
+          >
+            <Trash2 size={16} />
+          </button>
         </div>
       </div>
-      {isSalesLeadActive(lead) && (
-        <button 
-          className={`${styles.iconBtn} ${styles.complete}`}
-          onClick={() => handleOpenStepModal(lead)}
-          title={`Complete ${status.stepName}`}
-        >
-          <CheckSquare size={16} color="#1abc9c" />
-        </button>
+
+      <div className={styles.cardBody}>
+        <LeadCardDetails lead={lead} />
+      </div>
+
+      {expanded && (
+        <div className={styles.cardStepHistory}>
+          <LeadStepHistory lead={lead} />
+        </div>
       )}
     </div>
+  );
+};
+
+const LeadCardDetails = ({ lead }: { lead: Lead }) => {
+  const segments: LeadDetailSegment[] = [
+    { key: 'contact', icon: <Phone size={13} />, color: '#f7b84b', label: 'Contact', value: lead.contactNo || '-' },
+    { key: 'salesman', icon: <User size={13} />, color: '#3bafda', label: 'Salesman', value: lead.salesman || '-' },
+    { key: 'city', icon: <Building size={13} />, color: '#1abc9c', label: 'City', value: lead.cityType || '-' },
+    { key: 'client', icon: <Briefcase size={13} />, color: '#9b59b6', label: 'Client', value: lead.typeOfClient || '-' },
+    { key: 'builder', icon: <HardHat size={13} />, color: '#34495e', label: 'Builder', value: lead.nameOfBuilder || '-' },
+    { key: 'ref', icon: <Users size={13} />, color: '#e67e22', label: 'Ref', value: lead.referenceBy || '-' },
+    { key: 'gen', icon: <Fingerprint size={13} />, color: '#8e44ad', label: 'Generated', value: lead.generatedBy || '-' },
+    {
+      key: 'address',
+      icon: <MapPin size={13} />,
+      color: '#f1556c',
+      label: 'Address',
+      value: lead.address || '-',
+      spanCols: 3,
+    },
+  ];
+
+  if (lead.meeting_mode_2) {
+    segments.push({
+      key: 'channel',
+      icon: <Users size={13} />,
+      color: '#2980b9',
+      label: 'Channel',
+      value: lead.meeting_mode_2,
+    });
+  }
+  if (lead.meeting_type_3) {
+    segments.push({
+      key: 'presentation',
+      icon: <Store size={13} />,
+      color: '#16a085',
+      label: 'Presentation',
+      value: lead.meeting_type_3,
+    });
+  }
+  return (
+    <>
+      <div className={styles.cardDetailsGrid}>
+        {segments.map((seg) => (
+          <div
+            key={seg.key}
+            className={`${styles.cardDetailCell} ${
+              seg.spanCols === 3
+                ? styles.cardDetailCellSpan3
+                : seg.spanCols === 2
+                  ? styles.cardDetailCellSpan2
+                  : ''
+            }`}
+          >
+            <div className={styles.cardDetailCellHead}>
+              <span className={styles.cardDetailIcon} style={{ color: seg.color }}>
+                {seg.icon}
+              </span>
+              <span className={styles.cardDetailLabel}>{seg.label}</span>
+            </div>
+            <span className={styles.cardDetailValue} style={seg.valueStyle}>
+              {seg.value}
+            </span>
+          </div>
+        ))}
+      </div>
+      {lead.status_5 === 'Lost' && lead.remark_5 && (
+        <div className={styles.lostRemarkCompact}>
+          <XCircle size={12} color="#e74c3c" />
+          <span className={styles.lostRemarkLabel}>Lost:</span>
+          <span className={styles.lostRemarkText}>{lead.remark_5}</span>
+        </div>
+      )}
+    </>
   );
 };
 
 export const getLeadTypeColor = (type: string) => {
   switch(type) {
     case 'All Types': return '#3bafda';
+    case 'Disqualified Leads': return '#e74c3c';
     case 'Hotel': return '#f7b84b';
     case 'Club House': return '#f1556c';
     case 'Residence': return '#1abc9c';
@@ -491,14 +844,11 @@ export default function SalesPage() {
     setCurrentStepLead(lead);
     const info = getSalesStepInfo(lead);
     setStepFormData({
-      status:
-        info.step === 6
-          ? 'Won'
-          : info.step === 1
-            ? ''
-            : info.step === 2
-              ? 'Qualified'
-              : 'Done',
+      status: info.step === SALES_MAX_STEP ? 'Won' : info.step === 1 ? '' : 'Done',
+      meeting_mode_2: '',
+      meeting_type_3: '',
+      next_follow_up_date: '',
+      remarks: '',
     });
     setIsStepModalOpen(true);
   };
@@ -511,45 +861,80 @@ export default function SalesPage() {
     const info = getSalesStepInfo(currentStepLead);
     const step = info.step;
     if (step > SALES_MAX_STEP) return;
-    
+
+    const isNextFollowUpPre = stepFormData.status === 'Next Follow Up';
+    if (step === 2 && !isNextFollowUpPre && !stepFormData.meeting_mode_2) {
+      alert('Please select a meeting channel.');
+      setIsSubmitting(false);
+      return;
+    }
+    if (step === 3 && !isNextFollowUpPre && !stepFormData.meeting_type_3) {
+      alert('Please select a presentation type.');
+      setIsSubmitting(false);
+      return;
+    }
+
     const submitData = new FormData();
     Object.entries(currentStepLead).forEach(([k, v]) => {
       submitData.append(k, String(v || ''));
     });
     
     const now = new Date();
-    const isStep6 = step === SALES_MAX_STEP;
-    const isStepNextFollowUp = step > 1 && step < SALES_MAX_STEP && stepFormData.status === 'Next Follow Up';
-    
-    if (!isStepNextFollowUp || isStep6) {
+    const isClosureStep = step === SALES_MAX_STEP;
+    const isNextFollowUp = stepFormData.status === 'Next Follow Up';
+    const isStep1Disqualified = step === 1 && stepFormData.status === 'Disqualified';
+    const isStep1Qualified = step === 1 && stepFormData.status === 'Qualified';
+
+    if (step === 1 && isNextFollowUp) {
+      submitData.set('actual_1', '');
+    } else if (step === 1 && (isStep1Qualified || isStep1Disqualified)) {
+      submitData.set('actual_1', now.toISOString());
+      submitData.set('next_follow_up_date_1', '');
+      if (!stepFormData.remarks) {
+        submitData.set('remarks_1', '');
+      }
+    } else if (!isNextFollowUp || isClosureStep) {
       submitData.set(`actual_${step}`, now.toISOString());
     }
-    
+
     submitData.set(`status_${step}`, stepFormData.status || '');
 
-    if (isStep6) {
-      if (stepFormData.status === 'Lost') {
-        submitData.set('lost_remark', stepFormData.remarks || '');
-      } else {
-        submitData.set('lost_remark', '');
-      }
+    if (isClosureStep) {
+      submitData.set('remark_5', stepFormData.remarks || '');
     }
-    
-    if (step > 1 && !isStep6) {
-      submitData.set(`next_follow_up_date_${step}`, isStepNextFollowUp ? (stepFormData.next_follow_up_date || '') : '');
-      
+
+    if (!isClosureStep) {
+      if (isNextFollowUp) {
+        submitData.set(`next_follow_up_date_${step}`, stepFormData.next_follow_up_date || '');
+      } else if (step > 1) {
+        submitData.set(`next_follow_up_date_${step}`, '');
+      }
+
       if (stepFormData.remarks) {
-        if (step === 2) submitData.set(`remarks_2`, stepFormData.remarks);
+        if (step === 1) submitData.set('remarks_1', stepFormData.remarks);
+        else if (step === 2) submitData.set('remarks_2', stepFormData.remarks);
         else submitData.set(`remark_${step}`, stepFormData.remarks);
       }
-      if (step === 4 && stepFormData.meeting_mode) submitData.set(`meeting_mode_4`, stepFormData.meeting_mode);
+
+      if (step === 2 && !isNextFollowUp && stepFormData.meeting_mode_2) {
+        submitData.set('meeting_mode_2', stepFormData.meeting_mode_2);
+      }
+      if (step === 3 && !isNextFollowUp && stepFormData.meeting_type_3) {
+        submitData.set('meeting_type_3', stepFormData.meeting_type_3);
+      }
     }
-    
-    if (step < SALES_MAX_STEP && !isStepNextFollowUp) {
+
+    const shouldAdvancePlanned =
+      step < SALES_MAX_STEP &&
+      !isNextFollowUp &&
+      !isStep1Disqualified &&
+      (step > 1 || isStep1Qualified);
+
+    if (shouldAdvancePlanned) {
       const nextPlanned = new Date(now);
-      const tat = step === 2 ? 3 : 1; 
+      const tat = step === 2 ? 3 : 1;
       nextPlanned.setDate(nextPlanned.getDate() + tat);
-      if (nextPlanned.getDay() === 0) { // Sunday
+      if (nextPlanned.getDay() === 0) {
         nextPlanned.setDate(nextPlanned.getDate() + 1);
       }
       submitData.set(`planned_${step + 1}`, nextPlanned.toISOString());
@@ -631,13 +1016,24 @@ export default function SalesPage() {
         });
       }
     } else {
-      // All Time view hides lost leads
-      result = result.filter(l => !isSalesLeadLost(l));
+      const viewingCompletedStep =
+        sidebarMode === 'step' && selectedStep === SALES_MAX_STEP + 1;
+      // Default list hides lost leads unless browsing Completed (won / lost / disqualified together).
+      if (!viewingCompletedStep) {
+        result = result.filter((l) => !isSalesLeadLost(l));
+      }
     }
 
     // Apply Lead Type Filter
     if (selectedLeadTypes.length > 0) {
-      result = result.filter(l => selectedLeadTypes.includes(l.leadType));
+      if (
+        selectedLeadTypes.length === 1 &&
+        selectedLeadTypes[0] === DISQUALIFIED_LEADS_PILL
+      ) {
+        result = result.filter((l) => isSalesLeadDisqualified(l));
+      } else {
+        result = result.filter((l) => selectedLeadTypes.includes(l.leadType));
+      }
     }
 
     // Apply Advanced Filters
@@ -669,10 +1065,14 @@ export default function SalesPage() {
     currentPage * itemsPerPage
   );
 
-  const leadTypesList = useMemo(
-    () => ['All Types', ...leadTypeOptions],
-    [leadTypeOptions]
-  );
+  const leadTypesList = useMemo(() => {
+    const types = ['All Types', ...leadTypeOptions];
+    if (!types.includes(DISQUALIFIED_LEADS_PILL)) {
+      const newLeadsIdx = types.indexOf('New Leads');
+      types.splice(newLeadsIdx >= 0 ? newLeadsIdx + 1 : 1, 0, DISQUALIFIED_LEADS_PILL);
+    }
+    return types;
+  }, [leadTypeOptions]);
   const timeList = ['All Time', 'Delayed', 'Today', 'Tomorrow', 'Lost'];
 
   const activeLeadTypePill = selectedLeadTypes.length === 1 ? selectedLeadTypes[0] : 'All Types';
@@ -697,8 +1097,12 @@ export default function SalesPage() {
     });
     const activeLeads = leads.filter((l) => !isSalesLeadLost(l));
     counts['All Types'] = activeLeads.length;
+    if (leadTypesList.includes(DISQUALIFIED_LEADS_PILL)) {
+      counts[DISQUALIFIED_LEADS_PILL] = leads.filter((l) => isSalesLeadDisqualified(l)).length;
+    }
     activeLeads.forEach((l) => {
       if (!l.leadType) return;
+      if (l.leadType === DISQUALIFIED_LEADS_PILL) return;
       if (counts[l.leadType] === undefined) counts[l.leadType] = 0;
       counts[l.leadType]++;
     });
@@ -734,7 +1138,7 @@ export default function SalesPage() {
       alert("No data to export");
       return;
     }
-    const headers = ['ID', 'Name', 'Address', 'Contact No', 'Salesman', 'City Type', 'Reference By', 'Generated By', 'Lead Type', 'Type of Client', 'Builder Name', 'Date Created'];
+    const headers = ['ID', 'Name', 'Address', 'Contact No', 'Salesman', 'City Type', 'Reference By', 'Generated By', 'Lead Type', 'Type of Client', 'Builder Name'];
     const csvContent = [
       headers.join(','),
       ...filteredAndSortedLeads.map(l => [
@@ -748,8 +1152,7 @@ export default function SalesPage() {
         `"${l.generatedBy || ''}"`, 
         `"${l.leadType || ''}"`, 
         `"${l.typeOfClient || ''}"`, 
-        `"${l.nameOfBuilder || ''}"`, 
-        `"${l.timestamp ? new Date(l.timestamp).toLocaleDateString() : ''}"`
+        `"${l.nameOfBuilder || ''}"`,
       ].join(','))
     ].join('\n');
     
@@ -908,16 +1311,19 @@ export default function SalesPage() {
                     <span className={styles.badge}>{leads.length}</span>
                   </div>
                 </div>
-                {[1, 2, 3, 4, 5, 6, 7].map((step) => {
+                {[1, 2, 3, 4, 5, SALES_MAX_STEP + 1].map((step) => {
                   const count = leads.filter(l => getSalesStepInfo(l).step === step).length;
+                  const label = step === SALES_MAX_STEP + 1 ? 'Completed' : getStepName(step);
                   return (
                     <div 
                       key={step}
                       className={`${styles.filterItem} ${selectedStep === step ? styles.active : ''}`}
                       onClick={() => { setSelectedStep(step); setCurrentPage(1); }}
                     >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
-                        <span style={{ fontSize: '0.85rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '80%' }} title={getStepName(step)}>{getStepName(step)}</span>
+                      <div className={styles.sidebarStepRow}>
+                        <span className={styles.sidebarStepLabel} title={label}>
+                          {label}
+                        </span>
                         {count > 0 && <span className={styles.badge}>{count}</span>}
                       </div>
                     </div>
@@ -932,32 +1338,38 @@ export default function SalesPage() {
       <div className={styles.mainContent}>
         {/* Quick Filters */}
         <div className={styles.quickFiltersWrapper}>
-          <div className={styles.quickFiltersContainer} style={{ display: 'flex', gap: '20px', padding: '10px 0', border: 'none', background: 'transparent', boxShadow: 'none' }}>
-            
-            <div className={styles.toggleSwitchContainer} style={{ flex: 1, padding: '4px' }}>
-              <div 
-                className={styles.toggleSwitchSliderDynamic} 
-                style={{ 
-                  width: `calc((100% - 8px) / ${Math.max(leadTypesList.length, 1)})`,
-                  left: `calc(4px + ${Math.max(leadTypesList.indexOf(activeLeadTypePill), 0)} * ((100% - 8px) / ${Math.max(leadTypesList.length, 1)}))`,
-                  background: getLeadTypeColor(activeLeadTypePill)
-                }} 
-              />
-              {leadTypesList.map((type, idx) => {
-                const isActive = activeLeadTypePill === type;
-                const baseColor = getLeadTypeColor(type);
-                return (
-                  <button 
-                    key={idx}
-                    onClick={() => handleLeadTypePillClick(type)}
-                    className={`${styles.toggleSwitchBtn} ${isActive ? styles.active : ''}`}
-                    style={{ color: isActive ? '#fff' : '#6c757d' }}
-                  >
-                    {type} {leadTypeCounts[type] > 0 && <span className={styles.filterBadgeDynamic} style={{ background: isActive ? 'rgba(255,255,255,0.3)' : `${baseColor}15`, color: isActive ? '#fff' : baseColor }}>{leadTypeCounts[type]}</span>}
-                  </button>
-                );
-              })}
-            </div>
+          <div className={styles.leadTypePills}>
+            {leadTypesList.map((type) => {
+              const isActive = activeLeadTypePill === type;
+              const baseColor = getLeadTypeColor(type);
+              return (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => handleLeadTypePillClick(type)}
+                  className={`${styles.leadTypePill} ${isActive ? styles.leadTypePillActive : ''}`}
+                  style={
+                    isActive
+                      ? { background: baseColor, borderColor: baseColor, color: '#fff' }
+                      : { borderColor: `${baseColor}55`, color: 'var(--text-secondary)' }
+                  }
+                >
+                  {type}
+                  {leadTypeCounts[type] > 0 && (
+                    <span
+                      className={styles.leadTypePillCount}
+                      style={
+                        isActive
+                          ? { background: 'rgba(255,255,255,0.28)', color: '#fff' }
+                          : { background: `${baseColor}18`, color: baseColor }
+                      }
+                    >
+                      {leadTypeCounts[type]}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -970,160 +1382,13 @@ export default function SalesPage() {
           ) : (
             <div className={styles.cardGrid}>
               {currentLeads.map((lead) => (
-                <div key={lead.rowIndex} className={styles.leadCard}>
-                  <div className={styles.cardHeader}>
-                    <div className={styles.cardHeaderLeft}>
-                      <span className={styles.leadId}>{lead.id}</span>
-                      <span className={styles.leadName}>{lead.name}</span>
-                      {lead.leadType && (
-                        <span className={styles.leadTypeBadge} style={{
-                          backgroundColor: 'rgba(59, 175, 218, 0.1)',
-                          color: '#3bafda',
-                        }}>
-                          {lead.leadType}
-                        </span>
-                      )}
-                    </div>
-                    <div className={styles.cardActions}>
-                      <StepCountdown lead={lead} handleOpenStepModal={handleOpenStepModal} />
-                      <button 
-                        className={`${styles.iconBtn} ${styles.edit}`}
-                        onClick={() => handleOpenModal(lead)}
-                        title="Edit Lead"
-                      >
-                        <Edit2 size={16} />
-                      </button>
-                      <button 
-                        className={`${styles.iconBtn} ${styles.delete}`}
-                        onClick={() => handleDelete(lead.rowIndex)}
-                        title="Delete Lead"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </div>
-                  
-                  <div className={styles.cardBody}>
-                    <div className={styles.detailItem}>
-                      <div className={styles.detailIconWrapper} style={{ color: '#f7b84b' }}>
-                        <Phone size={16} />
-                      </div>
-                      <div className={styles.detailContent}>
-                        <span className={styles.detailLabel}>Contact No.</span>
-                        <span className={styles.detailValue}>{lead.contactNo || '-'}</span>
-                      </div>
-                    </div>
-                    <div className={styles.detailItem}>
-                      <div className={styles.detailIconWrapper} style={{ color: '#f1556c' }}>
-                        <MapPin size={16} />
-                      </div>
-                      <div className={styles.detailContent}>
-                        <span className={styles.detailLabel}>Address</span>
-                        <span className={styles.detailValue}>{lead.address || '-'}</span>
-                      </div>
-                    </div>
-                    <div className={styles.detailItem}>
-                      <div className={styles.detailIconWrapper} style={{ color: '#3bafda' }}>
-                        <User size={16} />
-                      </div>
-                      <div className={styles.detailContent}>
-                        <span className={styles.detailLabel}>Salesman</span>
-                        <span className={styles.detailValue}>{lead.salesman || '-'}</span>
-                      </div>
-                    </div>
-                    <div className={styles.detailItem}>
-                      <div className={styles.detailIconWrapper} style={{ color: '#1abc9c' }}>
-                        <Building size={16} />
-                      </div>
-                      <div className={styles.detailContent}>
-                        <span className={styles.detailLabel}>City Type</span>
-                        <span className={styles.detailValue}>{lead.cityType || '-'}</span>
-                      </div>
-                    </div>
-                    <div className={styles.detailItem}>
-                      <div className={styles.detailIconWrapper} style={{ color: '#9b59b6' }}>
-                        <Briefcase size={16} />
-                      </div>
-                      <div className={styles.detailContent}>
-                        <span className={styles.detailLabel}>Type of Client</span>
-                        <span className={styles.detailValue}>{lead.typeOfClient || '-'}</span>
-                      </div>
-                    </div>
-                    <div className={styles.detailItem}>
-                      <div className={styles.detailIconWrapper} style={{ color: '#34495e' }}>
-                        <HardHat size={16} />
-                      </div>
-                      <div className={styles.detailContent}>
-                        <span className={styles.detailLabel}>Builder Name</span>
-                        <span className={styles.detailValue}>{lead.nameOfBuilder || '-'}</span>
-                      </div>
-                    </div>
-                    <div className={styles.detailItem}>
-                      <div className={styles.detailIconWrapper} style={{ color: '#e67e22' }}>
-                        <Users size={16} />
-                      </div>
-                      <div className={styles.detailContent}>
-                        <span className={styles.detailLabel}>Reference By</span>
-                        <span className={styles.detailValue}>{lead.referenceBy || '-'}</span>
-                      </div>
-                    </div>
-                    <div className={styles.detailItem}>
-                      <div className={styles.detailIconWrapper} style={{ color: '#8e44ad' }}>
-                        <Fingerprint size={16} />
-                      </div>
-                      <div className={styles.detailContent}>
-                        <span className={styles.detailLabel}>Generated By</span>
-                        <span className={styles.detailValue}>{lead.generatedBy || '-'}</span>
-                      </div>
-                    </div>
-                    <div className={styles.detailItem}>
-                      <div className={styles.detailIconWrapper} style={{ color: '#7f8c8d' }}>
-                        <Calendar size={16} />
-                      </div>
-                      <div className={styles.detailContent}>
-                        <span className={styles.detailLabel}>Date Created</span>
-                        <span className={styles.detailValue}>
-                          {lead.timestamp ? new Date(lead.timestamp).toLocaleDateString() : '-'}
-                        </span>
-                      </div>
-                    </div>
-                    {lead.meeting_mode_4 && (
-                      <div className={styles.detailItem}>
-                        <div className={styles.detailIconWrapper} style={{ color: '#2980b9' }}>
-                          <Users size={16} />
-                        </div>
-                        <div className={styles.detailContent}>
-                          <span className={styles.detailLabel}>Meeting Mode</span>
-                          <span className={styles.detailValue}>{lead.meeting_mode_4}</span>
-                        </div>
-                      </div>
-                    )}
-                    {lead.status_6 && (
-                      <div className={styles.detailItem}>
-                        <div className={styles.detailIconWrapper} style={{ color: lead.status_6 === 'Won' ? '#1abc9c' : '#e74c3c' }}>
-                          {lead.status_6 === 'Won' ? <CheckSquare size={16} /> : <XCircle size={16} />}
-                        </div>
-                        <div className={styles.detailContent}>
-                          <span className={styles.detailLabel}>Close Status</span>
-                          <span className={styles.detailValue} style={{ color: lead.status_6 === 'Won' ? '#1abc9c' : '#e74c3c', fontWeight: 700 }}>
-                            {lead.status_6}
-                          </span>
-                        </div>
-                      </div>
-                    )}
-                    {lead.lost_remark && (
-                      <div className={styles.detailItem} style={{ gridColumn: '1 / -1', background: '#ffebee', padding: '10px', borderRadius: '8px', border: '1px solid #ffcdd2', marginTop: '10px', width: '100%', boxSizing: 'border-box' }}>
-                        <div className={styles.detailIconWrapper} style={{ color: '#e74c3c' }}>
-                          <XCircle size={16} />
-                        </div>
-                        <div className={styles.detailContent} style={{ width: '100%' }}>
-                          <span className={styles.detailLabel} style={{ color: '#e74c3c', fontWeight: 600 }}>Lost Remark</span>
-                          <span className={styles.detailValue} style={{ color: '#c0392b', whiteSpace: 'normal', display: 'block' }}>{lead.lost_remark}</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                <LeadRowCard
+                  key={lead.rowIndex}
+                  lead={lead}
+                  onComplete={handleOpenStepModal}
+                  onEdit={handleOpenModal}
+                  onDelete={handleDelete}
+                />
               ))}
             </div>
           )}
@@ -1401,79 +1666,45 @@ export default function SalesPage() {
         <Modal 
           isOpen={isStepModalOpen} 
           onClose={() => setIsStepModalOpen(false)} 
-          title={`Complete ${getSalesStepInfo(currentStepLead).title}`}
+          title={`Complete — ${getStepName(getSalesStepInfo(currentStepLead).step)}`}
         >
           <form onSubmit={handleStepSubmit} className={styles.bottomSheetForm}>
             {getSalesStepInfo(currentStepLead).step === 1 ? (
               <div className={styles.formGroup} style={{ gridColumn: '1 / -1' }}>
-                <label className={styles.outlineLabel}>Status</label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginTop: '10px' }}>
-                  <div 
-                    className={`${styles.stepToggle} ${stepFormData.status === 'Done' ? styles.stepToggleOn : ''}`}
-                    onClick={() => setStepFormData({...stepFormData, status: stepFormData.status === 'Done' ? '' : 'Done'})}
-                  >
-                    <div className={styles.stepToggleKnob} />
-                  </div>
-                  <span style={{ fontWeight: 600, color: stepFormData.status === 'Done' ? '#1abc9c' : 'var(--text-secondary)' }}>
-                    {stepFormData.status === 'Done' ? 'Done' : 'Pending'}
-                  </span>
-                </div>
+                <label className={styles.outlineLabel}>Outcome</label>
+                <StepChoiceButtons
+                  value={stepFormData.status || ''}
+                  onChange={(id) => setStepFormData({ ...stepFormData, status: id })}
+                  options={[
+                    { id: 'Qualified', label: 'Qualified', activeClass: styles.stepChoiceQualified },
+                    { id: 'Next Follow Up', label: 'Next Follow Up', activeClass: styles.stepChoiceFollowUp },
+                    { id: 'Disqualified', label: 'Disqualify', activeClass: styles.stepChoiceDisqualified },
+                  ]}
+                />
               </div>
             ) : getSalesStepInfo(currentStepLead).step === SALES_MAX_STEP ? (
               <div className={styles.formGroup} style={{ gridColumn: '1 / -1' }}>
                 <label className={styles.outlineLabel}>Close Outcome</label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginTop: '10px' }}>
-                  <div className={styles.toggleSwitchContainer} style={{ width: '320px' }}>
-                    <div 
-                      className={styles.toggleSwitchSliderDynamic} 
-                      style={{ 
-                        width: 'calc(50% - 4px)',
-                        left: stepFormData.status === 'Lost' ? 'calc(50% + 4px)' : '4px',
-                        background: stepFormData.status === 'Lost' ? '#e74c3c' : '#1abc9c'
-                      }} 
-                    />
-                    <button 
-                      type="button"
-                      onClick={() => setStepFormData({ ...stepFormData, status: 'Won' })}
-                      className={`${styles.toggleSwitchBtn} ${stepFormData.status !== 'Lost' ? styles.active : ''}`}
-                      style={{ color: stepFormData.status !== 'Lost' ? '#fff' : '#6c757d' }}
-                    >Won</button>
-                    <button 
-                      type="button"
-                      onClick={() => setStepFormData({ ...stepFormData, status: 'Lost' })}
-                      className={`${styles.toggleSwitchBtn} ${stepFormData.status === 'Lost' ? styles.active : ''}`}
-                      style={{ color: stepFormData.status === 'Lost' ? '#fff' : '#6c757d' }}
-                    >Lost</button>
-                  </div>
-                </div>
+                <StepChoiceButtons
+                  value={stepFormData.status || 'Won'}
+                  onChange={(id) => setStepFormData({ ...stepFormData, status: id })}
+                  options={[
+                    { id: 'Won', label: 'Won', activeClass: styles.stepChoiceQualified },
+                    { id: 'Lost', label: 'Lost', activeClass: styles.stepChoiceDisqualified },
+                  ]}
+                />
               </div>
             ) : (
               <div className={styles.formGroup} style={{ gridColumn: '1 / -1' }}>
                 <label className={styles.outlineLabel}>Outcome</label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginTop: '10px' }}>
-                  <div className={styles.toggleSwitchContainer} style={{ width: '320px' }}>
-                    <div 
-                      className={styles.toggleSwitchSliderDynamic} 
-                      style={{ 
-                        width: 'calc(50% - 4px)',
-                        left: stepFormData.status === 'Next Follow Up' ? 'calc(50% + 4px)' : '4px',
-                        background: stepFormData.status === 'Next Follow Up' ? '#f7b84b' : '#1abc9c'
-                      }} 
-                    />
-                    <button 
-                      type="button"
-                      onClick={() => setStepFormData({...stepFormData, status: getSalesStepInfo(currentStepLead).step === 2 ? 'Qualified' : 'Done'})}
-                      className={`${styles.toggleSwitchBtn} ${stepFormData.status !== 'Next Follow Up' ? styles.active : ''}`}
-                      style={{ color: stepFormData.status !== 'Next Follow Up' ? '#fff' : '#6c757d' }}
-                    >{getSalesStepInfo(currentStepLead).step === 2 ? 'Qualified' : 'Done'}</button>
-                    <button 
-                      type="button"
-                      onClick={() => setStepFormData({...stepFormData, status: 'Next Follow Up'})}
-                      className={`${styles.toggleSwitchBtn} ${stepFormData.status === 'Next Follow Up' ? styles.active : ''}`}
-                      style={{ color: stepFormData.status === 'Next Follow Up' ? '#fff' : '#6c757d' }}
-                    >Next Follow Up</button>
-                  </div>
-                </div>
+                <StepChoiceButtons
+                  value={stepFormData.status || 'Done'}
+                  onChange={(id) => setStepFormData({ ...stepFormData, status: id })}
+                  options={[
+                    { id: 'Done', label: 'Done', activeClass: styles.stepChoiceQualified },
+                    { id: 'Next Follow Up', label: 'Next Follow Up', activeClass: styles.stepChoiceFollowUp },
+                  ]}
+                />
               </div>
             )}
             
@@ -1494,7 +1725,7 @@ export default function SalesPage() {
                   />
                 </div>
               </div>
-            ) : getSalesStepInfo(currentStepLead).step > 1 && (
+            ) : (
               <>
                 {stepFormData.status === 'Next Follow Up' && (
                   <div className={styles.formGroup}>
@@ -1505,34 +1736,76 @@ export default function SalesPage() {
                     </div>
                   </div>
                 )}
-                
-                {getSalesStepInfo(currentStepLead).step === 4 && stepFormData.status !== 'Next Follow Up' && (
-                  <div className={styles.formGroup}>
-                    <label className={styles.outlineLabel}>Meeting Mode</label>
-                    <div className={styles.inputWithIcon}>
-                      <Users size={16} className={styles.inputIcon} />
-                      <select name="meeting_mode" value={stepFormData.meeting_mode || ''} onChange={e => setStepFormData({...stepFormData, meeting_mode: e.target.value})} required className={styles.dropdownSelect} style={{ width: '100%', padding: '10px 10px 10px 35px', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '0.85rem' }}>
-                        <option value="" disabled hidden> </option>
-                        <option value="Online">Online</option>
-                        <option value="Offline">Offline</option>
-                      </select>
-                    </div>
+
+                {getSalesStepInfo(currentStepLead).step === 2 && stepFormData.status !== 'Next Follow Up' && (
+                  <div className={styles.formGroup} style={{ gridColumn: '1 / -1' }}>
+                    <label className={styles.outlineLabel}>Meeting channel *</label>
+                    <StepChoiceButtons
+                      value={stepFormData.meeting_mode_2 || ''}
+                      onChange={(id) => setStepFormData({ ...stepFormData, meeting_mode_2: id })}
+                      options={[
+                        { id: 'WhatsApp', label: 'WhatsApp', activeClass: styles.stepChoiceWhatsApp },
+                        { id: 'Email', label: 'Email', activeClass: styles.stepChoiceEmail },
+                        { id: 'Physical', label: 'Physical', activeClass: styles.stepChoicePhysical },
+                      ]}
+                    />
+                  </div>
+                )}
+
+                {getSalesStepInfo(currentStepLead).step === 3 && stepFormData.status !== 'Next Follow Up' && (
+                  <div className={styles.formGroup} style={{ gridColumn: '1 / -1' }}>
+                    <label className={styles.outlineLabel}>Presentation type *</label>
+                    <StepChoiceButtons
+                      value={stepFormData.meeting_type_3 || ''}
+                      onChange={(id) => setStepFormData({ ...stepFormData, meeting_type_3: id })}
+                      options={[
+                        { id: 'Online', label: 'Online', activeClass: styles.stepChoiceOnline },
+                        { id: 'Offline', label: 'Offline', activeClass: styles.stepChoiceOffline },
+                      ]}
+                    />
                   </div>
                 )}
                 
-                <div className={styles.formGroup} style={{ gridColumn: '1 / -1' }}>
-                  <label className={styles.outlineLabel}>Remarks</label>
-                  <div className={styles.inputWithIcon}>
-                    <Edit2 size={16} className={styles.inputIcon} />
-                    <input type="text" name="remarks" value={stepFormData.remarks || ''} onChange={e => setStepFormData({...stepFormData, remarks: e.target.value})} placeholder="Any additional remarks..." />
+                {(getSalesStepInfo(currentStepLead).step > 1 ||
+                  (getSalesStepInfo(currentStepLead).step === 1 &&
+                    (stepFormData.status === 'Next Follow Up' ||
+                      stepFormData.status === 'Disqualified'))) && (
+                  <div className={styles.formGroup} style={{ gridColumn: '1 / -1' }}>
+                    <label className={styles.outlineLabel}>Remarks</label>
+                    <div className={styles.inputWithIcon}>
+                      <Edit2 size={16} className={styles.inputIcon} />
+                      <input
+                        type="text"
+                        name="remarks"
+                        value={stepFormData.remarks || ''}
+                        onChange={(e) => setStepFormData({ ...stepFormData, remarks: e.target.value })}
+                        placeholder="Any additional remarks..."
+                      />
+                    </div>
                   </div>
-                </div>
+                )}
               </>
             )}
             
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '24px', gridColumn: '1 / -1' }}>
               <button type="button" onClick={() => setIsStepModalOpen(false)} style={{ padding: '10px 16px', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'transparent', color: 'var(--text-main)', cursor: 'pointer', fontWeight: 600 }}>Cancel</button>
-              <button type="submit" disabled={isSubmitting} style={{ padding: '10px 16px', borderRadius: '8px', border: 'none', backgroundColor: '#1abc9c', color: 'white', cursor: 'pointer', fontWeight: 600 }}>{isSubmitting ? 'Saving...' : 'Complete Step'}</button>
+              <button
+                type="submit"
+                disabled={isSubmitting || (getSalesStepInfo(currentStepLead).step === 1 && !stepFormData.status)}
+                style={{ padding: '10px 16px', borderRadius: '8px', border: 'none', backgroundColor: '#1abc9c', color: 'white', cursor: 'pointer', fontWeight: 600 }}
+              >
+                {isSubmitting
+                  ? 'Saving...'
+                  : getSalesStepInfo(currentStepLead).step === 1
+                    ? stepFormData.status === 'Qualified'
+                      ? 'Confirm Qualified'
+                      : stepFormData.status === 'Disqualified'
+                        ? 'Confirm Disqualify'
+                        : stepFormData.status === 'Next Follow Up'
+                          ? 'Save Follow Up'
+                          : 'Select outcome'
+                    : 'Complete Step'}
+              </button>
             </div>
           </form>
         </Modal>

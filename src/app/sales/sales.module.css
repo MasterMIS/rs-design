@@ -1,20 +1,27 @@
 .pageWrapper {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 70px);
+  height: calc(100vh - 58px);
+  margin: -8px 0 0 0;
 }
 
 .header {
-  padding: 10px 20px 10px 20px;
+  padding: 2px 12px 6px 12px;
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
 .titleSection h2 {
-  font-size: 1.6rem;
-  margin-bottom: 2px;
+  font-size: 1.35rem;
+  margin: 0 0 0;
+  line-height: 1.2;
   color: var(--text-heading);
+}
+
+.pageWrapper :global(.breadcrumbNav) {
+  margin-top: 2px;
+  font-size: 0.8rem;
 }
 
 .container {
@@ -25,7 +32,8 @@
 }
 
 .sidebar {
-  width: 250px;
+  width: 232px;
+  min-width: 232px;
   background-color: var(--card-bg);
   border-right: 1px solid var(--border-color);
   display: flex;
@@ -53,14 +61,35 @@
 }
 
 .filterItem {
-  padding: 12px 20px;
+  padding: 10px 12px;
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   transition: background 0.2s;
   color: var(--text-primary);
-  font-size: 0.95rem;
+  font-size: 0.82rem;
+}
+
+.sidebarStepRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  width: 100%;
+}
+
+.sidebarStepLabel {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.74rem;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .filterItem:hover {
@@ -77,10 +106,11 @@
 .badge {
   background: rgba(59, 175, 218, 0.15);
   color: var(--text-primary);
-  padding: 2px 8px;
-  border-radius: 12px;
-  font-size: 0.75rem;
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-size: 0.65rem;
   font-weight: 700;
+  flex-shrink: 0;
 }
 
 .filterItem.active .badge {
@@ -292,8 +322,52 @@
 
 /* Quick Filters */
 .quickFiltersWrapper {
-  padding: 5px 20px 0 20px;
+  padding: 4px 16px 2px 16px;
   background: var(--background);
+}
+
+.leadTypePills {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+}
+
+.leadTypePill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 11px;
+  min-height: 30px;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  background: var(--card-bg);
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.25;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.leadTypePill:hover {
+  filter: brightness(0.97);
+}
+
+.leadTypePillActive {
+  font-weight: 700;
+}
+
+.leadTypePillCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  padding: 0 5px;
+  border-radius: 8px;
+  font-size: 0.6rem;
+  font-weight: 700;
 }
 
 .quickFiltersContainer {
@@ -342,7 +416,7 @@
 .cardGrid {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 10px;
 }
 
 .leadCard {
@@ -366,36 +440,144 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 20px;
+  padding: 8px 14px;
   border-bottom: 1px solid var(--border-color);
   background: var(--bg-hover);
+  gap: 10px;
+}
+
+.leadDueSummary {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 6px;
+  margin-left: auto;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.leadDuePlanned {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.leadDueSep {
+  color: var(--text-secondary);
+  opacity: 0.6;
+}
+
+.leadDueDelay {
+  font-weight: 700;
+}
+
+.leadDueSummaryTerminal {
+  max-width: min(360px, 48vw);
+}
+
+.leadDueStatus {
+  font-weight: 700;
+  font-size: 0.78rem;
+  text-transform: capitalize;
+}
+
+.stepChoiceButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.stepChoiceBtn {
+  flex: 1 1 100px;
+  min-height: 42px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background: var(--card-bg);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s;
+}
+
+.stepChoiceBtn:hover {
+  border-color: #3bafda;
+  box-shadow: 0 2px 8px rgba(59, 175, 218, 0.15);
+}
+
+.stepChoiceBtnActive {
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.stepChoiceQualified.stepChoiceBtnActive {
+  background: #1abc9c;
+}
+
+.stepChoiceFollowUp.stepChoiceBtnActive {
+  background: #f7b84b;
+  color: #212529;
+}
+
+.stepChoiceDisqualified.stepChoiceBtnActive {
+  background: #e74c3c;
+}
+
+.stepChoiceWhatsApp.stepChoiceBtnActive {
+  background: #25d366;
+}
+
+.stepChoiceEmail.stepChoiceBtnActive {
+  background: #3bafda;
+}
+
+.stepChoicePhysical.stepChoiceBtnActive {
+  background: #e67e22;
+}
+
+.stepChoiceOnline.stepChoiceBtnActive {
+  background: #1abc9c;
+}
+
+.stepChoiceOffline.stepChoiceBtnActive {
+  background: #6559cc;
 }
 
 .cardHeaderLeft {
   display: flex;
   align-items: center;
-  gap: 15px;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
 }
 
 .leadId {
   background: rgba(59, 175, 218, 0.15);
   color: #3bafda;
-  padding: 4px 10px;
-  border-radius: 6px;
-  font-size: 0.85rem;
+  padding: 3px 8px;
+  border-radius: 5px;
+  font-size: 0.75rem;
   font-weight: 600;
 }
 
 .leadName {
-  font-size: 1.15rem;
+  font-size: 0.95rem;
   font-weight: 600;
   color: var(--text-primary);
 }
 
 .leadTypeBadge {
-  padding: 4px 12px;
-  border-radius: 20px;
-  font-size: 0.8rem;
+  padding: 3px 9px;
+  border-radius: 12px;
+  font-size: 0.7rem;
   font-weight: 600;
 }
 
@@ -427,26 +609,239 @@
   background: rgba(241, 85, 108, 0.1);
 }
 
-.cardBody {
-  padding: 12px 20px;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 16px;
+.iconBtn.expandActive {
+  color: #3bafda;
+  background: rgba(59, 175, 218, 0.12);
 }
 
-.detailItem {
+.cardStepHistory {
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-hover);
+  padding: 10px 14px 14px;
+}
+
+.stepHistoryEmpty {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.stepHistoryTrack {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.stepHistoryCard {
+  flex: 1 1 0;
+  min-width: 168px;
+  max-width: 220px;
+  display: flex;
+  flex-direction: column;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 8px 10px 10px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+}
+
+.stepHistoryCardCurrent {
+  background: rgba(26, 188, 156, 0.08);
+  border-color: rgba(26, 188, 156, 0.35);
+}
+
+.stepHistoryCardDone {
+  border-color: rgba(26, 188, 156, 0.25);
+}
+
+.stepHistoryCardMuted {
+  opacity: 0.72;
+}
+
+.stepHistoryCardHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.stepHistoryStBadge {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: #3bafda;
+}
+
+.stepHistoryIconDone {
+  color: #1abc9c;
+  flex-shrink: 0;
+}
+
+.stepHistoryIconPending {
+  color: #95a5a6;
+  flex-shrink: 0;
+}
+
+.stepHistoryCardTitle {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.25;
+  margin-bottom: 8px;
+  min-height: 2.5em;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.stepHistoryCardBody {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  flex: 1;
+}
+
+.stepHistoryFieldRow {
   display: flex;
   align-items: flex-start;
+  justify-content: space-between;
   gap: 8px;
-  padding: 4px 8px;
-  background: var(--bg-hover);
-  border-radius: 8px;
-  transition: all 0.2s;
+  font-size: 0.68rem;
+  line-height: 1.25;
 }
 
-.detailItem:hover {
-  background: rgba(59, 175, 218, 0.05);
-  transform: translateX(2px);
+.stepHistoryFieldLabel {
+  flex: 0 0 auto;
+  max-width: 48%;
+  font-size: 0.58rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #1abc9c;
+}
+
+.stepHistoryFieldValue {
+  flex: 1 1 auto;
+  text-align: right;
+  color: var(--text-primary);
+  word-break: break-word;
+  font-size: 0.68rem;
+}
+
+@media (max-width: 720px) {
+  .stepHistoryCard {
+    min-width: 150px;
+  }
+}
+
+.leadCardExpanded {
+  border-color: rgba(59, 175, 218, 0.45);
+}
+
+.cardBody {
+  padding: 0;
+}
+
+.cardDetailsGrid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px 14px;
+  padding: 12px 14px 14px;
+  align-items: stretch;
+}
+
+.cardDetailCell {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 5px;
+  min-height: 52px;
+  padding: 6px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-hover);
+}
+
+.cardDetailCellSpan2 {
+  grid-column: span 2;
+}
+
+.cardDetailCellSpan3 {
+  grid-column: span 3;
+}
+
+.cardDetailCellSpan3 .cardDetailValue {
+  white-space: normal;
+  word-break: break-word;
+}
+
+.cardDetailCellHead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.cardDetailIcon {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.cardDetailLabel {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+
+.cardDetailValue {
+  font-size: 0.84rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  width: 100%;
+  line-height: 1.35;
+}
+
+@media (max-width: 1100px) {
+  .cardDetailsGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .cardDetailsGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.lostRemarkCompact {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0 14px 12px;
+  padding: 6px 10px;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  background: #ffebee;
+  border: 1px solid #ffcdd2;
+  border-radius: 6px;
+  color: #c0392b;
+}
+
+.lostRemarkLabel {
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.lostRemarkText {
+  word-break: break-word;
 }
 
 .detailIconWrapper {

@@ -23,22 +23,31 @@ export interface PipelineRecord {
   next_follow_up_date_3?: string;
   next_follow_up_date_4?: string;
   next_follow_up_date_5?: string;
+  remark_5?: string;
   lost_remark?: string;
 }
 
-export const SALES_MAX_STEP = 6;
+export const SALES_MAX_STEP = 5;
+
+export function normalizeSalesFollowUpDate(dateStr: string): string {
+  const raw = dateStr.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    return `${raw}T12:00:00.000Z`;
+  }
+  return raw;
+}
 
 export const SALES_PIPELINE_OPTS: PendingStepOptions = {
   maxStep: SALES_MAX_STEP,
+  normalizeFollowUpDate: normalizeSalesFollowUpDate,
 };
 
 export const SALES_STEP_NAMES: Record<number, string> = {
-  1: 'Step-1 Send link',
-  2: 'Step-2 Call and qualify',
-  3: 'Step-3 Meeting and presentation',
-  4: 'Step-4 Quotation and drawing',
-  5: 'Step-5 Follow up',
-  6: 'Step-6 Close - Win or Lost',
+  1: 'Step 1 — Leads Qualification call',
+  2: 'Step 2 — WhatsApp / Email / Physical meeting',
+  3: 'Step 3 — Presentation & Ask Design',
+  4: 'Step 4 — Send Quotation',
+  5: 'Step 5 — Closure',
 };
 
 export const HRMS_STEP_NAMES: Record<number, string> = {
@@ -49,26 +58,73 @@ export const HRMS_STEP_NAMES: Record<number, string> = {
   5: 'Step-5 Joining',
 };
 
+export function isSalesLeadDisqualified(record: PipelineRecord): boolean {
+  return record.status_1 === 'Disqualified';
+}
+
 export function getNextStepInfo(record: PipelineRecord, maxStep = 5) {
   if (!record.actual_1) return { step: 1, title: 'Step 1' };
+  if (isSalesLeadDisqualified(record)) {
+    return { step: maxStep + 1, title: 'Completed' };
+  }
   if (!record.actual_2) return { step: 2, title: 'Step 2' };
   if (!record.actual_3) return { step: 3, title: 'Step 3' };
   if (!record.actual_4) return { step: 4, title: 'Step 4' };
   if (!record.actual_5) return { step: 5, title: 'Step 5' };
-  if (maxStep >= 6 && !record.actual_6) return { step: 6, title: 'Step 6' };
   return { step: maxStep + 1, title: 'Completed' };
 }
 
-export function isSalesLeadLost(record: PipelineRecord): boolean {
-  return record.status_6 === 'Lost' || !!record.lost_remark?.trim();
+export function isSalesLeadLost(
+  record: PipelineRecord & { remark_5?: string; lost_remark?: string }
+): boolean {
+  const s5 = (record.status_5 || '').trim();
+  if (s5.toLowerCase() === 'lost') return true;
+  if (record.status_6?.trim().toLowerCase() === 'lost') return true;
+  if (record.lost_remark?.trim()) return true;
+  const completed = getNextStepInfo(record, SALES_MAX_STEP).step > SALES_MAX_STEP;
+  if (
+    completed &&
+    record.actual_5?.trim() &&
+    record.remark_5?.trim() &&
+    s5.toLowerCase() !== 'won'
+  ) {
+    return true;
+  }
+  return false;
 }
 
 export function isSalesLeadClosed(record: PipelineRecord): boolean {
-  return !!record.actual_6?.trim();
+  const s5 = (record.status_5 || '').trim();
+  if (s5.toLowerCase() === 'won') return !!record.actual_5?.trim();
+  if (record.status_6?.trim().toLowerCase() === 'won') return true;
+  if (!record.actual_5?.trim()) return false;
+  if (s5.toLowerCase() === 'done' && !record.remark_5?.trim()) return true;
+  return false;
+}
+
+export type SalesLeadOutcome = 'disqualified' | 'lost' | 'won';
+
+/** Terminal outcome for completed leads (UI badges, filters). */
+export function getSalesLeadOutcome(
+  record: PipelineRecord & { remark_5?: string; lost_remark?: string }
+): SalesLeadOutcome | null {
+  if (isSalesLeadDisqualified(record)) return 'disqualified';
+  if (isSalesLeadLost(record)) return 'lost';
+  if (isSalesLeadClosed(record)) return 'won';
+  if (getNextStepInfo(record, SALES_MAX_STEP).step <= SALES_MAX_STEP) return null;
+  const s5 = (record.status_5 || '').trim().toLowerCase();
+  if (s5 === 'lost') return 'lost';
+  if (s5 === 'won') return 'won';
+  if (s5 === 'done') return record.remark_5?.trim() ? 'lost' : 'won';
+  return null;
 }
 
 export function isSalesLeadActive(record: PipelineRecord): boolean {
-  return !isSalesLeadClosed(record) && !isSalesLeadLost(record);
+  return (
+    !isSalesLeadClosed(record) &&
+    !isSalesLeadLost(record) &&
+    !isSalesLeadDisqualified(record)
+  );
 }
 
 export function getStepName(step: number, names: Record<number, string> = SALES_STEP_NAMES) {
@@ -125,31 +181,22 @@ export function getPendingStepStatus(
   const now = options.now || new Date();
   const diffMs = plannedDate.getTime() - now.getTime();
   const diffDays = Math.floor(Math.abs(diffMs) / (1000 * 60 * 60 * 24));
-  const diffHours = Math.floor((Math.abs(diffMs) / (1000 * 60 * 60)) % 24);
-  const diffMinutes = Math.floor((Math.abs(diffMs) / (1000 * 60)) % 60);
-  const diffSeconds = Math.floor((Math.abs(diffMs) / 1000) % 60);
-
-  let timeText = '';
-  if (diffDays > 0) timeText += `${diffDays}d `;
-  if (diffHours > 0 || diffDays > 0) timeText += `${diffHours}h `;
-  if (diffMinutes > 0 || diffHours > 0 || diffDays > 0) timeText += `${diffMinutes}m `;
-  timeText += `${diffSeconds}s`;
-
   const isDelayed = diffMs < 0;
+  const dayLabel = diffDays === 1 ? 'day' : 'days';
+  const timeText = isDelayed
+    ? `${diffDays} ${dayLabel} delayed`
+    : `${diffDays} ${dayLabel} left`;
 
   const formattedPlannedDate = new Intl.DateTimeFormat('en-IN', {
-    day: '2-digit',
+    day: 'numeric',
     month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: true,
+    year: '2-digit',
   }).format(plannedDate);
 
   return {
     stepName: getStepName(step, stepNames),
     isDelayed,
-    timeText: isDelayed ? `${timeText} delayed` : `${timeText} left`,
+    timeText,
     plannedDate,
     formattedPlannedDate,
     step,
